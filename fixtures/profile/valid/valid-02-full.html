@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Full fixture</title>
+    <link rel="stylesheet" href="content/styles.css" />
+  </head>
+  <body>
+    <article>
+      <section id="sec-intro">
+        <h1 id="h-intro">Introduction</h1>
+        <p id="p-0001">
+          Text with <em>emphasis</em>, <strong>strength</strong>, <code>code()</code>, a
+          <a href="https://example.org/page">link</a>, an internal
+          <a href="#sec-data">reference</a>, <abbr title="Web Document Format">WDF</abbr>,
+          <q>a quote</q>, H<sub>2</sub>O, x<sup>2</sup>, <time datetime="2026-07-18">today</time>,
+          <cite>a work</cite>, and <span class="hl">a span</span>.
+        </p>
+        <blockquote id="bq-0001" cite="https://example.org/src">
+          <p id="p-0002">Quoted words.</p>
+        </blockquote>
+        <ul>
+          <li id="li-0001">First item</li>
+          <li id="li-0002">
+            Second item
+            <ol>
+              <li>nested one</li>
+              <li>nested two</li>
+            </ol>
+          </li>
+        </ul>
+        <dl>
+          <dt>Term</dt>
+          <dd>Definition</dd>
+        </dl>
+        <pre><code class="language-js">const x = 1;</code></pre>
+        <hr />
+      </section>
+      <section id="sec-data">
+        <h2 id="h-data">Data</h2>
+        <table id="tbl-main">
+          <caption>
+            Spending by year
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">anno</th>
+              <th scope="col">importo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2024</td>
+              <td>1250000.5</td>
+            </tr>
+            <tr>
+              <td>2025</td>
+              <td>1310000</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td>2560000.5</td>
+            </tr>
+          </tfoot>
+        </table>
+        <figure id="fig-chart">
+          <img src="content/assets/chart.svg" alt="Spending chart" width="600" height="400" />
+          <figcaption>The chart</figcaption>
+        </figure>
+      </section>
+    </article>
+  </body>
+</html>
