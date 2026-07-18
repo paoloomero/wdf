@@ -94,7 +94,6 @@ const POSITIVE_INT = /^[1-9][0-9]*$/;
 const LANGUAGE_TAG = /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/;
 const DATE_OR_DATETIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2}))?$/;
 // Control characters other than TAB (spec §6.3.5).
-// eslint-disable-next-line no-control-regex
 const FORBIDDEN_CONTROL = /[\x00-\x08\x0b\x0c\x0e-\x1f]/;
 
 class ProfileChecker {

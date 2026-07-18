@@ -1,0 +1,20 @@
+[
+  {
+    "id": "sec-hello",
+    "type": "section",
+    "title": "Hello, WDF",
+    "parent": null
+  },
+  {
+    "id": "h-hello",
+    "type": "heading",
+    "level": 1,
+    "title": "Hello, WDF",
+    "parent": "sec-hello"
+  },
+  {
+    "id": "p-0001",
+    "type": "paragraph",
+    "parent": "sec-hello"
+  }
+]

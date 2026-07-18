@@ -1,0 +1,104 @@
+[
+  {
+    "id": "h-titolo",
+    "type": "heading",
+    "level": 1,
+    "title": "Determina n. 42/2026 — Approvazione spesa",
+    "parent": null
+  },
+  {
+    "id": "p-preambolo",
+    "type": "paragraph",
+    "parent": null
+  },
+  {
+    "id": "sec-premesse",
+    "type": "section",
+    "title": "Premesse",
+    "parent": null
+  },
+  {
+    "id": "h-premesse",
+    "type": "heading",
+    "level": 2,
+    "title": "Premesse",
+    "parent": "sec-premesse"
+  },
+  {
+    "id": "p-0001",
+    "type": "paragraph",
+    "parent": "sec-premesse"
+  },
+  {
+    "id": "bq-norma",
+    "type": "blockquote",
+    "parent": "sec-premesse"
+  },
+  {
+    "id": "p-0002",
+    "type": "paragraph",
+    "parent": "bq-norma"
+  },
+  {
+    "id": "p-0003",
+    "type": "paragraph",
+    "parent": "bq-norma"
+  },
+  {
+    "id": "sec-dispositivo",
+    "type": "section",
+    "title": "Dispositivo",
+    "parent": null
+  },
+  {
+    "id": "h-dispositivo",
+    "type": "heading",
+    "level": 2,
+    "title": "Dispositivo",
+    "parent": "sec-dispositivo"
+  },
+  {
+    "id": "li-0001",
+    "type": "list-item",
+    "parent": "sec-dispositivo"
+  },
+  {
+    "id": "li-0002",
+    "type": "list-item",
+    "parent": "sec-dispositivo"
+  },
+  {
+    "id": "li-0003",
+    "type": "list-item",
+    "parent": "sec-dispositivo"
+  },
+  {
+    "id": "tbl-impegni",
+    "type": "table",
+    "title": "Impegni di spesa per capitolo",
+    "parent": "sec-dispositivo"
+  },
+  {
+    "id": "sec-pubblicazione",
+    "type": "section",
+    "title": "Pubblicazione",
+    "parent": null
+  },
+  {
+    "id": "h-pubblicazione",
+    "type": "heading",
+    "level": 2,
+    "title": "Pubblicazione",
+    "parent": "sec-pubblicazione"
+  },
+  {
+    "id": "p-0004",
+    "type": "paragraph",
+    "parent": "sec-pubblicazione"
+  },
+  {
+    "id": "p-firma",
+    "type": "paragraph",
+    "parent": null
+  }
+]

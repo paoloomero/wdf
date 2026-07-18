@@ -2,3 +2,5 @@ pnpm-lock.yaml
 dist/
 node_modules/
 coverage/
+# Test data, not source. Golden files are byte contracts — never reformat.
+fixtures/

@@ -1,0 +1,63 @@
+[
+  {
+    "id": "h-title",
+    "type": "heading",
+    "level": 1,
+    "title": "Costs & revenues 2024–2025 [draft] #3 {internal}",
+    "parent": null
+  },
+  {
+    "id": "p-0001",
+    "type": "paragraph",
+    "parent": null
+  },
+  {
+    "id": "sec-tables",
+    "type": "section",
+    "title": "Tables",
+    "parent": null
+  },
+  {
+    "id": "h-tables",
+    "type": "heading",
+    "level": 2,
+    "title": "Tables",
+    "parent": "sec-tables"
+  },
+  {
+    "id": "tbl-costs",
+    "type": "table",
+    "title": "Costs by unit | full-year",
+    "parent": "sec-tables"
+  },
+  {
+    "id": "tbl-rev",
+    "type": "table",
+    "title": "Revenues",
+    "parent": "sec-tables"
+  },
+  {
+    "id": "sec-chart",
+    "type": "section",
+    "title": "Chart",
+    "parent": null
+  },
+  {
+    "id": "h-chart",
+    "type": "heading",
+    "level": 2,
+    "title": "Chart",
+    "parent": "sec-chart"
+  },
+  {
+    "id": "fig-trend",
+    "type": "figure",
+    "title": "Figure 1 — the trend, briefly",
+    "parent": "sec-chart"
+  },
+  {
+    "id": "p-0002",
+    "type": "paragraph",
+    "parent": "sec-chart"
+  }
+]

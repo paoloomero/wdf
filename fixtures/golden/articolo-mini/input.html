@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Deterministic extraction in practice</title>
+  </head>
+  <body>
+    <article>
+      <h1 id="h-title">Deterministic extraction in practice</h1>
+      <p id="p-0001">
+        Call <code>extract(html)</code> — or the variant <code>fn(`tpl`)</code> with a backtick —
+        and compare H<sub>2</sub>O with x<sup>2</sup>, per
+        <abbr title="Web Document Format">WDF</abbr> <q>the docs say so</q>, as
+        <cite>the spec</cite> notes.<br />
+        This line follows a hard break.
+      </p>
+      <section id="sec-code">
+        <h2 id="h-code">Code</h2>
+        <pre><code class="language-ts">const s = `template ${x}`;
+if (a &amp;&amp; b) {
+  return "ok";
+}</code></pre>
+        <p id="p-0002">
+          See <a href="https://en.wikipedia.org/wiki/Bracket_(disambiguation)">brackets</a> or write
+          to <a href="mailto:info@example.org">info</a>.
+        </p>
+        <hr />
+        <dl>
+          <dt>determinism</dt>
+          <dd>same input, same bytes</dd>
+          <dt>isomorphism</dt>
+          <dd>Node and browser agree</dd>
+        </dl>
+      </section>
+      <section id="sec-empty">
+        <h2 id="h-empty">Edge cases</h2>
+        <p id="p-0003">
+          <em> spaced emphasis </em>and<strong></strong> empty strong,
+          <span>transparent <em>nested</em> span</span>.
+        </p>
+      </section>
+    </article>
+  </body>
+</html>

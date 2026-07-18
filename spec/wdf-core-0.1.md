@@ -514,6 +514,12 @@ Nested elements serialize inside-out in the natural way. URL values in
 `(<…>)` are emitted verbatim (the profile forbids `<`, `>`, and whitespace
 in them, §6.3.2).
 
+Two hard-break clarifications: space items immediately adjacent to a hard
+break are dropped (a consequence of §7.7's no-trailing-whitespace rule,
+applied symmetrically); and in contexts that serialize to a single line —
+headings, table captions and cells, figure captions, list items, definition
+terms and descriptions — `br` renders as a single space instead of a break.
+
 #### 7.4.3 Code spans
 
 Content of `code` is emitted without escaping, delimited by a run of

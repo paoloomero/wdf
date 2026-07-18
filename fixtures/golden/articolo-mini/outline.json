@@ -1,0 +1,50 @@
+[
+  {
+    "id": "h-title",
+    "type": "heading",
+    "level": 1,
+    "title": "Deterministic extraction in practice",
+    "parent": null
+  },
+  {
+    "id": "p-0001",
+    "type": "paragraph",
+    "parent": null
+  },
+  {
+    "id": "sec-code",
+    "type": "section",
+    "title": "Code",
+    "parent": null
+  },
+  {
+    "id": "h-code",
+    "type": "heading",
+    "level": 2,
+    "title": "Code",
+    "parent": "sec-code"
+  },
+  {
+    "id": "p-0002",
+    "type": "paragraph",
+    "parent": "sec-code"
+  },
+  {
+    "id": "sec-empty",
+    "type": "section",
+    "title": "Edge cases",
+    "parent": null
+  },
+  {
+    "id": "h-empty",
+    "type": "heading",
+    "level": 2,
+    "title": "Edge cases",
+    "parent": "sec-empty"
+  },
+  {
+    "id": "p-0003",
+    "type": "paragraph",
+    "parent": "sec-empty"
+  }
+]
