@@ -1,0 +1,33 @@
+{
+  "wdf": "0.1",
+  "id": "urn:uuid:a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "title": "Delibera n. 42/2026 — Approvazione spesa",
+  "language": "it",
+  "authors": [
+    { "name": "Comune di Esempio", "role": "author" },
+    { "name": "Ufficio Ragioneria", "role": "contributor" }
+  ],
+  "created": "2026-07-15T09:30:00Z",
+  "modified": "2026-07-20T14:00:00+02:00",
+  "entry": "content/index.html",
+  "resources": [
+    { "path": "content/styles.css", "mediaType": "text/css" },
+    { "path": "content/assets/logo.svg", "mediaType": "image/svg+xml" }
+  ],
+  "datasets": [
+    {
+      "path": "data/spesa-2025.json",
+      "title": "Spesa per capitolo 2025",
+      "schema": {
+        "columns": [
+          { "name": "capitolo", "type": "string" },
+          { "name": "anno", "type": "integer" },
+          { "name": "importo", "type": "number" },
+          { "name": "approvato", "type": "boolean" },
+          { "name": "data_delibera", "type": "date" }
+        ]
+      }
+    }
+  ],
+  "extensions": []
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@wdf/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "WDF core library — isomorphic (Node + browser): manifest, profile validation, canonical extraction, integrity, packaging.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

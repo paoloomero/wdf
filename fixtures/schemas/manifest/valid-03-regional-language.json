@@ -1,0 +1,11 @@
+{
+  "wdf": "0.1",
+  "id": "urn:uuid:0f9e8d7c-6b5a-4d3c-9b1a-2f3e4d5c6b7a",
+  "title": "Technical article with extensions declared",
+  "language": "en-GB",
+  "authors": [{ "name": "Jane Doe" }],
+  "created": "2026-01-01T00:00:00Z",
+  "modified": "2026-06-30T23:59:59Z",
+  "entry": "content/index.html",
+  "extensions": [{ "name": "wdf-ext-live-data", "version": "0.1" }]
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wdf.dev/schemas/0.1/hashes.schema.json",
+  "title": "WDF Core 0.1 — integrity/hashes.json",
+  "description": "SHA-256 digest of every file in the package except integrity/hashes.json itself (WDF Core 0.1 §integrity). The key pattern excludes the integrity/ directory, which contains only this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["algorithm", "files"],
+  "properties": {
+    "algorithm": {
+      "const": "sha256"
+    },
+    "files": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^(manifest\\.json|(content|data|ai)(/[A-Za-z0-9][A-Za-z0-9._-]*)+)$"
+      },
+      "additionalProperties": {
+        "description": "Lowercase hex SHA-256 digest.",
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  }
+}

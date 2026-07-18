@@ -1,0 +1,17 @@
+{
+  "wdf": "0.1",
+  "id": "urn:uuid:6f1f6b2a-3c4d-4e5f-8a9b-0c1d2e3f4a5b",
+  "title": "Dataset column with unknown type",
+  "language": "en",
+  "created": "2026-08-01T10:00:00Z",
+  "modified": "2026-08-01T10:00:00Z",
+  "entry": "content/index.html",
+  "datasets": [
+    {
+      "path": "data/values.json",
+      "schema": {
+        "columns": [{ "name": "amount", "type": "float" }]
+      }
+    }
+  ]
+}

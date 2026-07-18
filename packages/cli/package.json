@@ -1,0 +1,16 @@
+{
+  "name": "@wdf/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The wdf command: validate, pack, unpack, extract, import, new.",
+  "bin": {
+    "wdf": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@wdf/core": "workspace:*"
+  }
+}

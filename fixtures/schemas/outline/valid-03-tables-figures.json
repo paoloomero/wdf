@@ -1,0 +1,16 @@
+[
+  { "id": "sec-dati", "type": "section", "title": "Dati", "parent": null },
+  {
+    "id": "tbl-spesa-2025",
+    "type": "table",
+    "title": "Spesa per capitolo 2025",
+    "parent": "sec-dati"
+  },
+  {
+    "id": "fig-andamento",
+    "type": "figure",
+    "title": "Andamento della spesa",
+    "parent": "sec-dati"
+  },
+  { "id": "bq-0001", "type": "blockquote", "parent": "sec-dati" }
+]

@@ -1,0 +1,15 @@
+[
+  { "id": "sec-introduzione", "type": "section", "title": "Introduzione", "parent": null },
+  {
+    "id": "h-introduzione",
+    "type": "heading",
+    "level": 1,
+    "title": "Introduzione",
+    "parent": "sec-introduzione"
+  },
+  { "id": "p-0001", "type": "paragraph", "parent": "sec-introduzione" },
+  { "id": "sec-metodo", "type": "section", "title": "Metodo", "parent": null },
+  { "id": "h-metodo", "type": "heading", "level": 2, "title": "Metodo", "parent": "sec-metodo" },
+  { "id": "p-0002", "type": "paragraph", "parent": "sec-metodo" },
+  { "id": "li-0001", "type": "list-item", "parent": "sec-metodo" }
+]

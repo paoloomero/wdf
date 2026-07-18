@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wdf.dev/schemas/0.1/outline.schema.json",
+  "title": "WDF Core 0.1 — ai/outline.json",
+  "description": "Ordered structure map of the document: one node per citable element, in document order (WDF Core 0.1 §ai-layer). Node ids MUST be unique and MUST match the id attributes in content/index.html; uniqueness and cross-references are enforced by the validator, not by this schema.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "type", "parent"],
+    "properties": {
+      "id": {
+        "description": "Stable element id: type prefix + slug or counter (e.g. sec-introduction, p-0012, tbl-spesa-2025).",
+        "type": "string",
+        "pattern": "^[a-z]+-[a-z0-9][a-z0-9-]*$"
+      },
+      "type": {
+        "enum": ["section", "heading", "paragraph", "table", "figure", "blockquote", "list-item"]
+      },
+      "level": {
+        "description": "Heading level; present if and only if type is \"heading\".",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 6
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1
+      },
+      "parent": {
+        "description": "id of the containing node, or null for top-level nodes.",
+        "oneOf": [
+          { "type": "null" },
+          { "type": "string", "pattern": "^[a-z]+-[a-z0-9][a-z0-9-]*$" }
+        ]
+      }
+    },
+    "if": {
+      "properties": { "type": { "const": "heading" } },
+      "required": ["type"]
+    },
+    "then": {
+      "required": ["level"]
+    },
+    "else": {
+      "not": { "required": ["level"] }
+    }
+  }
+}

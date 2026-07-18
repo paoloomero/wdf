@@ -1,0 +1,13 @@
+{
+  "name": "@wdf/viewer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Single-file HTML viewer for .wdf packages — zero installation, works offline.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@wdf/core": "workspace:*"
+  }
+}
