@@ -1,0 +1,10 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "manifest.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "content/index.html": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+    "ai/content.md": "fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9",
+    "ai/outline.json": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+    "ext/signatures/manifest.sig": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d919e9c1c9f9e9f9a9b9c9d9e"
+  }
+}
