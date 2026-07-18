@@ -3,6 +3,13 @@ export const WDF_VERSION = '0.1';
 export { WdfError } from './errors.js';
 export { extract, serializeOutline, type ExtractResult } from './extract.js';
 export {
+  sha256Hex,
+  computeHashes,
+  serializeHashes,
+  verifyPackage,
+  type VerifyResult,
+} from './integrity.js';
+export {
   isElement,
   getAttr,
   hasAttr,
