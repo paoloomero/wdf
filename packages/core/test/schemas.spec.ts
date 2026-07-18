@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { createSchemaValidators, type SchemaValidators } from '../src/schemas.js';
+import { createSchemaValidators, wdfSchemas, type SchemaValidators } from '../src/schemas.js';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const schemasDir = join(repoRoot, 'spec/schemas');
@@ -17,6 +17,16 @@ const validators = createSchemaValidators({
   manifest: loadJson(join(schemasDir, 'manifest.schema.json')) as object,
   outline: loadJson(join(schemasDir, 'outline.schema.json')) as object,
   hashes: loadJson(join(schemasDir, 'hashes.schema.json')) as object,
+});
+
+describe('embedded schemas', () => {
+  it.each(['manifest', 'outline', 'hashes'] as const)(
+    'schemas.data.ts matches spec/schemas/%s.schema.json (source of truth)',
+    (name) => {
+      const specSchema = loadJson(join(schemasDir, `${name}.schema.json`));
+      expect(wdfSchemas[name], 'run `pnpm sync:schemas` to regenerate').toEqual(specSchema);
+    },
+  );
 });
 
 function fixtureFiles(schema: string, kind: 'valid' | 'invalid'): string[] {

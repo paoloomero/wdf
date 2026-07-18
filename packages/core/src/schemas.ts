@@ -2,6 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
+import { hashesSchema, manifestSchema, outlineSchema } from './schemas.data.js';
 import type { WdfHashes, WdfManifest, WdfOutline } from './types.js';
 
 /**
@@ -33,4 +34,18 @@ export function createSchemaValidators(schemas: SchemaSet): SchemaValidators {
     outline: ajv.compile<WdfOutline>(schemas.outline),
     hashes: ajv.compile<WdfHashes>(schemas.hashes),
   };
+}
+
+/** The schemas of WDF Core 0.1, embedded (generated from spec/schemas). */
+export const wdfSchemas: SchemaSet = {
+  manifest: manifestSchema,
+  outline: outlineSchema,
+  hashes: hashesSchema,
+};
+
+let defaultValidators: SchemaValidators | undefined;
+
+/** Memoized validators for the embedded WDF Core 0.1 schemas. */
+export function getSchemaValidators(): SchemaValidators {
+  return (defaultValidators ??= createSchemaValidators(wdfSchemas));
 }

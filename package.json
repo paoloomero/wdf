@@ -9,6 +9,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "vitest run",
+    "sync:schemas": "node scripts/sync-schemas.mjs",
     "test:watch": "vitest",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write ."
