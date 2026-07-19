@@ -1,6 +1,15 @@
 export const WDF_VERSION = '0.1';
 
 export { WdfError } from './errors.js';
+export {
+  parseDatasetFile,
+  canonicalCellText,
+  cellMatchesType,
+  checkTableCorrespondence,
+  validateDatasets,
+  type WdfCell,
+  type WdfDatasetFile,
+} from './dataset.js';
 export { extract, serializeOutline, type ExtractResult } from './extract.js';
 export {
   sha256Hex,
