@@ -7,7 +7,9 @@ import { extract, serializeOutline } from '../src/extract.js';
 import { getSchemaValidators } from '../src/schemas.js';
 
 const goldenDir = resolve(import.meta.dirname, '../../../fixtures/golden');
-const goldenCases = readdirSync(goldenDir).sort();
+const goldenCases = readdirSync(goldenDir)
+  .filter((name) => !name.startsWith('.'))
+  .sort();
 
 // The most important tests in the repo: golden files are contracts (CLAUDE.md).
 // If a change alters them, regenerate explicitly with `pnpm golden:update`

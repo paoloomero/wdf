@@ -17,12 +17,14 @@ const profileValidDir = resolve(import.meta.dirname, '../../../fixtures/profile/
 
 const inputs: [string, string][] = [
   ...readdirSync(goldenDir)
+    .filter((name) => !name.startsWith('.'))
     .sort()
     .map((name): [string, string] => [
       `golden/${name}`,
       readFileSync(join(goldenDir, name, 'input.html'), 'utf8'),
     ]),
   ...readdirSync(profileValidDir)
+    .filter((name) => !name.startsWith('.'))
     .sort()
     .map((name): [string, string] => [
       `profile/${name}`,

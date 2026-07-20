@@ -163,6 +163,17 @@ tbody th {
   font-size: 0.93rem;
 }
 
+.transcript {
+  background: #0f1420;
+  color: #d6dbe6;
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
 footer {
   border-top: 1px solid #e0e5ec;
   padding: 1.4rem 1.5rem 2.5rem;

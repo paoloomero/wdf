@@ -31,11 +31,8 @@ cpSync(join(root, 'packages/viewer/dist/viewer.html'), join(site, 'viewer.html')
 cpSync(join(root, 'site/index.html'), join(site, 'index.html'));
 cpSync(join(root, 'site/site.css'), join(site, 'site.css'));
 cpSync(join(root, 'spec/wdf-core-0.1.md'), join(site, 'wdf-core-0.1.md'));
-if (existsSync(join(root, 'docs/llm-extraction-comparison.md'))) {
-  cpSync(
-    join(root, 'docs/llm-extraction-comparison.md'),
-    join(site, 'llm-extraction-comparison.md'),
-  );
+for (const doc of ['llm-extraction-comparison.md', 'mcp-demo.md']) {
+  if (existsSync(join(root, 'docs', doc))) cpSync(join(root, 'docs', doc), join(site, doc));
 }
 
 console.log(`demo site assembled in _site/`);

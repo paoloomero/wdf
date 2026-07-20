@@ -156,6 +156,27 @@
       </section>
 
       <section>
+        <h2>Agent-native by design (MCP)</h2>
+        <p>
+          The <code>@wdf/mcp</code> server gives any MCP-capable agent four tools —
+          <code>wdf_open</code>, <code>wdf_outline</code>, <code>wdf_read</code>,
+          <code>wdf_cite</code> — so an assistant answers questions about a document by navigating
+          stable ids, never by parsing heuristics, and cites verifiably:
+        </p>
+        <pre class="transcript">
+&gt; wdf_cite { "id": "tbl-impegni" }
+
+Citation: wdf:urn:uuid:7d444840-…#tbl-impegni
+Verified: yes — the cited content is provably what the human-view document shows
+Resolves to:
+Impegni di spesa per capitolo ed esercizio {#tbl-impegni}</pre>
+        <p class="hint">
+          Full recorded session: <a href="mcp-demo.md">MCP demo transcript</a>. Register it in
+          Claude Code with <code>claude mcp add wdf -- node packages/mcp/dist/index.js</code>.
+        </p>
+      </section>
+
+      <section>
         <h2>Boring on purpose</h2>
         <p>
           WDF invents almost nothing: ZIP container (the EPUB model), JSON manifest with JSON
