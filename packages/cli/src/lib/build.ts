@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
 import {
   computeHashes,
   extract,
@@ -42,14 +45,34 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** The real single-file viewer template built by @wdf/viewer (plan T4.5). */
+export function hasViewerTemplate(): boolean {
+  return loadViewerTemplate() !== undefined;
+}
+
+function loadViewerTemplate(): string | undefined {
+  try {
+    const require = createRequire(import.meta.url);
+    return readFileSync(require.resolve('@wdf/viewer/standalone.html'), 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Standalone distribution profile (spec §9): one HTML file embedding the
- * package as base64. PRELIMINARY shell — the full embedded viewer lands with
- * WP4 (T4.5); this version renders a notice and re-exposes the canonical
- * `.wdf` bytes (§9.2) so tooling can always round-trip.
+ * package as base64 plus the full offline viewer. Falls back to a minimal
+ * shell (notice + canonical `.wdf` re-extraction, §9.2) when the viewer has
+ * not been built yet — e.g. tests running before the build.
  */
 export function makeStandalone(wdfBytes: Uint8Array, title: string): string {
   const b64 = Buffer.from(wdfBytes).toString('base64');
+  const template = loadViewerTemplate();
+  if (template !== undefined) {
+    return template
+      .replaceAll('__WDF_TITLE__', () => escapeHtml(title))
+      .replace('__WDF_PACKAGE_BASE64__', () => b64);
+  }
   return `<!doctype html>
 <html lang="en">
   <head>

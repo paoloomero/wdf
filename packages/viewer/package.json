@@ -4,10 +4,17 @@
   "private": true,
   "type": "module",
   "description": "Single-file HTML viewer for .wdf packages — zero installation, works offline.",
+  "exports": {
+    "./viewer.html": "./dist/viewer.html",
+    "./standalone.html": "./dist/standalone.html"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc --noEmit -p tsconfig.json && node build.mjs"
   },
   "dependencies": {
     "@wdf/core": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
   }
 }

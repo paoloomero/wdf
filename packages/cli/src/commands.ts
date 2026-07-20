@@ -22,7 +22,7 @@ import {
 } from './import/ast.js';
 import { importHtml } from './import/html.js';
 import { importMarkdown } from './import/markdown.js';
-import { buildPackage, makeStandalone } from './lib/build.js';
+import { buildPackage, hasViewerTemplate, makeStandalone } from './lib/build.js';
 import { readDirFiles, writeDirFiles } from './lib/fsutil.js';
 
 /** Output sinks, injectable for tests. `out` is raw stdout (no newline added). */
@@ -121,7 +121,9 @@ export async function cmdPack(
       const output = opts.output ?? `${base}.html`;
       writeFileSync(output, makeStandalone(bytes, manifest.title));
       ctx.log(`wrote ${output} (standalone, ${String(bytes.length)} bytes embedded)`);
-      ctx.log('note: preliminary standalone shell — the embedded viewer lands with WP4');
+      if (!hasViewerTemplate()) {
+        ctx.log('note: @wdf/viewer is not built — used the minimal fallback shell');
+      }
     } else {
       const output = opts.output ?? `${base}.wdf`;
       writeFileSync(output, bytes);

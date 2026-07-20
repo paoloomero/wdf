@@ -1,4 +1,369 @@
-// Viewer implementation lands in WP4 (single-file build via esbuild).
-import { WDF_VERSION } from '@wdf/core';
+import {
+  readPackage,
+  validateDatasets,
+  validateProfile,
+  validateStylesheet,
+  verifyPackage,
+  WdfError,
+  type Violation,
+  type WdfOutline,
+  type WdfPackage,
+} from '@wdf/core';
 
-export const viewerVersion = WDF_VERSION;
+import {
+  agentBlocks,
+  buildSrcdoc,
+  citation,
+  outlineTree,
+  type OutlineTreeNode,
+} from './prepare.js';
+
+function $(id: string): HTMLElement {
+  const node = document.getElementById(id);
+  if (node === null) throw new Error(`missing element #${id}`);
+  return node;
+}
+
+const dec = new TextDecoder('utf-8', { fatal: true });
+
+interface Loaded {
+  pkg: WdfPackage;
+  outline: WdfOutline;
+  markdown: string;
+}
+
+let loaded: Loaded | undefined;
+let selectedId: string | undefined;
+
+// ---------------------------------------------------------------------------
+// Opening packages
+
+function showDropError(message: string): void {
+  const box = $('drop-error');
+  box.textContent = message;
+  box.hidden = false;
+}
+
+function openBytes(bytes: Uint8Array, name: string): void {
+  let pkg: WdfPackage;
+  try {
+    pkg = readPackage(bytes);
+  } catch (e) {
+    showDropError(e instanceof WdfError ? e.message : String(e));
+    return;
+  }
+  try {
+    const markdown = dec.decode(pkg.files.get('ai/content.md') ?? new Uint8Array());
+    const outline = JSON.parse(
+      dec.decode(pkg.files.get('ai/outline.json') ?? new Uint8Array()),
+    ) as WdfOutline;
+    loaded = { pkg, outline, markdown };
+  } catch (e) {
+    showDropError(`unreadable AI layer: ${String(e)}`);
+    return;
+  }
+
+  $('drop-screen').hidden = true;
+  $('app').hidden = false;
+  document.title = `${pkg.manifest.title} — WDF`;
+  $('doc-title').textContent = pkg.manifest.title;
+  $('doc-title').title = name;
+
+  renderHuman(loaded);
+  renderAgent(loaded);
+  renderOutline(loaded);
+  void verify(loaded);
+}
+
+function renderHuman(doc: Loaded): void {
+  const entry = dec.decode(doc.pkg.files.get(doc.pkg.manifest.entry) ?? new Uint8Array());
+  const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  ($('human') as HTMLIFrameElement).srcdoc = buildSrcdoc(entry, doc.pkg.files, nonce);
+}
+
+function renderAgent(doc: Loaded): void {
+  const container = $('agent');
+  container.textContent = '';
+  for (const block of agentBlocks(doc.markdown)) {
+    const div = document.createElement('div');
+    div.className = 'md-block';
+    div.dataset['ids'] = block.ids.join(' ');
+    let rest = block.text;
+    // Wrap anchors in highlighted spans, keeping the raw text intact.
+    const parts = rest.split(/(\{#[a-z]+-[a-z0-9-]*\})/g);
+    for (const part of parts) {
+      if (/^\{#[a-z]+-[a-z0-9-]*\}$/.test(part)) {
+        const span = document.createElement('span');
+        span.className = 'md-anchor';
+        span.textContent = part;
+        div.append(span);
+      } else if (part !== '') {
+        div.append(document.createTextNode(part));
+      }
+    }
+    rest = '';
+    div.addEventListener('click', () => {
+      const first = block.ids[0];
+      if (first !== undefined) select(first, 'agent');
+    });
+    container.append(div);
+  }
+}
+
+function typeLabel(type: string): string {
+  const map: Record<string, string> = {
+    section: '§',
+    heading: 'H',
+    paragraph: '¶',
+    table: '⊞',
+    figure: '▣',
+    blockquote: '❝',
+    'list-item': '•',
+  };
+  return map[type] ?? '·';
+}
+
+function renderOutline(doc: Loaded): void {
+  const nav = $('outline');
+  nav.textContent = '';
+  const render = (nodes: OutlineTreeNode[]): HTMLUListElement => {
+    const ul = document.createElement('ul');
+    for (const { node, children } of nodes) {
+      const li = document.createElement('li');
+      const row = document.createElement('div');
+      row.className = 'ol-row';
+
+      const label = document.createElement('button');
+      label.className = 'ol-label';
+      const type = document.createElement('span');
+      type.className = 'ol-type';
+      type.textContent = typeLabel(node.type);
+      label.append(type, document.createTextNode(node.title ?? node.id));
+      label.title = node.id;
+      label.addEventListener('click', () => {
+        select(node.id, 'outline');
+      });
+
+      const cite = document.createElement('button');
+      cite.className = 'ol-cite';
+      cite.textContent = '❞';
+      cite.title = `Copy citation for ${node.id}`;
+      cite.addEventListener('click', () => {
+        void copyCitation(node.id, cite);
+      });
+
+      row.append(label, cite);
+      li.append(row);
+      if (children.length > 0) li.append(render(children));
+      ul.append(li);
+    }
+    return ul;
+  };
+  nav.append(render(outlineTree(doc.outline)));
+}
+
+// ---------------------------------------------------------------------------
+// Verification badge (T4.2)
+
+async function verify(doc: Loaded): Promise<void> {
+  const badge = $('badge');
+  const label = $('badge-label');
+  const list = $('details-list');
+  list.textContent = '';
+  const add = (text: string, cls: string): void => {
+    const li = document.createElement('li');
+    li.className = cls;
+    li.textContent = text;
+    list.append(li);
+  };
+
+  try {
+    const result = await verifyPackage(doc.pkg);
+    badge.className = result.verified ? 'badge badge-ok' : 'badge badge-bad';
+    label.textContent = result.verified ? 'verified' : 'tampered';
+    add(
+      result.integrity
+        ? 'Integrity: every file matches its SHA-256 digest (§8.2)'
+        : 'Integrity: FAILED',
+      result.integrity ? 'ok' : 'bad',
+    );
+    add(
+      result.determinism
+        ? 'Determinism: the AI layer is the canonical extraction of the content (§7.1)'
+        : 'Determinism: FAILED',
+      result.determinism ? 'ok' : 'bad',
+    );
+    for (const p of result.problems) add(`[${p.spec}] ${p.path} — ${p.message}`, 'bad');
+
+    const entry = dec.decode(doc.pkg.files.get(doc.pkg.manifest.entry) ?? new Uint8Array());
+    const violations: Violation[] = [...validateProfile(entry), ...validateDatasets(doc.pkg)];
+    const styles = doc.pkg.files.get('content/styles.css');
+    if (styles !== undefined) violations.push(...validateStylesheet(dec.decode(styles)));
+    const errors = violations.filter((v) => v.severity === 'error');
+    if (errors.length > 0 && result.verified) {
+      badge.className = 'badge badge-warn';
+      label.textContent = 'profile errors';
+    }
+    for (const v of violations) {
+      add(
+        `[${v.spec}] ${v.severity === 'warning' ? 'warning: ' : ''}${v.path} — ${v.message}`,
+        v.severity === 'warning' ? '' : 'bad',
+      );
+    }
+    if (errors.length === 0) add('WDF-HTML profile: conforming (§6)', 'ok');
+  } catch (e) {
+    badge.className = 'badge badge-warn';
+    label.textContent = 'not verifiable';
+    add(`Verification failed to run: ${String(e)}`, 'bad');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Selection, citations (T4.3, T4.4)
+
+function postToHuman(message: unknown): void {
+  ($('human') as HTMLIFrameElement).contentWindow?.postMessage(message, '*');
+}
+
+function select(id: string, source: 'human' | 'agent' | 'outline'): void {
+  selectedId = id;
+  // Agent view highlight.
+  const container = $('agent');
+  let target: HTMLElement | undefined;
+  for (const block of container.querySelectorAll<HTMLElement>('.md-block')) {
+    const ids = (block.dataset['ids'] ?? '').split(' ');
+    const hit = ids.includes(id);
+    block.classList.toggle('selected', hit && target === undefined);
+    if (hit && target === undefined) target = block;
+  }
+  if (target !== undefined && !$('agent').hidden) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  // Human view scroll (unless the click originated there).
+  if (source !== 'human') postToHuman({ type: 'wdf-scroll', id });
+
+  // Citation chip.
+  if (loaded !== undefined) {
+    $('chip').hidden = false;
+    $('chip-id').textContent = citation(loaded.pkg.manifest.id, id);
+  }
+}
+
+async function copyCitation(id: string, button?: HTMLElement): Promise<void> {
+  if (loaded === undefined) return;
+  const text = citation(loaded.pkg.manifest.id, id);
+  try {
+    await navigator.clipboard.writeText(text);
+    if (button !== undefined) {
+      const old = button.textContent;
+      button.textContent = '✓';
+      setTimeout(() => {
+        button.textContent = old;
+      }, 900);
+    }
+  } catch {
+    window.prompt('Copy citation:', text);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wiring
+
+function setView(view: 'human' | 'agent'): void {
+  $('human').hidden = view !== 'human';
+  $('agent').hidden = view !== 'agent';
+  $('view-human').classList.toggle('active', view === 'human');
+  $('view-agent').classList.toggle('active', view === 'agent');
+  if (view === 'agent' && selectedId !== undefined) select(selectedId, 'outline');
+}
+
+function init(): void {
+  const dropCard = $('drop-card');
+  const fileInput = $('file-input') as HTMLInputElement;
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (file !== undefined) {
+      void file.arrayBuffer().then((buf) => {
+        openBytes(new Uint8Array(buf), file.name);
+      });
+    }
+  });
+  for (const eventName of ['dragover', 'dragenter'] as const) {
+    dropCard.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropCard.classList.add('dragover');
+    });
+  }
+  dropCard.addEventListener('dragleave', () => {
+    dropCard.classList.remove('dragover');
+  });
+  dropCard.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropCard.classList.remove('dragover');
+    const file = e.dataTransfer?.files[0];
+    if (file !== undefined) {
+      void file.arrayBuffer().then((buf) => {
+        openBytes(new Uint8Array(buf), file.name);
+      });
+    }
+  });
+
+  $('view-human').addEventListener('click', () => {
+    setView('human');
+  });
+  $('view-agent').addEventListener('click', () => {
+    setView('agent');
+  });
+  $('sidebar-toggle').addEventListener('click', () => {
+    $('app').classList.toggle('sidebar-open');
+  });
+  $('badge').addEventListener('click', () => {
+    $('details-panel').hidden = false;
+  });
+  $('details-close').addEventListener('click', () => {
+    $('details-panel').hidden = true;
+  });
+  $('chip-copy').addEventListener('click', () => {
+    if (selectedId !== undefined) void copyCitation(selectedId, $('chip-copy'));
+  });
+
+  window.addEventListener('message', (e: MessageEvent) => {
+    const data = e.data as { type?: string; id?: string; href?: string } | null;
+    if (data === null || typeof data !== 'object') return;
+    if (data.type === 'wdf-click' && typeof data.id === 'string') {
+      select(data.id, 'human');
+    } else if (data.type === 'wdf-link' && typeof data.href === 'string') {
+      if (/^(https?:\/\/|mailto:)/.test(data.href)) window.open(data.href, '_blank', 'noopener');
+    }
+  });
+
+  // Standalone distribution profile (spec §9): embedded package.
+  const embedded = document.getElementById('wdf-package');
+  if (embedded !== null) {
+    const b64 = (embedded.textContent ?? '').replace(/\s+/g, '');
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    openBytes(bytes, 'embedded document');
+    return;
+  }
+
+  // Hosted viewer convenience: ?doc=<same-site .wdf URL> (user-initiated).
+  const doc = new URLSearchParams(location.search).get('doc');
+  if (doc !== null && (location.protocol === 'http:' || location.protocol === 'https:')) {
+    void fetch(doc)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${String(r.status)}`);
+        return r.arrayBuffer();
+      })
+      .then((buf) => {
+        openBytes(new Uint8Array(buf), doc);
+      })
+      .catch((e: unknown) => {
+        showDropError(`cannot load ${doc}: ${String(e)}`);
+      });
+  }
+}
+
+init();

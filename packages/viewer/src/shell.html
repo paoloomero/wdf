@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WDF Viewer</title>
+    <!--WDF:CSS-->
+  </head>
+  <body>
+    <div id="drop-screen">
+      <div class="drop-card" id="drop-card">
+        <h1>WDF Viewer</h1>
+        <p>
+          Open a <strong>Web Document Format</strong> package: what the human reads and what an AI
+          agent reads are the same thing — verifiably.
+        </p>
+        <p class="drop-hint">Drop a <code>.wdf</code> file here, or</p>
+        <label class="file-button">
+          Choose a file
+          <input type="file" id="file-input" accept=".wdf,application/wdf+zip" hidden />
+        </label>
+        <p id="drop-error" class="drop-error" hidden></p>
+      </div>
+    </div>
+
+    <div id="app" hidden>
+      <header id="topbar">
+        <button id="sidebar-toggle" title="Outline" aria-label="Toggle outline">☰</button>
+        <div id="doc-head">
+          <span id="doc-title"></span>
+          <button id="badge" class="badge badge-wait" title="Verification details">
+            <span id="badge-label">checking…</span>
+          </button>
+        </div>
+        <nav id="view-toggle" aria-label="View">
+          <button id="view-human" class="active">Human</button>
+          <button id="view-agent">Agent</button>
+        </nav>
+      </header>
+
+      <div id="details-panel" hidden>
+        <div id="details-inner">
+          <h2>Verification</h2>
+          <ul id="details-list"></ul>
+          <button id="details-close">Close</button>
+        </div>
+      </div>
+
+      <div id="layout">
+        <nav id="outline" aria-label="Document outline"></nav>
+        <main id="content">
+          <iframe id="human" sandbox="allow-scripts" title="Document"></iframe>
+          <div id="agent" hidden></div>
+        </main>
+      </div>
+
+      <div id="chip" hidden>
+        <code id="chip-id"></code>
+        <button id="chip-copy">Copy citation</button>
+      </div>
+    </div>
+
+    <!--WDF:PACKAGE-->
+    <!--WDF:JS-->
+  </body>
+</html>

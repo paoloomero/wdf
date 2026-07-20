@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@wdf/core": "workspace:*",
+    "@wdf/viewer": "workspace:*",
     "commander": "^13.0.0"
   }
 }
