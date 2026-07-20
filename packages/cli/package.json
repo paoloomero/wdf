@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@wdf/core": "workspace:*"
+    "@wdf/core": "workspace:*",
+    "commander": "^13.0.0"
   }
 }

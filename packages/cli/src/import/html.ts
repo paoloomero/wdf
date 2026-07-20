@@ -1,0 +1,385 @@
+import {
+  elementChildren,
+  findChild,
+  getAttr,
+  isElement,
+  normalizedText,
+  parseHtml,
+  type WdfElement,
+  type WdfNode,
+} from '@wdf/core';
+
+import { el, isEl, type MEl, type MNode } from './ast.js';
+
+/**
+ * Best-effort HTML → WDF-HTML conversion (plan T3.4): keep what the profile
+ * allows, unwrap generic containers, drop what cannot be expressed, and
+ * report every drop. The output then goes through ensureIds and the
+ * canonical serializer.
+ */
+
+const DROP = new Set([
+  'script',
+  'style',
+  'noscript',
+  'template',
+  'iframe',
+  'object',
+  'embed',
+  'video',
+  'audio',
+  'canvas',
+  'svg',
+  'math',
+  'form',
+  'input',
+  'button',
+  'select',
+  'textarea',
+  'label',
+  'head',
+  'title',
+  'meta',
+  'link',
+  'base',
+]);
+const RENAME: Record<string, string> = {
+  b: 'strong',
+  i: 'em',
+  dfn: 'em',
+  var: 'code',
+  kbd: 'code',
+  samp: 'code',
+};
+const INLINE = new Set([
+  'a',
+  'em',
+  'strong',
+  'code',
+  'sub',
+  'sup',
+  'time',
+  'cite',
+  'q',
+  'abbr',
+  'span',
+  'br',
+]);
+const BLOCKS = new Set([
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'p',
+  'blockquote',
+  'figure',
+  'pre',
+  'hr',
+  'ul',
+  'ol',
+  'dl',
+  'table',
+]);
+const SECTIONING = new Set(['section', 'header', 'footer', 'nav']);
+const HREF_OK = /^(https?:\/\/[^\s<>]+|mailto:[^\s<>]+|#.+)$/;
+const IMG_SRC_OK = /^content\/assets(\/[A-Za-z0-9][A-Za-z0-9._-]*)+$/;
+const GLOBAL_ATTRS = ['id', 'class', 'lang', 'dir'];
+const EXTRA_ATTRS: Record<string, string[]> = {
+  a: ['href'],
+  img: ['src', 'alt', 'width', 'height'],
+  time: ['datetime'],
+  abbr: ['title'],
+  blockquote: ['cite'],
+  th: ['scope'],
+  table: ['data-wdf-dataset'],
+};
+
+function pickAttrs(node: WdfElement, tag: string): Record<string, string> {
+  const allowed = new Set([...GLOBAL_ATTRS, ...(EXTRA_ATTRS[tag] ?? [])]);
+  const attrs: Record<string, string> = {};
+  for (const { name, value } of node.attrs) {
+    if (allowed.has(name)) attrs[name] = value;
+  }
+  return attrs;
+}
+
+function phrasing(nodes: readonly WdfNode[], report: string[], inP: boolean): MNode[] {
+  const out: MNode[] = [];
+  for (const node of nodes) {
+    if (!isElement(node)) {
+      out.push(node.text);
+      continue;
+    }
+    const tag = RENAME[node.tag] ?? node.tag;
+    if (DROP.has(tag)) {
+      report.push(`dropped <${node.tag}> (not representable in WDF-HTML)`);
+      continue;
+    }
+    if (tag === 'img') {
+      const src = getAttr(node, 'src') ?? '';
+      if (inP && IMG_SRC_OK.test(src)) {
+        const attrs = pickAttrs(node, 'img');
+        attrs['alt'] = attrs['alt'] ?? '';
+        out.push(el('img', attrs));
+      } else {
+        report.push(
+          `dropped <img src="${src}"> (${inP ? 'src outside content/assets/' : 'not inside a paragraph or figure'})`,
+        );
+      }
+      continue;
+    }
+    if (tag === 'br') {
+      out.push(el('br'));
+      continue;
+    }
+    if (INLINE.has(tag)) {
+      if (tag === 'a') {
+        const href = getAttr(node, 'href') ?? '';
+        if (!HREF_OK.test(href)) {
+          report.push(`unwrapped <a href="${href}"> (scheme not permitted)`);
+          out.push(...phrasing(node.children, report, inP));
+          continue;
+        }
+      }
+      out.push(el(tag, pickAttrs(node, tag), phrasing(node.children, report, inP)));
+      continue;
+    }
+    // Block or unknown element in phrasing position: unwrap its content.
+    out.push(...phrasing(node.children, report, inP));
+  }
+  return out;
+}
+
+function rebuildTable(node: WdfElement, report: string[]): MEl | undefined {
+  const rows: WdfElement[] = [];
+  const collectRows = (elm: WdfElement): void => {
+    for (const child of elementChildren(elm)) {
+      if (child.tag === 'tr') rows.push(child);
+      else collectRows(child);
+    }
+  };
+  collectRows(node);
+  if (rows.length === 0) {
+    report.push('dropped <table> with no rows');
+    return undefined;
+  }
+
+  const captionSrc = elementChildren(node).find((c) => c.tag === 'caption');
+  const captionText = captionSrc === undefined ? '' : normalizedText(captionSrc);
+  if (captionSrc === undefined) report.push('synthesized empty <caption> for a table');
+
+  const width = Math.max(...rows.map((r) => elementChildren(r).length));
+  const cellsOf = (tr: WdfElement, cellTag: 'th' | 'td'): MEl[] => {
+    const cells = elementChildren(tr).map((cell) => {
+      if (cell.attrs.some((a) => a.name === 'colspan' || a.name === 'rowspan')) {
+        report.push('dropped colspan/rowspan (not permitted in WDF-HTML)');
+      }
+      const content = phrasing(cell.children, report, false).filter(
+        (n) => !(isEl(n) && (n.tag === 'br' || n.tag === 'img')),
+      );
+      return el(cellTag, cellTag === 'th' ? pickAttrs(cell, 'th') : {}, content);
+    });
+    while (cells.length < width) cells.push(el(cellTag));
+    return cells;
+  };
+
+  const tableAttrs = pickAttrs(node, 'table');
+  if (tableAttrs['data-wdf-dataset'] !== undefined) {
+    report.push(
+      `dropped data-wdf-dataset="${tableAttrs['data-wdf-dataset']}" (import does not carry dataset files)`,
+    );
+    delete tableAttrs['data-wdf-dataset'];
+  }
+  const [headRow, ...bodyRows] = rows;
+  const table = el('table', tableAttrs, [
+    el('caption', {}, captionText === '' ? [] : [captionText]),
+    el('thead', {}, [el('tr', {}, cellsOf(headRow as WdfElement, 'th'))]),
+    el(
+      'tbody',
+      {},
+      bodyRows.map((r) => el('tr', {}, cellsOf(r, 'td'))),
+    ),
+  ]);
+  if (bodyRows.length === 0) {
+    report.push('table had a single row: kept as header with empty body');
+  }
+  return table;
+}
+
+function blockOf(node: WdfElement, report: string[]): MNode[] {
+  const tag = RENAME[node.tag] ?? node.tag;
+  if (DROP.has(tag)) {
+    report.push(`dropped <${node.tag}> (not representable in WDF-HTML)`);
+    return [];
+  }
+  switch (tag) {
+    case 'section':
+    case 'header':
+    case 'footer':
+    case 'nav':
+      return [el(tag, pickAttrs(node, tag), toBlocks(node.children, report))];
+    case 'h1':
+    case 'h2':
+    case 'h3':
+    case 'h4':
+    case 'h5':
+    case 'h6':
+      return [el(tag, pickAttrs(node, tag), phrasing(node.children, report, false))];
+    case 'p':
+      return [el('p', pickAttrs(node, 'p'), phrasing(node.children, report, true))];
+    case 'blockquote': {
+      const inner = toBlocks(node.children, report);
+      const ps = inner.filter((b) => b.tag === 'p');
+      for (const other of inner.filter((b) => b.tag !== 'p')) {
+        report.push(`dropped <${other.tag}> inside blockquote (only paragraphs allowed)`);
+      }
+      if (ps.length === 0) return [];
+      return [el('blockquote', pickAttrs(node, 'blockquote'), ps)];
+    }
+    case 'ul':
+    case 'ol':
+      return [rebuildList(node, report)];
+    case 'dl': {
+      const items = elementChildren(node)
+        .filter((c) => c.tag === 'dt' || c.tag === 'dd')
+        .map((c) => el(c.tag, {}, phrasing(c.children, report, false)));
+      return items.length === 0 ? [] : [el('dl', pickAttrs(node, 'dl'), items)];
+    }
+    case 'figure': {
+      const img = elementChildren(node).find((c) => c.tag === 'img');
+      const src = img === undefined ? '' : (getAttr(img, 'src') ?? '');
+      if (img === undefined || !IMG_SRC_OK.test(src)) {
+        report.push('unwrapped <figure> without a packageable image');
+        return toBlocks(
+          node.children.filter((c) => !isElement(c) || c.tag !== 'img'),
+          report,
+        );
+      }
+      const attrs = pickAttrs(img, 'img');
+      attrs['alt'] = attrs['alt'] ?? '';
+      const children: MNode[] = [el('img', attrs)];
+      const figcaption = elementChildren(node).find((c) => c.tag === 'figcaption');
+      if (figcaption !== undefined) {
+        children.push(el('figcaption', {}, phrasing(figcaption.children, report, false)));
+      }
+      return [el('figure', pickAttrs(node, 'figure'), children)];
+    }
+    case 'pre': {
+      const code = elementChildren(node).find((c) => c.tag === 'code');
+      const text = textContentOf(code ?? node);
+      const language = /language-[A-Za-z0-9+-]+/.exec(
+        code === undefined ? '' : (getAttr(code, 'class') ?? ''),
+      )?.[0];
+      const codeEl = el('code', language === undefined ? {} : { class: language }, [text]);
+      return [el('pre', pickAttrs(node, 'pre'), [codeEl])];
+    }
+    case 'table': {
+      const table = rebuildTable(node, report);
+      return table === undefined ? [] : [table];
+    }
+    case 'hr':
+      return [el('hr')];
+    case 'img':
+    case 'br':
+      // img at block level: promote into a figure so it survives (§6.2.9).
+      if (tag === 'img') {
+        const src = getAttr(node, 'src') ?? '';
+        if (IMG_SRC_OK.test(src)) {
+          const attrs = pickAttrs(node, 'img');
+          attrs['alt'] = attrs['alt'] ?? '';
+          report.push('wrapped a top-level <img> in <figure>');
+          return [el('figure', {}, [el('img', attrs)])];
+        }
+        report.push(`dropped <img src="${src}"> (src outside content/assets/)`);
+      }
+      return [];
+    default:
+      if (INLINE.has(tag)) return phrasing([node], report, false);
+      // div, main, aside, unknown containers: unwrap.
+      return toBlocksNodes(node.children, report);
+  }
+}
+
+function rebuildList(node: WdfElement, report: string[]): MEl {
+  const items: MEl[] = [];
+  for (const li of elementChildren(node)) {
+    if (li.tag !== 'li') {
+      report.push(`dropped <${li.tag}> inside a list`);
+      continue;
+    }
+    const nestedSrc = elementChildren(li).filter((c) => c.tag === 'ul' || c.tag === 'ol');
+    const inlineSrc = li.children.filter(
+      (c) => !isElement(c) || (c.tag !== 'ul' && c.tag !== 'ol'),
+    );
+    const children: MNode[] = phrasing(inlineSrc, report, false);
+    if (nestedSrc.length > 0) {
+      children.push(rebuildList(nestedSrc[0] as WdfElement, report));
+      if (nestedSrc.length > 1) report.push('merged multiple nested lists into one');
+    }
+    items.push(el('li', pickAttrs(li, 'li'), children));
+  }
+  return el(node.tag, pickAttrs(node, node.tag), items);
+}
+
+function textContentOf(node: WdfNode): string {
+  return isElement(node) ? node.children.map(textContentOf).join('') : node.text;
+}
+
+/** Groups a mixed node list into WDF-HTML blocks, wrapping stray phrasing runs in <p>. */
+function toBlocksNodes(nodes: readonly WdfNode[], report: string[]): MEl[] {
+  const blocks: MEl[] = [];
+  let run: MNode[] = [];
+  const flushRun = (): void => {
+    const meaningful = run.some((n) => (isEl(n) ? true : n.trim() !== ''));
+    if (meaningful) blocks.push(el('p', {}, run));
+    run = [];
+  };
+  for (const node of nodes) {
+    if (!isElement(node)) {
+      if (node.text.trim() !== '' || run.length > 0) run.push(node.text);
+      continue;
+    }
+    const tag = RENAME[node.tag] ?? node.tag;
+    if (INLINE.has(tag) || tag === 'img') {
+      run.push(...phrasing([node], report, true));
+      continue;
+    }
+    flushRun();
+    const produced = blockOf(node, report);
+    for (const b of produced) {
+      if (isEl(b) && (BLOCKS.has(b.tag) || SECTIONING.has(b.tag))) blocks.push(b);
+      else run.push(b);
+    }
+  }
+  flushRun();
+  return blocks;
+}
+
+function toBlocks(nodes: readonly WdfNode[], report: string[]): MEl[] {
+  return toBlocksNodes(nodes, report);
+}
+
+export interface HtmlImportResult {
+  blocks: MEl[];
+  title: string | undefined;
+  language: string | undefined;
+  report: string[];
+}
+
+export function importHtml(html: string): HtmlImportResult {
+  const report: string[] = [];
+  const doc = parseHtml(html);
+  const root = doc.html;
+  const body = root === null ? undefined : findChild(root, 'body');
+  const article = body === undefined ? undefined : findChild(body, 'article');
+  const source = article ?? body;
+  const blocks = source === undefined ? [] : toBlocks(source.children, report);
+
+  const head = root === null ? undefined : findChild(root, 'head');
+  const titleEl = head === undefined ? undefined : findChild(head, 'title');
+  const title = titleEl === undefined ? undefined : normalizedText(titleEl) || undefined;
+  const language = root === null ? undefined : (getAttr(root, 'lang') ?? undefined);
+  return { blocks, title, language, report };
+}
