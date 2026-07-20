@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      Same bytes, same meaning: how WDF makes documents verifiable for humans and machines
+    </title>
+    <link rel="stylesheet" href="content/styles.css" />
+  </head>
+  <body>
+    <article>
+      <header>
+        <h1 id="h-title">
+          Same bytes, same meaning: how WDF makes documents verifiable for humans and machines
+        </h1>
+        <p id="p-standfirst" class="standfirst">
+          Every WDF package carries two views of one document — a rendered page for people and a
+          Markdown layer for machines — and a proof that they cannot drift apart.
+        </p>
+      </header>
+
+      <section id="sec-problem">
+        <h2 id="h-problem">The problem: documents that lie to machines</h2>
+        <p id="p-0001">
+          An entire industry exists to reconstruct structure from PDFs before feeding them to
+          language models. The results are probabilistic: headings guessed from font sizes, tables
+          re-assembled from x/y coordinates, citations pointing at page numbers rather than
+          statements. As <cite>the PDF Association</cite> itself puts it, the format is
+          <q>visually focused, not AI-friendly</q>.
+        </p>
+        <p id="p-0002">
+          The failure is structural. When the machine-readable view is
+          <em>derived by heuristics</em>, nobody can say whether it matches what the human saw — and
+          when money or law is involved, <q>probably the same</q> is not an answer.
+        </p>
+      </section>
+
+      <section id="sec-approach">
+        <h2 id="h-approach">The WDF approach</h2>
+        <p id="p-0003">
+          WDF inverts the relationship. The package contains constrained semantic HTML as the single
+          source of truth, and a <strong>canonical extraction algorithm</strong> — normative, step
+          by step — derives the machine view from it. Determinism is the contract:
+        </p>
+        <blockquote id="bq-rule">
+          <p id="p-0004">
+            Same input bytes, same output bytes, on every platform. A validator re-runs the
+            extraction and rejects the package on any difference.
+          </p>
+        </blockquote>
+        <figure id="fig-pipeline">
+          <img
+            src="content/assets/pipeline.svg"
+            alt="Diagram: content/index.html renders to the human view and is canonically extracted to the agent view"
+            width="560"
+            height="170"
+          />
+          <figcaption>
+            One source, two synchronized views. Tampering with either side is detectable.
+          </figcaption>
+        </figure>
+        <p id="p-0005">
+          Every citable element carries a stable identifier, so an agent can answer with a citation
+          such as <code>wdf:urn:uuid:…#tbl-spesa-2025</code> that anyone can resolve and verify —
+          down to the paragraph, H<sub>2</sub>O-molecule precision instead of page<sup>2</sup>-level
+          guesswork.
+        </p>
+      </section>
+
+      <section id="sec-code">
+        <h2 id="h-code">What verification looks like</h2>
+        <p id="p-0006">The reference implementation exposes the whole check as one call:</p>
+        <pre><code class="language-ts">import { readPackage, verifyPackage } from '@wdf/core';
+
+const pkg = readPackage(bytes);
+const result = await verifyPackage(pkg);
+// result.integrity   — every file matches its SHA-256 digest
+// result.determinism — ai/ is the canonical extraction of content/
+// result.verified    — both, or the package is rejected</code></pre>
+        <p id="p-0007">
+          Note what this rules out: an attacker who edits the Markdown and diligently recomputes
+          every hash still fails, because the <em>determinism</em> check re-derives the agent view
+          from the human view and compares byte by byte.
+        </p>
+      </section>
+
+      <section id="sec-glossary">
+        <h2 id="h-glossary">Small glossary</h2>
+        <dl>
+          <dt>canonical extraction</dt>
+          <dd>
+            The normative algorithm (spec §7) mapping WDF-HTML to Markdown and an outline, with no
+            locale-, time- or platform-dependent behavior.
+          </dd>
+          <dt>citable element</dt>
+          <dd>
+            A section, heading, paragraph, table, figure, blockquote or top-level list item,
+            carrying a mandatory stable <code>id</code>.
+          </dd>
+          <dt>standalone profile</dt>
+          <dd>
+            A single HTML file embedding viewer and package: double-click to open, offline, and the
+            canonical bytes remain extractable.
+          </dd>
+        </dl>
+        <p id="p-0008">
+          The specification and tooling are open: <a href="https://github.com/">repository</a> and
+          <abbr title="Web Document Format">WDF</abbr> Core 0.1 draft. Feedback is welcome at
+          <a href="mailto:info@example.org">info@example.org</a>.
+        </p>
+      </section>
+    </article>
+  </body>
+</html>

@@ -1,0 +1,83 @@
+article {
+  max-width: 42rem;
+  margin: 0 auto;
+  font-family: Charter, Georgia, serif;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #21242b;
+}
+h1 {
+  font-size: 1.7rem;
+  line-height: 1.25;
+  margin: 0.5rem 0;
+}
+.standfirst {
+  font-size: 1.12rem;
+  color: #4a5262;
+  font-style: italic;
+}
+h2 {
+  font-family: system-ui, sans-serif;
+  font-size: 1.15rem;
+  margin-top: 2.2rem;
+}
+blockquote {
+  margin: 1.2rem 0;
+  padding: 0.7rem 1.1rem;
+  border-left: 3px solid #1a56c4;
+  background: #f5f7fb;
+}
+blockquote p {
+  margin: 0;
+  font-weight: 500;
+}
+pre {
+  background: #14181f;
+  color: #dbe2ee;
+  padding: 1rem 1.2rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+p code,
+dd code {
+  background: #eef1f6;
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+figure {
+  margin: 1.5rem 0;
+}
+img {
+  max-width: 100%;
+  height: auto;
+}
+figcaption {
+  color: #5b6472;
+  font-size: 0.88rem;
+  font-family: system-ui, sans-serif;
+  margin-top: 0.4rem;
+}
+dt {
+  font-weight: 700;
+  margin-top: 0.8rem;
+}
+dd {
+  margin: 0.2rem 0 0 0;
+}
+a {
+  color: #1a56c4;
+}
+@media (max-width: 40rem) {
+  article {
+    font-size: 1rem;
+  }
+  h1 {
+    font-size: 1.35rem;
+  }
+}

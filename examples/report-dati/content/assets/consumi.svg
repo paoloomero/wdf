@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" font-family="system-ui, sans-serif">
+  <title>Consumi elettrici per anno (kWh)</title>
+  <rect width="480" height="300" fill="#ffffff"/>
+  <text x="24" y="30" font-size="15" font-weight="600" fill="#1c2128">Consumi elettrici per anno (kWh)</text>
+  <line x1="50" y1="250" x2="440" y2="250" stroke="#8b95a3" stroke-width="1"/>
+  <!-- Bars: h = kwh / 182400 * 190 (2023: 190, 2024: 178, 2025: 165) -->
+  <g fill="#1a56c4">
+    <rect x="80" y="60" width="80" height="190"/>
+    <rect x="205" y="72" width="80" height="178" fill="#3d74d9"/>
+    <rect x="330" y="85" width="80" height="165" fill="#6f9be6"/>
+  </g>
+  <g font-size="13" fill="#1c2128" text-anchor="middle">
+    <text x="120" y="52">182400</text>
+    <text x="245" y="64">171100</text>
+    <text x="370" y="77">158300</text>
+  </g>
+  <g font-size="13" fill="#444c57" text-anchor="middle">
+    <text x="120" y="272">2023</text>
+    <text x="245" y="272">2024</text>
+    <text x="370" y="272">2025</text>
+  </g>
+</svg>

@@ -11,6 +11,7 @@
     "test": "vitest run",
     "sync:schemas": "node scripts/sync-schemas.mjs",
     "golden:update": "pnpm --filter @wdf/core build && node scripts/update-golden.mjs",
+    "demo": "pnpm build && node scripts/build-demo.mjs",
     "test:watch": "vitest",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write ."

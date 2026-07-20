@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rapporto sui consumi energetici degli edifici comunali 2023-2025</title>
+    <link rel="stylesheet" href="content/styles.css" />
+  </head>
+  <body>
+    <article>
+      <header>
+        <p id="p-intestazione" class="ente">
+          Comune di Esempio — Ufficio Energia <em>(documento fittizio a scopo dimostrativo)</em>
+        </p>
+        <h1 id="h-titolo">Rapporto sui consumi energetici degli edifici comunali 2023-2025</h1>
+      </header>
+
+      <section id="sec-sintesi">
+        <h2 id="h-sintesi">Sintesi</h2>
+        <p id="p-0001">
+          Nel triennio 2023-2025 i consumi elettrici degli edifici comunali sono diminuiti da
+          <strong>182400 kWh</strong> a <strong>158300 kWh</strong> (circa il 13 per cento), mentre
+          la spesa è aumentata da <strong>43776 euro</strong> a <strong>52239 euro</strong> per
+          effetto dell'incremento dei prezzi unitari. Gli interventi di efficientamento conclusi
+          hanno prodotto risparmi verificati; per l'intervento più recente la verifica è programmata
+          per il 2026.
+        </p>
+      </section>
+
+      <section id="sec-consumi">
+        <h2 id="h-consumi">Consumi e costi</h2>
+        <p id="p-0002">
+          La tabella seguente è collegata al dataset tipizzato <code>data/consumi.json</code>: ogni
+          valore visualizzato coincide, verificabilmente, con il dato leggibile dalle macchine.
+        </p>
+        <table id="tbl-consumi" data-wdf-dataset="data/consumi.json">
+          <caption>
+            Consumi e costi per anno
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">anno</th>
+              <th scope="col">kwh</th>
+              <th scope="col">costo_euro</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2023</td>
+              <td>182400</td>
+              <td>43776</td>
+            </tr>
+            <tr>
+              <td>2024</td>
+              <td>171100</td>
+              <td>47908</td>
+            </tr>
+            <tr>
+              <td>2025</td>
+              <td>158300</td>
+              <td>52239</td>
+            </tr>
+          </tbody>
+        </table>
+        <figure id="fig-consumi">
+          <img
+            src="content/assets/consumi.svg"
+            alt="Grafico a barre dei consumi elettrici annui: 182400 kWh nel 2023, 171100 nel 2024, 158300 nel 2025"
+            width="480"
+            height="300"
+          />
+          <figcaption>
+            Figura 1 — Consumi elettrici per anno. Il grafico è generato dagli stessi valori del
+            dataset.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section id="sec-interventi">
+        <h2 id="h-interventi">Interventi di efficientamento</h2>
+        <table id="tbl-interventi" data-wdf-dataset="data/interventi.json">
+          <caption>
+            Interventi di efficientamento
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">intervento</th>
+              <th scope="col">concluso</th>
+              <th scope="col">risparmio_stimato_kwh</th>
+              <th scope="col">verificato</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Relamping LED — scuola primaria</td>
+              <td>2024-03-15</td>
+              <td>6200</td>
+              <td>true</td>
+            </tr>
+            <tr>
+              <td>Cappotto termico — biblioteca civica</td>
+              <td>2024-11-30</td>
+              <td>9800</td>
+              <td>true</td>
+            </tr>
+            <tr>
+              <td>Pompe di calore — palestra comunale</td>
+              <td>2025-09-10</td>
+              <td>12400</td>
+              <td>false</td>
+            </tr>
+          </tbody>
+        </table>
+        <ul>
+          <li id="li-0001">
+            gli interventi con esito <em>verificato</em> hanno confermato i risparmi stimati entro
+            un margine del 10 per cento;
+          </li>
+          <li id="li-0002">
+            la verifica dell'impianto a pompe di calore richiede un intero anno termico di
+            esercizio.
+          </li>
+        </ul>
+      </section>
+
+      <section id="sec-note">
+        <h2 id="h-note">Nota metodologica</h2>
+        <p id="p-0003">
+          I valori sono espressi in unità canoniche (kWh interi, euro con separatore decimale a
+          punto) come richiesto dal formato: la formattazione locale degli importi è demandata a
+          estensioni future. Fonte dei dati: sistema di monitoraggio interno, letture al 31 dicembre
+          di ciascun anno.
+        </p>
+      </section>
+    </article>
+  </body>
+</html>

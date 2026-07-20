@@ -22,7 +22,10 @@ const dec = new TextDecoder('utf-8', { fatal: true });
 export async function buildPackage(source: ReadonlyMap<string, Uint8Array>): Promise<Uint8Array> {
   const files = new Map<string, Uint8Array>();
   for (const [path, data] of source) {
-    if (path.startsWith('ai/') || path.startsWith('integrity/')) continue;
+    // ai/ and integrity/ are regenerated; anything else outside the package
+    // locations (§3.2.3) — READMEs, comparison PDFs — is simply not packed.
+    const top = path.split('/', 1)[0] ?? '';
+    if (path !== 'manifest.json' && top !== 'content' && top !== 'data' && top !== 'ext') continue;
     files.set(path, data);
   }
 

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 170" font-family="system-ui, sans-serif">
+  <title>WDF pipeline: one source, two synchronized views</title>
+  <rect width="560" height="170" fill="#ffffff"/>
+  <g stroke="#1a56c4" fill="#eef3fc" stroke-width="1.5">
+    <rect x="20" y="55" width="150" height="60" rx="10"/>
+    <rect x="390" y="15" width="150" height="55" rx="10"/>
+    <rect x="390" y="100" width="150" height="55" rx="10"/>
+  </g>
+  <g font-size="14" fill="#1c2128" text-anchor="middle">
+    <text x="95" y="80">content/index.html</text>
+    <text x="95" y="99" font-size="11" fill="#5b6472">semantic HTML, stable ids</text>
+    <text x="465" y="38">human view</text>
+    <text x="465" y="56" font-size="11" fill="#5b6472">browser rendering</text>
+    <text x="465" y="123">agent view</text>
+    <text x="465" y="141" font-size="11" fill="#5b6472">ai/content.md + outline</text>
+  </g>
+  <g stroke="#5b6472" stroke-width="1.5" fill="none" marker-end="none">
+    <path d="M 170 75 C 260 60, 300 45, 388 42"/>
+    <path d="M 170 95 C 260 110, 300 125, 388 128"/>
+  </g>
+  <text x="255" y="40" font-size="12" fill="#5b6472">renders</text>
+  <text x="230" y="140" font-size="12" fill="#5b6472">canonical extraction (§7)</text>
+</svg>

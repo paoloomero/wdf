@@ -29,7 +29,14 @@ pnpm install
 pnpm test
 pnpm lint
 pnpm build
+pnpm demo   # assembles the public demo site (viewer + examples) into _site/
 ```
+
+The three example documents under `examples/` (a fictional PA decree, a data
+report, a technical article) each build into a `.wdf` package, a standalone
+HTML file, and ship with a comparison PDF printed from the same source
+(`node scripts/gen-pdfs.mjs`, requires Chrome). See
+`docs/llm-extraction-comparison.md` for the WDF-vs-PDF LLM extraction study.
 
 See `CLAUDE.md` for ground rules (determinism, whitelist thinking, dependency budget).
 

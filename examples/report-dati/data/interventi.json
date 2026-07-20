@@ -1,0 +1,13 @@
+{
+  "columns": [
+    { "name": "intervento", "type": "string" },
+    { "name": "concluso", "type": "date" },
+    { "name": "risparmio_stimato_kwh", "type": "integer" },
+    { "name": "verificato", "type": "boolean" }
+  ],
+  "rows": [
+    ["Relamping LED — scuola primaria", "2024-03-15", 6200, true],
+    ["Cappotto termico — biblioteca civica", "2024-11-30", 9800, true],
+    ["Pompe di calore — palestra comunale", "2025-09-10", 12400, false]
+  ]
+}

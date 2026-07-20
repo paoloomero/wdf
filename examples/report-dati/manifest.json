@@ -1,0 +1,41 @@
+{
+  "wdf": "0.1",
+  "id": "urn:uuid:3f21aa04-88b1-5c77-9d02-6e19c0a4d5b8",
+  "title": "Rapporto sui consumi energetici degli edifici comunali 2023-2025",
+  "language": "it",
+  "authors": [
+    {
+      "name": "Comune di Esempio — Ufficio Energia (documento fittizio a scopo dimostrativo)",
+      "role": "author"
+    }
+  ],
+  "created": "2026-06-15T08:30:00Z",
+  "modified": "2026-06-15T08:30:00Z",
+  "entry": "content/index.html",
+  "resources": [{ "path": "content/assets/consumi.svg", "mediaType": "image/svg+xml" }],
+  "datasets": [
+    {
+      "path": "data/consumi.json",
+      "title": "Consumi e costi per anno",
+      "schema": {
+        "columns": [
+          { "name": "anno", "type": "integer" },
+          { "name": "kwh", "type": "integer" },
+          { "name": "costo_euro", "type": "number" }
+        ]
+      }
+    },
+    {
+      "path": "data/interventi.json",
+      "title": "Interventi di efficientamento",
+      "schema": {
+        "columns": [
+          { "name": "intervento", "type": "string" },
+          { "name": "concluso", "type": "date" },
+          { "name": "risparmio_stimato_kwh", "type": "integer" },
+          { "name": "verificato", "type": "boolean" }
+        ]
+      }
+    }
+  ]
+}

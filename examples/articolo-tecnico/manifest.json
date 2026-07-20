@@ -1,0 +1,11 @@
+{
+  "wdf": "0.1",
+  "id": "urn:uuid:9b7c2e10-4fd6-5a3b-8e91-2c5d7f0a1b6e",
+  "title": "Same bytes, same meaning: how WDF makes documents verifiable for humans and machines",
+  "language": "en",
+  "authors": [{ "name": "WDF project (example document)", "role": "author" }],
+  "created": "2026-07-10T14:00:00Z",
+  "modified": "2026-07-10T14:00:00Z",
+  "entry": "content/index.html",
+  "resources": [{ "path": "content/assets/pipeline.svg", "mediaType": "image/svg+xml" }]
+}

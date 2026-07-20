@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WDF — Web Document Format</title>
+    <meta
+      name="description"
+      content="An open, web-native, AI-ready document format: what the human reads and what an AI agent reads are the same thing — verifiably."
+    />
+    <link rel="stylesheet" href="site.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <p class="kicker">WDF · Web Document Format · Core 0.1 draft</p>
+      <h1>Documents that humans and machines read <em>identically</em> — verifiably.</h1>
+      <p class="sub">
+        A <strong>.wdf</strong> file is a small ZIP of constrained, semantic web content plus an AI
+        layer (Markdown + outline with stable element ids) derived by a canonical,
+        byte-deterministic algorithm. Hashes prove integrity; re-running the extraction proves the
+        two views never drift apart. Responsive on any phone, offline by design, no new rendering
+        engine.
+      </p>
+      <p class="cta">
+        <a class="button" href="viewer.html?doc=examples/delibera-pa.wdf">Open a document</a>
+        <a class="button ghost" href="viewer.html">Viewer (drop your own .wdf)</a>
+        <a class="button ghost" href="wdf-core-0.1.md">Spec draft</a>
+      </p>
+    </header>
+
+    <main>
+      <section>
+        <h2>Three examples, side by side with their PDF</h2>
+        <p>
+          Each example is authored once and published in every form below. The PDFs are printed from
+          the very same source with Chrome — a deliberately fair comparison, not a strawman.
+          <em>(The PA documents are fictional, written for demonstration.)</em>
+        </p>
+        <div class="cards">
+          <div class="card">
+            <h3>Determina comunale</h3>
+            <p>
+              A public-administration decree with a typed commitments table bound to
+              <code>data/impegni.json</code>.
+            </p>
+            <p class="links">
+              <a href="viewer.html?doc=examples/delibera-pa.wdf">viewer</a>
+              <a href="examples/delibera-pa.wdf" download>.wdf</a>
+              <a href="examples/delibera-pa.html">standalone</a>
+              <a href="examples/delibera-pa.pdf">pdf</a>
+            </p>
+          </div>
+          <div class="card">
+            <h3>Rapporto con dati</h3>
+            <p>
+              An energy report: two dataset-bound tables and an SVG chart generated from the same
+              values.
+            </p>
+            <p class="links">
+              <a href="viewer.html?doc=examples/report-dati.wdf">viewer</a>
+              <a href="examples/report-dati.wdf" download>.wdf</a>
+              <a href="examples/report-dati.html">standalone</a>
+              <a href="examples/report-dati.pdf">pdf</a>
+            </p>
+          </div>
+          <div class="card">
+            <h3>Technical article</h3>
+            <p>Code blocks, a figure, a glossary — and its own verification story.</p>
+            <p class="links">
+              <a href="viewer.html?doc=examples/articolo-tecnico.wdf">viewer</a>
+              <a href="examples/articolo-tecnico.wdf" download>.wdf</a>
+              <a href="examples/articolo-tecnico.html">standalone</a>
+              <a href="examples/articolo-tecnico.pdf">pdf</a>
+            </p>
+          </div>
+        </div>
+        <p class="hint">
+          In the viewer, toggle <strong>Human / Agent</strong> and click any paragraph: the same
+          element highlights in both views, with a copyable citation like
+          <code>wdf:&lt;document-id&gt;#tbl-impegni</code>. The <strong>standalone</strong> files
+          open with a double click, offline, viewer included.
+        </p>
+      </section>
+
+      <section>
+        <h2>The same document, four axes</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>WDF</th>
+                <th>PDF</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th>Mobile reading</th>
+                <td>Reflows: it is semantic HTML with responsive CSS.</td>
+                <td>Fixed A4 pages; pinch-and-pan on a phone.</td>
+              </tr>
+              <tr>
+                <th>Tabular data</th>
+                <td>Tables are typed datasets; a validator proves cells equal the data.</td>
+                <td>Rows serialize to flat text; columns and types are inferred by heuristics.</td>
+              </tr>
+              <tr>
+                <th>Verifiability</th>
+                <td>
+                  SHA-256 per file, plus a determinism check tying the AI layer to the content.
+                </td>
+                <td>No link between extracted text and rendered pages.</td>
+              </tr>
+              <tr>
+                <th>AI extraction</th>
+                <td><code>wdf extract</code>: canonical Markdown with stable, citable anchors.</td>
+                <td>Parsing pipelines; citations stop at page numbers.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>One prompt, two answers</h2>
+        <p>
+          We gave the same task —
+          <em>“extract the committed amounts and cite your source so a reviewer can verify it”</em>
+          — to the same LLM, on the decree's PDF and on its <code>wdf extract</code> output.
+        </p>
+        <div class="compare">
+          <div class="pane pdf">
+            <h3>From the PDF</h3>
+            <p>
+              Values read correctly (a clean, born-digital PDF is the best case) — but table rows
+              arrive as flat lines like
+              <code>1042.3 — Servizi informatici 2026 14640 2026-12-31</code>, so column meaning is
+              guessed from position, and the only possible citation is <strong>“page 2”</strong>.
+              Nothing ties the extracted text to what the document displays.
+            </p>
+          </div>
+          <div class="pane wdf">
+            <h3>From WDF</h3>
+            <p>
+              Typed values (<code>integer</code>, <code>number</code>, <code>date</code>) from the
+              dataset bound to the visible table, each with a resolvable citation:
+              <code>wdf:urn:uuid:7d44…#tbl-impegni</code>. The package verifies: hashes plus the
+              proof that the agent view is the canonical derivation of the human view.
+            </p>
+          </div>
+        </div>
+        <p class="hint">
+          Full method and transcript:
+          <a href="llm-extraction-comparison.md">LLM extraction comparison</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Boring on purpose</h2>
+        <p>
+          WDF invents almost nothing: ZIP container (the EPUB model), JSON manifest with JSON
+          Schema, a closed whitelist of HTML5 + CSS, CommonMark for the AI layer, SHA-256 for
+          integrity. The core spec draft is ~20 pages; the reference implementation (validator, CLI,
+          this viewer) is open source. Signatures/C2PA, live data and vertical profiles are
+          versioned extensions, out of the core.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        WDF is an open format under development by
+        <a href="https://www.infofactory.it/">infoFACTORY</a>. Spec: CC-BY 4.0 (planned) · Code:
+        open source license to be finalized. Built in the context of the European
+        <em>Open Internet Stack</em> / NLnet ecosystem.
+      </p>
+    </footer>
+  </body>
+</html>
