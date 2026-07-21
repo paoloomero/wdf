@@ -14,5 +14,6 @@
     "@wdf/core": "workspace:*",
     "@wdf/viewer": "workspace:*",
     "commander": "^13.0.0"
-  }
+  },
+  "license": "Apache-2.0"
 }

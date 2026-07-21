@@ -42,5 +42,6 @@ See `CLAUDE.md` for ground rules (determinism, whitelist thinking, dependency bu
 
 ## License
 
-- Specification: CC-BY 4.0 (planned)
-- Code: MIT or EUPL — **to be decided before the first public release**
+- Code: [Apache-2.0](LICENSE) — maximum embeddability for a reference
+  implementation, with an explicit patent grant.
+- Specification (`spec/`): [CC-BY 4.0](LICENSE-SPEC).
