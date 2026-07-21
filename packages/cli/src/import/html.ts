@@ -10,6 +10,13 @@ import {
 } from '@wdf/core';
 
 import { el, isEl, textOf, type MEl, type MNode } from './ast.js';
+import {
+  DEFAULT_CAPS,
+  resolveDocumentAssets,
+  type AssetCaps,
+  type AssetLoader,
+  type LoadedAsset,
+} from './assets.js';
 import { collectStyleRules, hoistStyles, StyleResolver, STYLE_TMP_ATTR } from './styles.js';
 
 /**
@@ -54,8 +61,17 @@ const RENAME: Record<string, string> = {
   font: 'span',
 };
 
-// Active during one importHtml run (imports are synchronous, single-shot).
+// Active during one importHtml run (imports are single-shot).
 let resolver: StyleResolver | undefined;
+// original img src → resolved content/assets/ path (T7.3).
+let assetMap: Map<string, string> | undefined;
+
+/** Resolved package path for an img src, or undefined if not packageable. */
+function resolveImgSrc(src: string): string | undefined {
+  const mapped = assetMap?.get(src);
+  if (mapped !== undefined) return mapped;
+  return IMG_SRC_OK.test(src) ? src : undefined;
+}
 const INLINE = new Set([
   'a',
   'em',
@@ -127,14 +143,14 @@ function phrasing(nodes: readonly WdfNode[], report: string[], inP: boolean): MN
     }
     if (tag === 'img') {
       const src = getAttr(node, 'src') ?? '';
-      if (inP && IMG_SRC_OK.test(src)) {
+      const resolved = inP ? resolveImgSrc(src) : undefined;
+      if (resolved !== undefined) {
         const attrs = pickAttrs(node, 'img');
+        attrs['src'] = resolved;
         attrs['alt'] = attrs['alt'] ?? '';
         out.push(el('img', attrs));
-      } else {
-        report.push(
-          `dropped <img src="${src}"> (${inP ? 'src outside content/assets/' : 'not inside a paragraph or figure'})`,
-        );
+      } else if (!inP) {
+        report.push(`dropped <img src="${src}"> (not inside a paragraph or figure)`);
       }
       continue;
     }
@@ -264,7 +280,8 @@ function blockOf(node: WdfElement, report: string[]): MNode[] {
     case 'figure': {
       const img = elementChildren(node).find((c) => c.tag === 'img');
       const src = img === undefined ? '' : (getAttr(img, 'src') ?? '');
-      if (img === undefined || !IMG_SRC_OK.test(src)) {
+      const resolved = img === undefined ? undefined : resolveImgSrc(src);
+      if (img === undefined || resolved === undefined) {
         report.push('unwrapped <figure> without a packageable image');
         return toBlocks(
           node.children.filter((c) => !isElement(c) || c.tag !== 'img'),
@@ -272,6 +289,7 @@ function blockOf(node: WdfElement, report: string[]): MNode[] {
         );
       }
       const attrs = pickAttrs(img, 'img');
+      attrs['src'] = resolved;
       attrs['alt'] = attrs['alt'] ?? '';
       const children: MNode[] = [el('img', attrs)];
       const figcaption = elementChildren(node).find((c) => c.tag === 'figcaption');
@@ -300,13 +318,14 @@ function blockOf(node: WdfElement, report: string[]): MNode[] {
       // img at block level: promote into a figure so it survives (§6.2.9).
       if (tag === 'img') {
         const src = getAttr(node, 'src') ?? '';
-        if (IMG_SRC_OK.test(src)) {
+        const resolved = resolveImgSrc(src);
+        if (resolved !== undefined) {
           const attrs = pickAttrs(node, 'img');
+          attrs['src'] = resolved;
           attrs['alt'] = attrs['alt'] ?? '';
           report.push('wrapped a top-level <img> in <figure>');
           return [el('figure', {}, [el('img', attrs)])];
         }
-        report.push(`dropped <img src="${src}"> (src outside content/assets/)`);
       }
       return [];
     default:
@@ -419,31 +438,85 @@ export interface HtmlImportResult {
   language: string | undefined;
   /** Generated content/styles.css (T7.2), when the source carries style. */
   stylesheet: string | undefined;
+  /** Images pulled into content/assets/ (T7.3). */
+  assets: LoadedAsset[];
   report: string[];
 }
 
-export function importHtml(html: string): HtmlImportResult {
+export interface HtmlImportOptions {
+  /** When present, referenced images are resolved and packaged (T7.3). */
+  loadAsset?: AssetLoader;
+  caps?: AssetCaps;
+}
+
+/** Package paths of every content/assets/ image still referenced by blocks. */
+function usedAssetPaths(blocks: MEl[]): Set<string> {
+  const used = new Set<string>();
+  const walk = (node: MEl): void => {
+    if (node.tag === 'img') {
+      const src = node.attrs['src'];
+      if (src !== undefined && src.startsWith('content/assets/')) used.add(src);
+    }
+    for (const child of node.children) if (isEl(child)) walk(child);
+  };
+  for (const block of blocks) walk(block);
+  return used;
+}
+
+export async function importHtml(
+  html: string,
+  options: HtmlImportOptions = {},
+): Promise<HtmlImportResult> {
   const report: string[] = [];
   const doc = parseHtml(html);
   const root = doc.html;
+
+  let assets: LoadedAsset[] = [];
+  if (root !== null && options.loadAsset !== undefined) {
+    const resolved = await resolveDocumentAssets(
+      root,
+      options.loadAsset,
+      options.caps ?? DEFAULT_CAPS,
+      report,
+    );
+    assetMap = resolved.map;
+    assets = resolved.assets;
+  } else {
+    assetMap = undefined;
+  }
+
   resolver = root === null ? undefined : new StyleResolver(collectStyleRules(root));
   const body = root === null ? undefined : findChild(root, 'body');
   const article = body === undefined ? undefined : findChild(body, 'article');
   const source = article ?? body;
   const raw = source === undefined ? [] : toBlocks(source.children, report);
   resolver = undefined;
+  assetMap = undefined;
   const { blocks, removed } = pruneSpacerParagraphs(raw);
   if (removed > 0) {
     report.push(`dropped ${String(removed)} empty spacer paragraph(s)`);
   }
+  // Drop assets whose images did not survive the profile (e.g. table cells).
+  const used = usedAssetPaths(blocks);
+  assets = assets.filter((a) => used.has(a.path));
+
   const stylesheet = hoistStyles(blocks);
   if (stylesheet !== undefined) {
     report.push('translated source styling into a generated content/styles.css');
   }
 
   const head = root === null ? undefined : findChild(root, 'head');
+  if (
+    head !== undefined &&
+    elementChildren(head).some(
+      (c) => c.tag === 'link' && (getAttr(c, 'rel') ?? '').toLowerCase().includes('stylesheet'),
+    )
+  ) {
+    report.push('external stylesheet not imported (site CSS is dropped; inline styles translated)');
+  }
+
   const titleEl = head === undefined ? undefined : findChild(head, 'title');
   const title = titleEl === undefined ? undefined : normalizedText(titleEl) || undefined;
   const language = root === null ? undefined : (getAttr(root, 'lang') ?? undefined);
-  return { blocks, title, language, stylesheet, report };
+  return { blocks, title, language, stylesheet, assets, report };
 }

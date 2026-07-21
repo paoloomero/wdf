@@ -51,8 +51,8 @@ program
 
 program
   .command('import')
-  .description('best-effort conversion of an HTML or Markdown file to a valid .wdf package')
-  .argument('<file>', 'input file (.html or .md)')
+  .description('best-effort conversion of an HTML/Markdown file or a URL to a valid .wdf package')
+  .argument('<file>', 'input file (.html or .md) or an http(s) URL')
   .option('-o, --output <file>', 'output file')
   .option('--title <title>', 'document title (default: from the source)')
   .option('--lang <tag>', 'document language (default: from the source, or "en")')

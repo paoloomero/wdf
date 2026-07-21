@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import {
   readPackage,
@@ -20,6 +20,14 @@ import {
   serializeDocument,
   type MEl,
 } from './import/ast.js';
+import {
+  DEFAULT_CAPS,
+  fetchPage,
+  localAssetLoader,
+  urlAssetLoader,
+  type AssetLoader,
+  type LoadedAsset,
+} from './import/assets.js';
 import { decodeHtml } from './import/encoding.js';
 import { importHtml } from './import/html.js';
 import { importMarkdown } from './import/markdown.js';
@@ -187,45 +195,79 @@ function deterministicUuid(hex: string): string {
   return `urn:uuid:${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
+function urlBaseName(url: string): string {
+  try {
+    const last = new URL(url).pathname
+      .split('/')
+      .filter((s) => s !== '')
+      .pop();
+    return last === undefined ? 'imported' : last.replace(/\.[^.]+$/, '') || 'imported';
+  } catch {
+    return 'imported';
+  }
+}
+
 export async function cmdImport(
-  file: string,
+  input: string,
   opts: { output?: string; title?: string; lang?: string; date?: string } = {},
   ctx: Ctx = defaultCtx,
 ): Promise<number> {
-  let bytes: Uint8Array;
-  try {
-    bytes = readFileSync(file);
-  } catch (e) {
-    ctx.err(`error: cannot read ${file} (${String(e)})`);
-    return 2;
+  const isUrl = /^https?:\/\//i.test(input);
+  const isMarkdown = !isUrl && /\.(md|markdown)$/i.test(input);
+  const report: string[] = [];
+
+  let text: string;
+  let loader: AssetLoader | undefined;
+  let baseName: string;
+  if (isUrl) {
+    try {
+      const page = await fetchPage(input, DEFAULT_CAPS);
+      const decoded = decodeHtml(page.bytes);
+      text = decoded.text;
+      if (decoded.encoding !== 'utf-8') report.push(`decoded page as ${decoded.encoding}`);
+      loader = urlAssetLoader(page.baseUrl, DEFAULT_CAPS);
+      baseName = urlBaseName(input);
+    } catch (e) {
+      ctx.err(`error: cannot fetch ${input} (${String(e)})`);
+      return 2;
+    }
+  } else {
+    let bytes: Uint8Array;
+    try {
+      bytes = readFileSync(input);
+    } catch (e) {
+      ctx.err(`error: cannot read ${input} (${String(e)})`);
+      return 2;
+    }
+    if (isMarkdown) {
+      text = dec.decode(bytes);
+    } else {
+      const decoded = decodeHtml(bytes);
+      text = decoded.text;
+      if (decoded.encoding !== 'utf-8') {
+        report.push(`decoded source as ${decoded.encoding} (declared or detected)`);
+      }
+      loader = localAssetLoader(dirname(input), DEFAULT_CAPS);
+    }
+    baseName = basename(input).replace(/\.[^.]+$/, '');
   }
 
-  const isMarkdown = /\.(md|markdown)$/i.test(file);
-  const report: string[] = [];
-  let text: string;
-  if (isMarkdown) {
-    text = dec.decode(bytes);
-  } else {
-    const decoded = decodeHtml(bytes);
-    text = decoded.text;
-    if (decoded.encoding !== 'utf-8') {
-      report.push(`decoded source as ${decoded.encoding} (declared or detected)`);
-    }
-  }
   let blocks: MEl[];
   let sourceTitle: string | undefined;
   let sourceLang: string | undefined;
   let stylesheet: string | undefined;
+  let assets: LoadedAsset[] = [];
   if (isMarkdown) {
     const result = importMarkdown(text);
     blocks = result.blocks;
     report.push(...result.report);
   } else {
-    const result = importHtml(text);
+    const result = await importHtml(text, loader === undefined ? {} : { loadAsset: loader });
     blocks = result.blocks;
     sourceTitle = result.title;
     sourceLang = result.language;
     stylesheet = result.stylesheet;
+    assets = result.assets;
     report.push(...result.report);
   }
 
@@ -240,7 +282,7 @@ export async function cmdImport(
   const title =
     opts.title ??
     sourceTitle ??
-    (firstHeading === undefined ? basename(file) : textOf(firstHeading).trim());
+    (firstHeading === undefined ? baseName : textOf(firstHeading).trim());
   const lang = opts.lang ?? sourceLang ?? 'en';
   const html = serializeDocument(lang, title, blocks, stylesheet !== undefined);
   const htmlBytes = enc.encode(html);
@@ -255,6 +297,9 @@ export async function cmdImport(
     modified: date,
     entry: 'content/index.html',
   };
+  if (assets.length > 0) {
+    manifest.resources = assets.map((a) => ({ path: a.path, mediaType: a.mediaType }));
+  }
 
   const source = new Map<string, Uint8Array>([
     ['manifest.json', enc.encode(`${JSON.stringify(manifest, null, 2)}\n`)],
@@ -263,10 +308,13 @@ export async function cmdImport(
   if (stylesheet !== undefined) {
     source.set('content/styles.css', enc.encode(stylesheet));
   }
+  for (const asset of assets) {
+    source.set(asset.path, asset.bytes);
+  }
 
   try {
     const bytes = await buildPackage(source);
-    const output = opts.output ?? `${basename(file).replace(/\.[^.]+$/, '')}.wdf`;
+    const output = opts.output ?? `${baseName}.wdf`;
     writeFileSync(output, bytes);
     for (const line of report) ctx.log(`note: ${line}`);
     ctx.log(`wrote ${output} (${String(bytes.length)} bytes)`);
