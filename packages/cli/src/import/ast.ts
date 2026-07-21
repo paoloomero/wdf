@@ -223,14 +223,20 @@ export function serializeNode(node: MEl, indent: string): string {
 }
 
 /** Serializes a complete WDF-HTML entry document. */
-export function serializeDocument(lang: string, title: string, blocks: MEl[]): string {
+export function serializeDocument(
+  lang: string,
+  title: string,
+  blocks: MEl[],
+  hasStylesheet = false,
+): string {
   const article = el('article', {}, blocks);
+  const link = hasStylesheet ? '\n    <link rel="stylesheet" href="content/styles.css" />' : '';
   return `<!DOCTYPE html>
 <html lang="${escAttr(lang)}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escText(title)}</title>
+    <title>${escText(title)}</title>${link}
   </head>
   <body>
 ${serializeNode(article, '    ')}

@@ -215,6 +215,7 @@ export async function cmdImport(
   let blocks: MEl[];
   let sourceTitle: string | undefined;
   let sourceLang: string | undefined;
+  let stylesheet: string | undefined;
   if (isMarkdown) {
     const result = importMarkdown(text);
     blocks = result.blocks;
@@ -224,6 +225,7 @@ export async function cmdImport(
     blocks = result.blocks;
     sourceTitle = result.title;
     sourceLang = result.language;
+    stylesheet = result.stylesheet;
     report.push(...result.report);
   }
 
@@ -240,7 +242,7 @@ export async function cmdImport(
     sourceTitle ??
     (firstHeading === undefined ? basename(file) : textOf(firstHeading).trim());
   const lang = opts.lang ?? sourceLang ?? 'en';
-  const html = serializeDocument(lang, title, blocks);
+  const html = serializeDocument(lang, title, blocks, stylesheet !== undefined);
   const htmlBytes = enc.encode(html);
 
   const date = opts.date ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -258,6 +260,9 @@ export async function cmdImport(
     ['manifest.json', enc.encode(`${JSON.stringify(manifest, null, 2)}\n`)],
     ['content/index.html', htmlBytes],
   ]);
+  if (stylesheet !== undefined) {
+    source.set('content/styles.css', enc.encode(stylesheet));
+  }
 
   try {
     const bytes = await buildPackage(source);

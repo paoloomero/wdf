@@ -10,6 +10,7 @@ import {
 } from '@wdf/core';
 
 import { el, isEl, textOf, type MEl, type MNode } from './ast.js';
+import { collectStyleRules, hoistStyles, StyleResolver, STYLE_TMP_ATTR } from './styles.js';
 
 /**
  * Best-effort HTML → WDF-HTML conversion (plan T3.4): keep what the profile
@@ -50,7 +51,11 @@ const RENAME: Record<string, string> = {
   var: 'code',
   kbd: 'code',
   samp: 'code',
+  font: 'span',
 };
+
+// Active during one importHtml run (imports are synchronous, single-shot).
+let resolver: StyleResolver | undefined;
 const INLINE = new Set([
   'a',
   'em',
@@ -102,6 +107,9 @@ function pickAttrs(node: WdfElement, tag: string): Record<string, string> {
   for (const { name, value } of node.attrs) {
     if (allowed.has(name)) attrs[name] = value;
   }
+  // T7.2 style translation: carry the resolved style signature until hoisting.
+  const signature = resolver?.resolve(node);
+  if (signature !== undefined) attrs[STYLE_TMP_ATTR] = signature;
   return attrs;
 }
 
@@ -179,7 +187,7 @@ function rebuildTable(node: WdfElement, report: string[]): MEl | undefined {
       const content = phrasing(cell.children, report, false).filter(
         (n) => !(isEl(n) && (n.tag === 'br' || n.tag === 'img')),
       );
-      return el(cellTag, cellTag === 'th' ? pickAttrs(cell, 'th') : {}, content);
+      return el(cellTag, pickAttrs(cell, cellTag), content);
     });
     while (cells.length < width) cells.push(el(cellTag));
     return cells;
@@ -409,6 +417,8 @@ export interface HtmlImportResult {
   blocks: MEl[];
   title: string | undefined;
   language: string | undefined;
+  /** Generated content/styles.css (T7.2), when the source carries style. */
+  stylesheet: string | undefined;
   report: string[];
 }
 
@@ -416,18 +426,24 @@ export function importHtml(html: string): HtmlImportResult {
   const report: string[] = [];
   const doc = parseHtml(html);
   const root = doc.html;
+  resolver = root === null ? undefined : new StyleResolver(collectStyleRules(root));
   const body = root === null ? undefined : findChild(root, 'body');
   const article = body === undefined ? undefined : findChild(body, 'article');
   const source = article ?? body;
   const raw = source === undefined ? [] : toBlocks(source.children, report);
+  resolver = undefined;
   const { blocks, removed } = pruneSpacerParagraphs(raw);
   if (removed > 0) {
     report.push(`dropped ${String(removed)} empty spacer paragraph(s)`);
+  }
+  const stylesheet = hoistStyles(blocks);
+  if (stylesheet !== undefined) {
+    report.push('translated source styling into a generated content/styles.css');
   }
 
   const head = root === null ? undefined : findChild(root, 'head');
   const titleEl = head === undefined ? undefined : findChild(head, 'title');
   const title = titleEl === undefined ? undefined : normalizedText(titleEl) || undefined;
   const language = root === null ? undefined : (getAttr(root, 'lang') ?? undefined);
-  return { blocks, title, language, report };
+  return { blocks, title, language, stylesheet, report };
 }
