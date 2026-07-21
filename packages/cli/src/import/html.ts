@@ -9,7 +9,7 @@ import {
   type WdfNode,
 } from '@wdf/core';
 
-import { el, isEl, type MEl, type MNode } from './ast.js';
+import { el, isEl, textOf, type MEl, type MNode } from './ast.js';
 
 /**
  * Best-effort HTML → WDF-HTML conversion (plan T3.4): keep what the profile
@@ -227,8 +227,14 @@ function blockOf(node: WdfElement, report: string[]): MNode[] {
     case 'h5':
     case 'h6':
       return [el(tag, pickAttrs(node, tag), phrasing(node.children, report, false))];
-    case 'p':
+    case 'p': {
+      // Word marks the document title as a styled paragraph, not a heading.
+      if (/\bMsoTitle\b/.test(getAttr(node, 'class') ?? '')) {
+        report.push('mapped Word MsoTitle paragraph to <h1>');
+        return [el('h1', pickAttrs(node, 'h1'), phrasing(node.children, report, false))];
+      }
       return [el('p', pickAttrs(node, 'p'), phrasing(node.children, report, true))];
+    }
     case 'blockquote': {
       const inner = toBlocks(node.children, report);
       const ps = inner.filter((b) => b.tag === 'p');
@@ -361,6 +367,44 @@ function toBlocks(nodes: readonly WdfNode[], report: string[]): MEl[] {
   return toBlocksNodes(nodes, report);
 }
 
+const PRUNE_CONTAINERS = new Set(['section', 'header', 'footer', 'nav']);
+
+/**
+ * Drops Word's spacer paragraphs (content reduced to whitespace/&nbsp;/br,
+ * typically emitted as `<p class=MsoNormal><o:p>&nbsp;</o:p></p>`), and
+ * blockquotes left empty by the pruning. Returns how many were removed.
+ */
+function pruneSpacerParagraphs(blocks: MEl[]): { blocks: MEl[]; removed: number } {
+  let removed = 0;
+  const isSpacer = (b: MEl): boolean =>
+    b.tag === 'p' &&
+    textOf(b).replace(/[\s ]/g, '') === '' &&
+    !b.children.some((c) => isEl(c) && c.tag === 'img');
+
+  const walk = (list: MEl[]): MEl[] =>
+    list
+      .map((block): MEl | undefined => {
+        if (isSpacer(block)) {
+          removed += 1;
+          return undefined;
+        }
+        if (PRUNE_CONTAINERS.has(block.tag) || block.tag === 'blockquote') {
+          const inner = walk(block.children.filter(isEl));
+          const text = block.children.filter((c) => !isEl(c));
+          block.children = [...text, ...inner];
+          if (block.tag === 'blockquote' && inner.length === 0) {
+            removed += 1;
+            return undefined;
+          }
+        }
+        return block;
+      })
+      .filter((b): b is MEl => b !== undefined);
+
+  const pruned = walk(blocks);
+  return { blocks: pruned, removed };
+}
+
 export interface HtmlImportResult {
   blocks: MEl[];
   title: string | undefined;
@@ -375,7 +419,11 @@ export function importHtml(html: string): HtmlImportResult {
   const body = root === null ? undefined : findChild(root, 'body');
   const article = body === undefined ? undefined : findChild(body, 'article');
   const source = article ?? body;
-  const blocks = source === undefined ? [] : toBlocks(source.children, report);
+  const raw = source === undefined ? [] : toBlocks(source.children, report);
+  const { blocks, removed } = pruneSpacerParagraphs(raw);
+  if (removed > 0) {
+    report.push(`dropped ${String(removed)} empty spacer paragraph(s)`);
+  }
 
   const head = root === null ? undefined : findChild(root, 'head');
   const titleEl = head === undefined ? undefined : findChild(head, 'title');

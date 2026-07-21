@@ -20,6 +20,7 @@ import {
   serializeDocument,
   type MEl,
 } from './import/ast.js';
+import { decodeHtml } from './import/encoding.js';
 import { importHtml } from './import/html.js';
 import { importMarkdown } from './import/markdown.js';
 import { buildPackage, hasViewerTemplate, makeStandalone } from './lib/build.js';
@@ -191,9 +192,9 @@ export async function cmdImport(
   opts: { output?: string; title?: string; lang?: string; date?: string } = {},
   ctx: Ctx = defaultCtx,
 ): Promise<number> {
-  let text: string;
+  let bytes: Uint8Array;
   try {
-    text = dec.decode(readFileSync(file));
+    bytes = readFileSync(file);
   } catch (e) {
     ctx.err(`error: cannot read ${file} (${String(e)})`);
     return 2;
@@ -201,6 +202,16 @@ export async function cmdImport(
 
   const isMarkdown = /\.(md|markdown)$/i.test(file);
   const report: string[] = [];
+  let text: string;
+  if (isMarkdown) {
+    text = dec.decode(bytes);
+  } else {
+    const decoded = decodeHtml(bytes);
+    text = decoded.text;
+    if (decoded.encoding !== 'utf-8') {
+      report.push(`decoded source as ${decoded.encoding} (declared or detected)`);
+    }
+  }
   let blocks: MEl[];
   let sourceTitle: string | undefined;
   let sourceLang: string | undefined;
