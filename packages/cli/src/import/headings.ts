@@ -2,12 +2,12 @@ import { isEl, textOf, type MEl, type MNode } from './ast.js';
 import { STYLE_TMP_ATTR } from './styles.js';
 
 /**
- * Styled-paragraph → heading heuristic (plan §10.14/§10.15, T7.7): word
- * processors export titles as styled paragraphs, never h1..h6, leaving the
- * AI outline flat. When the imported document has no heading at all,
- * paragraphs whose uniform font size clearly exceeds the body text are
- * promoted to headings, largest size first. Best-effort, deterministic,
- * every promotion reported; no spec change (import behavior only).
+ * Styled-paragraph → heading heuristic (plan §10.14/§10.15 T7.7, §10.17
+ * T7.8): word processors export titles as styled paragraphs, never h1..h6,
+ * leaving the AI outline flat. A document with no heading at all gets the
+ * full ladder from its font sizes; a document with headings but no h1 gets
+ * exactly one title promoted. Best-effort, deterministic, every promotion
+ * reported; no spec change (import behavior only).
  */
 
 /** Promotion threshold: candidate size ≥ body size × this factor (§10.15). */
@@ -68,15 +68,28 @@ interface Candidate {
   el: MEl;
   size: number;
   text: string;
+  /** Appears before the first existing heading in document order (T7.8). */
+  preHeading: boolean;
+}
+
+function promote(candidate: Candidate, level: number, report: string[]): void {
+  candidate.el.tag = `h${String(level)}`;
+  const excerpt = candidate.text.length > 40 ? `${candidate.text.slice(0, 40)}…` : candidate.text;
+  report.push(
+    `promoted styled paragraph (${String(candidate.size)}pt) to <h${String(level)}>: "${excerpt}"`,
+  );
 }
 
 /**
- * Promotes styled title paragraphs to h1..h6 in place. Runs only when the
- * document contains no heading (real or MsoTitle-mapped): the heuristic
- * fixes the flat-outline case, it never reorganizes structured documents.
+ * Promotes styled title paragraphs to headings in place. Two modes:
+ * no heading at all (real or MsoTitle-mapped) → full ladder h1..h6 (T7.7);
+ * headings present but no h1 → exactly one title paragraph becomes h1
+ * (T7.8). Documents that already have an h1 are never touched.
  */
 export function promoteHeadings(blocks: MEl[], report: string[]): void {
   let hasHeading = false;
+  let hasH1 = false;
+  const headingSizes: number[] = [];
   const paragraphs: Candidate[] = [];
   const candidates: Candidate[] = [];
 
@@ -85,7 +98,12 @@ export function promoteHeadings(blocks: MEl[], report: string[]): void {
   // nothing but <p> (§6.2.6).
   const scan = (list: MEl[], promotable: boolean): void => {
     for (const block of list) {
-      if (HEADINGS.has(block.tag)) hasHeading = true;
+      if (HEADINGS.has(block.tag)) {
+        hasHeading = true;
+        if (block.tag === 'h1') hasH1 = true;
+        const size = uniformSizePt(block);
+        if (size !== undefined) headingSizes.push(size);
+      }
       if (SECTIONING.has(block.tag)) {
         scan(block.children.filter(isEl), promotable);
         continue;
@@ -99,13 +117,13 @@ export function promoteHeadings(blocks: MEl[], report: string[]): void {
       if (size === undefined) continue;
       const text = textOf(block).replace(/\s+/g, ' ').trim();
       if (text === '') continue;
-      const candidate = { el: block, size, text };
+      const candidate = { el: block, size, text, preHeading: !hasHeading };
       paragraphs.push(candidate);
       if (promotable && text.length <= MAX_HEADING_CHARS) candidates.push(candidate);
     }
   };
   scan(blocks, true);
-  if (hasHeading || paragraphs.length === 0) return;
+  if (hasH1 || paragraphs.length === 0) return;
 
   // Body size = the size covering the most text (tie → smaller size).
   const weights = new Map<number, number>();
@@ -117,6 +135,25 @@ export function promoteHeadings(blocks: MEl[], report: string[]): void {
   )[0] as [number, number];
   const bodySize = body[0];
 
+  if (hasHeading) {
+    // T7.8 — the document is structured but lacks its title: promote the
+    // first paragraph of the largest qualifying size found before the
+    // first heading, provided it outranks every measurable heading.
+    const maxHeading = headingSizes.length > 0 ? Math.max(...headingSizes) : undefined;
+    const titles = candidates.filter(
+      (c) =>
+        c.preHeading &&
+        c.size >= bodySize * SIZE_RATIO &&
+        (maxHeading === undefined || c.size >= maxHeading),
+    );
+    if (titles.length === 0) return;
+    const top = Math.max(...titles.map((c) => c.size));
+    const first = titles.find((c) => c.size === top);
+    if (first !== undefined) promote(first, 1, report);
+    return;
+  }
+
+  // T7.7 — flat document: full ladder, largest size first.
   const promotable = candidates.filter(({ size }) => size >= bodySize * SIZE_RATIO);
   if (promotable.length === 0) return;
 
@@ -125,16 +162,14 @@ export function promoteHeadings(blocks: MEl[], report: string[]): void {
     if (levels.size < MAX_LEVEL) levels.set(size, levels.size + 1);
   }
 
-  for (const { el, size, text } of promotable) {
-    const level = levels.get(size);
+  for (const candidate of promotable) {
+    const level = levels.get(candidate.size);
     if (level === undefined) {
-      report.push(`kept styled paragraph (${String(size)}pt) as <p>: more than 6 heading sizes`);
+      report.push(
+        `kept styled paragraph (${String(candidate.size)}pt) as <p>: more than 6 heading sizes`,
+      );
       continue;
     }
-    el.tag = `h${String(level)}`;
-    const excerpt = text.length > 40 ? `${text.slice(0, 40)}…` : text;
-    report.push(
-      `promoted styled paragraph (${String(size)}pt) to <h${String(level)}>: "${excerpt}"`,
-    );
+    promote(candidate, level, report);
   }
 }

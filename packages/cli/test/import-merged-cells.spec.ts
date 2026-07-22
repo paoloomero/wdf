@@ -71,3 +71,25 @@ describe('merged-cell import (T11.3)', () => {
     expect(md).toContain(['| North | 10 | 20 |', '|  | 5 | 15 |'].join('\n'));
   });
 });
+
+describe('images inside table cells (WP12)', () => {
+  it('imports a cell image into the package instead of dropping it', async () => {
+    const work = mkdtempSync(join(tmpdir(), 'wdf-cellimg-'));
+    const wdf = join(work, 'cell-image.wdf');
+    const run = capture();
+    const code = await cmdImport(
+      join(fixturesDir, 'cell-image-it.html'),
+      { output: wdf, date: '2026-07-22T12:00:00Z' },
+      run,
+    );
+    expect(code, run.logs.join('\n')).toBe(0);
+    expect(await cmdValidate(wdf, {}, capture())).toBe(0);
+    const pkg = readPackage(readFileSync(wdf));
+    const html = new TextDecoder().decode(pkg.files.get('content/index.html'));
+    expect(html).toMatch(
+      /<td[^>]*><img src="content\/assets\/[0-9a-f]+\.svg" alt="completata" \/><\/td>/,
+    );
+    expect([...pkg.files.keys()].some((p) => p.startsWith('content/assets/'))).toBe(true);
+    expect(run.logs.some((l) => l.includes('not inside a paragraph'))).toBe(false);
+  });
+});

@@ -166,6 +166,39 @@ describe('promoteHeadings guardrails', () => {
     expect(typeof quoted !== 'string' && quoted?.tag).toBe('p');
   });
 
+  it('promotes one title to h1 when headings exist but no h1 (T7.8)', async () => {
+    const html = `<html><body>
+      <p style="font-size:20.0pt">Small caps kicker</p>
+      <p style="font-size:26.0pt">The Actual Title</p>
+      <h2>First section</h2>
+      <p style="font-size:12.0pt">Body text long enough to dominate the statistics of the document.</p>
+      <p style="font-size:26.0pt">Large paragraph after a heading</p>
+    </body></html>`;
+    const { blocks, report } = await importHtml(html);
+    expect(blocks.map((b) => b.tag)).toEqual(['p', 'h1', 'h2', 'p', 'p']);
+    expect(report.filter((l) => l.includes('promoted styled paragraph'))).toHaveLength(1);
+  });
+
+  it('T7.8 requires the title to outrank existing measurable headings', async () => {
+    const html = `<html><head><style>h2 { font-size: 16.0pt }</style></head><body>
+      <p style="font-size:14.0pt">Not big enough to be the title</p>
+      <h2>First section</h2>
+      <p style="font-size:12.0pt">Body text long enough to dominate the statistics of the document.</p>
+    </body></html>`;
+    const { blocks } = await importHtml(html);
+    expect(blocks.map((b) => b.tag)).toEqual(['p', 'h2', 'p']);
+  });
+
+  it('never touches a document that already has an h1', async () => {
+    const html = `<html><body>
+      <h1>Real title</h1>
+      <p style="font-size:26.0pt">Big styled paragraph</p>
+      <p style="font-size:12.0pt">Body text long enough to dominate the statistics of the document.</p>
+    </body></html>`;
+    const { blocks } = await importHtml(html);
+    expect(blocks.map((b) => b.tag)).toEqual(['h1', 'p', 'p']);
+  });
+
   it('keeps paragraphs beyond six distinct heading sizes', async () => {
     const sizes = ['40', '36', '32', '28', '24', '20', '16'];
     const html = `<html><body>${sizes

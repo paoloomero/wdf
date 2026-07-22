@@ -234,8 +234,9 @@ function rebuildTable(node: WdfElement, report: string[]): MEl | undefined {
   const width = Math.max(...rows.map((r) => elementChildren(r).length));
   const cellsOf = (tr: WdfElement, cellTag: 'th' | 'td'): MEl[] => {
     const cells = elementChildren(tr).map((cell) => {
-      const content = phrasing(cell.children, report, false).filter(
-        (n) => !(isEl(n) && (n.tag === 'br' || n.tag === 'img')),
+      // Inline images are permitted in cells (§6.2.9, WP12); br is not (§6.2.8).
+      const content = phrasing(cell.children, report, true).filter(
+        (n) => !(isEl(n) && n.tag === 'br'),
       );
       const attrs = pickAttrs(cell, cellTag);
       if (keepSpans) {

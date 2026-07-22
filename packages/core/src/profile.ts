@@ -283,7 +283,11 @@ function visit(el: WdfElement, path: string, c: ProfileChecker, ctx: WalkContext
       for (const [i, child] of children.entries()) {
         const p = childPath(path, child, i + 1);
         if (child.tag === 'img') {
-          c.report('§6.2.9', p, '<img> may appear only inside <figure> or inline inside <p>');
+          c.report(
+            '§6.2.9',
+            p,
+            '<img> may appear only inside <figure>, or inline inside <p> or a table cell',
+          );
         } else if (INLINE.has(child.tag)) {
           c.report('§6.2', p, `inline element <${child.tag}> needs a block container`);
         } else if (!BLOCKS.has(child.tag) && !(allowSectioning && SECTIONING.has(child.tag))) {
@@ -327,8 +331,9 @@ function visit(el: WdfElement, path: string, c: ProfileChecker, ctx: WalkContext
           );
         }
       }
-      visitChildren(ctx);
-      checkInlineOnly(el, path, c, ctx);
+      // §6.2.9 — inline images are permitted in cells, as in <p>.
+      visitChildren({ ...ctx, inParagraph: true });
+      checkInlineOnly(el, path, c, { ...ctx, inParagraph: true });
       break;
     case 'li': {
       const listIndex = children.findIndex((ch) => ch.tag === 'ul' || ch.tag === 'ol');
@@ -465,7 +470,11 @@ function checkInlineOnly(el: WdfElement, path: string, c: ProfileChecker, ctx: W
     const p = childPath(path, child, i + 1);
     if (child.tag === 'img') {
       if (!ctx.inParagraph) {
-        c.report('§6.2.9', p, '<img> may appear only inside <figure> or inline inside <p>');
+        c.report(
+          '§6.2.9',
+          p,
+          '<img> may appear only inside <figure>, or inline inside <p> or a table cell',
+        );
       }
       continue;
     }

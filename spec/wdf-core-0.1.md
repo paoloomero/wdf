@@ -337,7 +337,9 @@ elements. _(MathML support is deferred to a future version or extension.)_
   slot of every row covered exactly once (no overlaps, no holes), no cell
   extending past the column count, and no `rowspan` extending past the last
   row of the cell's row group (`thead`, `tbody`, or `tfoot`).
-- **6.2.9** `img` MUST NOT appear outside `figure` except inline inside `p`.
+- **6.2.9** `img` MUST NOT appear outside `figure` except inline inside
+  `p`, `th`, or `td` (an inline image in a table cell serializes per
+  §7.4.2, which GFM permits in cells).
 
 ### 6.3 Attribute rules
 

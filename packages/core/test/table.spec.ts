@@ -69,6 +69,20 @@ describe('computeTableGrid (§6.2.8)', () => {
   });
 });
 
+describe('extraction of an image in a cell (§6.2.9, §7.4.2)', () => {
+  it('serializes the inline image inside the GFM cell', () => {
+    const html = readFileSync(
+      join(
+        resolve(import.meta.dirname, '../../../fixtures/profile/valid'),
+        'valid-07-img-in-cell.html',
+      ),
+      'utf8',
+    );
+    const { markdown } = extract(html);
+    expect(markdown).toContain('| Done | ![done](<content/assets/done.svg>) |');
+  });
+});
+
 describe('extraction of merged cells (§7.5.9)', () => {
   it('expands spans to empty slots in the canonical GFM grid', () => {
     const html = readFileSync(
