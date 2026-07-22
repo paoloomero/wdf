@@ -29,6 +29,7 @@ import {
   type LoadedAsset,
 } from './import/assets.js';
 import { decodeHtml } from './import/encoding.js';
+import { embedFonts } from './import/fonts.js';
 import { importHtml, type HtmlImportOptions } from './import/html.js';
 import { importMarkdown } from './import/markdown.js';
 import { buildPackage, hasViewerTemplate, makeStandalone } from './lib/build.js';
@@ -215,6 +216,7 @@ export async function cmdImport(
     lang?: string;
     date?: string;
     withSource?: boolean;
+    embedFonts?: boolean;
   } = {},
   ctx: Ctx = defaultCtx,
 ): Promise<number> {
@@ -325,6 +327,22 @@ export async function cmdImport(
   // ext/source/; images are not duplicated — source.json maps the original
   // src values onto the content/assets/ copies.
   const extFiles = new Map<string, Uint8Array>();
+  const extensions: { name: string; version: string }[] = [];
+
+  // WP9 (plan §10.19): embed metric-compatible open clones for well-known
+  // families and prepend them to the generated stacks.
+  if (opts.embedFonts === true && stylesheet !== undefined) {
+    const fonts = embedFonts(stylesheet);
+    if (fonts === undefined) {
+      report.push('no substitutable font family in the stylesheet — fonts extension not added');
+    } else {
+      stylesheet = fonts.stylesheet;
+      for (const [path, bytes] of fonts.files) extFiles.set(path, bytes);
+      extensions.push({ name: 'fonts', version: '0.1' });
+      report.push(...fonts.report);
+    }
+  }
+
   if (opts.withSource === true && sourceBytes !== undefined) {
     const mainPath = `ext/source/${(await sha256Hex(sourceBytes)).slice(0, 16)}.${isMarkdown ? 'md' : 'html'}`;
     const sourceJson = {
@@ -334,12 +352,15 @@ export async function cmdImport(
       encoding: sourceEncoding,
       resources: sourceMap,
     };
-    manifest.extensions = [{ name: 'source', version: '0.1' }];
+    extensions.push({ name: 'source', version: '0.1' });
     extFiles.set(mainPath, sourceBytes);
     extFiles.set('ext/source/source.json', enc.encode(`${JSON.stringify(sourceJson, null, 2)}\n`));
     report.push(
       `embedded the original source as ${mainPath} (extension "source", docs/ext-source.md)`,
     );
+  }
+  if (extensions.length > 0) {
+    manifest.extensions = extensions.sort((a, b) => (a.name < b.name ? -1 : 1));
   }
 
   const source = new Map<string, Uint8Array>([

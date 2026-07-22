@@ -8,6 +8,7 @@ const MIME: Record<string, string> = {
   jpeg: 'image/jpeg',
   svg: 'image/svg+xml',
   webp: 'image/webp',
+  woff2: 'font/woff2',
 };
 
 export function mimeFor(path: string): string {
@@ -93,18 +94,38 @@ export const CONTROLLER_JS = `
 `;
 
 /**
+ * The fonts extension's @font-face sheet (WP9, docs/ext-fonts.md) with the
+ * packaged woff2 files inlined as data: URIs, or undefined when absent.
+ */
+export function fontsCss(files: ReadonlyMap<string, Uint8Array>): string | undefined {
+  const sheet = files.get('ext/fonts/fonts.css');
+  if (sheet === undefined) return undefined;
+  return new TextDecoder()
+    .decode(sheet)
+    .replace(/url\("(ext\/fonts\/[^"]+)"\)/g, (match, path: string) => {
+      const bytes = files.get(path);
+      return bytes === undefined ? match : `url("${toDataUri(path, bytes)}")`;
+    });
+}
+
+/**
  * Builds the sandboxed srcdoc: restrictive CSP (only the nonce'd controller
  * may run — the profile already forbids scripts, this is defense in depth),
- * base styles, inlined resources, controller (spec §11.1).
+ * base styles, inlined resources, embedded fonts, controller (spec §11.1).
  */
 export function buildSrcdoc(
   entryHtml: string,
   files: ReadonlyMap<string, Uint8Array>,
   nonce: string,
 ): string {
-  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'" />`;
+  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; script-src 'nonce-${nonce}'" />`;
   let out = inlineResources(entryHtml, files);
-  out = out.replace(/<head([^>]*)>/, (match) => `${match}${csp}<style>${BASE_CSS}</style>`);
+  const fonts = fontsCss(files);
+  const fontStyle = fonts === undefined ? '' : `<style>${fonts}</style>`;
+  out = out.replace(
+    /<head([^>]*)>/,
+    (match) => `${match}${csp}<style>${BASE_CSS}</style>${fontStyle}`,
+  );
   const controller = `<script nonce="${nonce}">${CONTROLLER_JS}</script>`;
   out = out.includes('</body>') ? out.replace('</body>', `${controller}</body>`) : out + controller;
   return out;

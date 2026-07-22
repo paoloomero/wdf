@@ -58,10 +58,21 @@ program
   .option('--lang <tag>', 'document language (default: from the source, or "en")')
   .option('--date <iso>', 'created/modified timestamp (default: now)')
   .option('--with-source', 'embed the original input byte-for-byte (extension "source", §10)')
+  .option(
+    '--embed-fonts',
+    'embed open metric-compatible clones of referenced fonts (extension "fonts", §10)',
+  )
   .action(
     async (
       file: string,
-      opts: { output?: string; title?: string; lang?: string; date?: string; withSource?: boolean },
+      opts: {
+        output?: string;
+        title?: string;
+        lang?: string;
+        date?: string;
+        withSource?: boolean;
+        embedFonts?: boolean;
+      },
     ) => {
       process.exitCode = await cmdImport(file, opts);
     },

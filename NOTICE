@@ -4,3 +4,12 @@ Copyright 2026 Paolo Omero / infoFACTORY and WDF contributors
 Licensed under the Apache License, Version 2.0.
 The WDF Core specification (spec/) is licensed separately under
 CC-BY 4.0 — see LICENSE-SPEC.
+
+This repository redistributes the following fonts (packages/cli/fonts/),
+all licensed under the SIL Open Font License 1.1 — full license texts in
+packages/cli/fonts/LICENSE-<family>.txt:
+- Carlito — Copyright 2013 The Carlito Project Authors
+- Caladea — Copyright 2012 The Caladea Project Authors
+- Arimo — Copyright 2020 The Arimo Project Authors
+- Tinos — Copyright 2026 The Tinos Project Authors
+- Cousine — Copyright 2026 The Cousine Project Authors

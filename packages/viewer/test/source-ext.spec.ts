@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildOriginalSrcdoc, parseSourceExt, type SourceExt } from '../src/prepare.js';
+import {
+  buildOriginalSrcdoc,
+  buildSrcdoc,
+  fontsCss,
+  parseSourceExt,
+  type SourceExt,
+} from '../src/prepare.js';
 
 // WP13 (plan §10.18): the "Original" view renders the embedded source with
 // mapped images inlined, a no-network CSP, and no injected styling.
@@ -55,6 +61,24 @@ describe('buildOriginalSrcdoc', () => {
     // The original is untouched: no viewer styling, no controller script.
     expect(srcdoc).not.toContain('<script');
     expect(srcdoc).not.toContain('wdf-flash');
+  });
+
+  it('inlines embedded fonts as data: URIs in the sandbox (WP9)', () => {
+    const files = new Map<string, Uint8Array>([
+      [
+        'ext/fonts/fonts.css',
+        enc.encode(
+          '@font-face {\n  font-family: "Carlito";\n  src: url("ext/fonts/carlito-latin-400-normal.woff2") format("woff2");\n}\n',
+        ),
+      ],
+      ['ext/fonts/carlito-latin-400-normal.woff2', new Uint8Array([0x77, 0x4f, 0x46, 0x32])],
+    ]);
+    const css = fontsCss(files);
+    expect(css).toContain('url("data:font/woff2;base64,');
+    const srcdoc = buildSrcdoc('<html><head></head><body></body></html>', files, 'n');
+    expect(srcdoc).toContain('@font-face');
+    expect(srcdoc).toContain('font-src data:');
+    expect(fontsCss(new Map())).toBeUndefined();
   });
 
   it('decodes with the declared encoding', () => {
