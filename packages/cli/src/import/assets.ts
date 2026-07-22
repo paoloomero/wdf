@@ -80,7 +80,15 @@ export function localAssetLoader(baseDir: string, caps: AssetCaps): AssetLoader 
       });
     }
     const clean = (src.split(/[?#]/, 1)[0] ?? '').replace(/\\/g, '/');
-    const rel = normalize(clean);
+    // Word URL-encodes the companion-folder path (spaces → %20), but the
+    // folder on disk has literal spaces; decode before resolving.
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(clean);
+    } catch {
+      decoded = clean;
+    }
+    const rel = normalize(decoded);
     if (isAbsolute(rel) || rel.split('/').includes('..')) {
       return Promise.resolve({ reason: 'path escapes the document directory' });
     }
@@ -162,7 +170,8 @@ function collectImgSrcs(root: WdfElement): string[] {
   const walk = (el: WdfElement): void => {
     for (const child of el.children) {
       if (!isElement(child)) continue;
-      if (child.tag === 'img') {
+      // <img> plus Word's VML <v:imagedata> carrier (full "Web Page" export).
+      if (child.tag === 'img' || child.tag === 'v:imagedata') {
         const src = getAttr(child, 'src');
         if (src !== undefined && src !== '' && !seen.has(src)) {
           seen.add(src);

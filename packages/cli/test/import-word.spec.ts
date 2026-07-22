@@ -1,7 +1,8 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import { readPackage } from '@wdf/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdExtract, cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
@@ -107,6 +108,19 @@ describe('windows-1252 Word export', () => {
     expect(md).toContain('Perché la trasferta è durata più di un giorno');
     // The curly apostrophe (cp1252 0x92) survives as ’.
     expect(md).toContain('l’indennità');
+  });
+});
+
+describe("Word full 'Web Page' export with VML images (T7.4)", () => {
+  it('imports a VML <v:imagedata> image via its local companion folder', async () => {
+    const { run, wdf } = await importFixture('word-webpage-vml');
+    // The image reached content/assets/, dedup'd across the VML variants.
+    const pkg = readPackage(readFileSync(wdf));
+    const assets = [...pkg.files.keys()].filter((p) => p.startsWith('content/assets/'));
+    expect(assets).toHaveLength(1);
+    expect(assets[0]).toMatch(/\.png$/);
+    expect(pkg.manifest.resources?.some((r) => r.path === assets[0])).toBe(true);
+    expect(run.logs.some((l) => l.includes('imported image'))).toBe(true);
   });
 });
 

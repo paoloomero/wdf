@@ -158,6 +158,16 @@ function phrasing(nodes: readonly WdfNode[], report: string[], inP: boolean): MN
       out.push(el('br'));
       continue;
     }
+    // Word's full "Web Page" export carries images as VML <v:imagedata>, not
+    // <img>; treat the src the same way so those images survive (T7.4).
+    if (tag === 'v:imagedata') {
+      const src = getAttr(node, 'src') ?? '';
+      const resolved = inP ? resolveImgSrc(src) : undefined;
+      if (resolved !== undefined) {
+        out.push(el('img', { src: resolved, alt: getAttr(node, 'o:title') ?? '' }));
+      }
+      continue;
+    }
     if (INLINE.has(tag)) {
       if (tag === 'a') {
         const href = getAttr(node, 'href') ?? '';
@@ -401,12 +411,16 @@ const PRUNE_CONTAINERS = new Set(['section', 'header', 'footer', 'nav']);
  * typically emitted as `<p class=MsoNormal><o:p>&nbsp;</o:p></p>`), and
  * blockquotes left empty by the pruning. Returns how many were removed.
  */
+function hasImg(node: MEl): boolean {
+  return node.children.some((c) => isEl(c) && (c.tag === 'img' || hasImg(c)));
+}
+
 function pruneSpacerParagraphs(blocks: MEl[]): { blocks: MEl[]; removed: number } {
   let removed = 0;
+  // A spacer is an empty paragraph with no image anywhere in it - Word nests
+  // images inside spans, so the check looks through the whole subtree.
   const isSpacer = (b: MEl): boolean =>
-    b.tag === 'p' &&
-    textOf(b).replace(/[\s ]/g, '') === '' &&
-    !b.children.some((c) => isEl(c) && c.tag === 'img');
+    b.tag === 'p' && textOf(b).replace(/[\s ]/g, '') === '' && !hasImg(b);
 
   const walk = (list: MEl[]): MEl[] =>
     list
