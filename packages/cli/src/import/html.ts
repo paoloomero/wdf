@@ -17,6 +17,7 @@ import {
   type AssetLoader,
   type LoadedAsset,
 } from './assets.js';
+import { promoteHeadings } from './headings.js';
 import { collectStyleRules, hoistStyles, StyleResolver, STYLE_TMP_ATTR } from './styles.js';
 
 /**
@@ -510,6 +511,9 @@ export async function importHtml(
   if (removed > 0) {
     report.push(`dropped ${String(removed)} empty spacer paragraph(s)`);
   }
+  // T7.7: styled title paragraphs become headings while style signatures
+  // are still attached (the heuristic reads resolved font sizes).
+  promoteHeadings(blocks, report);
   // Drop assets whose images did not survive the profile (e.g. table cells).
   const used = usedAssetPaths(blocks);
   assets = assets.filter((a) => used.has(a.path));
