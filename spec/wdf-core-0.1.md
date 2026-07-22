@@ -327,8 +327,16 @@ elements. _(MathML support is deferred to a future version or extension.)_
   element containing text only.
 - **6.2.8** `table` MUST contain, in order: exactly one `caption`, exactly
   one `thead` containing exactly one `tr` of `th` cells, exactly one
-  `tbody`, and optionally one `tfoot`. All rows MUST have the same number
-  of cells. `br` is not permitted inside `th` or `td`.
+  `tbody`, and optionally one `tfoot`. `br` is not permitted inside `th` or
+  `td`. The table's **column count** is the sum of the `colspan` values
+  (default 1) of the header row's cells. Cells are laid out by the
+  following grid algorithm: rows are processed in document order; within a
+  row, each cell occupies the leftmost slot not already covered by an
+  earlier cell's `colspan` or `rowspan`, and covers `colspan` columns and
+  `rowspan` rows. The resulting grid MUST be exactly rectangular: every
+  slot of every row covered exactly once (no overlaps, no holes), no cell
+  extending past the column count, and no `rowspan` extending past the last
+  row of the cell's row group (`thead`, `tbody`, or `tfoot`).
 - **6.2.9** `img` MUST NOT appear outside `figure` except inline inside `p`.
 
 ### 6.3 Attribute rules
@@ -352,8 +360,13 @@ attributes (`on*`), `style`, and all `data-*` attributes other than
 - **6.3.4** `time`: `datetime` MAY be present (a valid RFC 3339 date or
   date-time). `abbr`: `title` MAY be present. `blockquote`: `cite` MAY be
   present (same value rules as `a href`, external forms only). `th`:
-  `scope` MAY be present (`col` or `row`). `table`: `data-wdf-dataset` MAY
-  be present (§6.5). `meta`, `link`, `html`: as in §6.1/§6.7.
+  `scope` MAY be present (`col` or `row`). `th`, `td`: `colspan` and
+  `rowspan` MAY be present, as decimal integers between 2 and 1000
+  inclusive — the value 1 is expressed by omitting the attribute, so that
+  every table has exactly one encoding — subject to the grid rules of
+  §6.2.8, and forbidden in dataset-bound tables (§6.5.2). `table`:
+  `data-wdf-dataset` MAY be present (§6.5). `meta`, `link`, `html`: as in
+  §6.1/§6.7.
 - **6.3.5** No attribute value may contain a control character other than
   TAB.
 - **6.3.6** The document MUST NOT reference any resource outside the
@@ -387,8 +400,9 @@ dataset. For a bound table:
 
 - **6.5.1** The path MUST be declared in the manifest's `datasets` (§4.1).
 - **6.5.2** The table MUST NOT contain a `tfoot`, and no cell may carry
-  `colspan` or `rowspan` (these attributes are forbidden in the profile
-  generally).
+  `colspan` or `rowspan`: a bound table is a full grid in which every cell
+  is one typed value (merged cells are permitted only in unbound tables,
+  §6.3.4).
 - **6.5.3** The `thead` row MUST have exactly one `th` per dataset column,
   in order, and the normalized text (§7.3) of each `th` MUST equal the
   column `name`.
@@ -564,9 +578,14 @@ anchors).
   the table's anchors (§7.6). Then a blank line, then GFM rows: header row
   from the `thead` cells, a delimiter row with `---` per column (no
   alignment colons), then one row per `tbody` (and then `tfoot`, if any)
-  `tr`. Each row is `|` + (space + cell inline content + space + `|`) per
-  cell. Empty cells produce two spaces between pipes. Alignment is a
-  stylesheet concern and never encoded.
+  `tr`. Every row emits exactly one cell per grid column (§6.2.8): a cell's
+  inline content appears in its **origin slot** (its first row, leftmost
+  column); every other slot covered by its `colspan`/`rowspan` — like every
+  hole in a non-conforming grid — is emitted as an empty cell. GFM cannot
+  express merged cells; this expansion is the canonical rendering. Each row
+  is `|` + (space + cell inline content + space + `|`) per cell. Empty
+  cells produce two spaces between pipes. Alignment is a stylesheet concern
+  and never encoded.
 - **7.5.10 Thematic breaks.** `hr` → the line `---`. No anchor.
 
 ### 7.6 Anchors

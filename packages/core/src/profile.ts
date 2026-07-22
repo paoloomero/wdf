@@ -10,6 +10,7 @@ import {
   type WdfElement,
 } from './html/ast.js';
 import { parseHtml } from './html/parse.js';
+import { computeTableGrid, parseSpan, type SpanCell } from './table.js';
 
 /**
  * A violation of the WDF-HTML profile (spec §6). `spec` cites the enforced
@@ -81,7 +82,8 @@ const EXTRA_ATTRS: Record<string, Set<string>> = {
   time: new Set(['datetime']),
   abbr: new Set(['title']),
   blockquote: new Set(['cite']),
-  th: new Set(['scope']),
+  th: new Set(['scope', 'colspan', 'rowspan']),
+  td: new Set(['colspan', 'rowspan']),
   table: new Set(['data-wdf-dataset']),
 };
 
@@ -201,14 +203,34 @@ function checkAttributes(el: WdfElement, path: string, c: ProfileChecker): void 
       if (v !== undefined && v !== 'col' && v !== 'row') {
         c.report('§6.3.4', path, `th scope must be "col" or "row" (got "${v}")`);
       }
+      checkSpanAttrs(el, path, c);
       break;
     }
+    case 'td':
+      checkSpanAttrs(el, path, c);
+      break;
     case 'table': {
       const v = getAttr(el, 'data-wdf-dataset');
       if (v !== undefined && !DATASET_PATH.test(v)) {
         c.report('§6.5', path, `data-wdf-dataset "${v}" is not a data/*.json package path`);
       }
       break;
+    }
+  }
+}
+
+// colspan/rowspan: integers 2..1000; the value 1 is expressed by omission (§6.3.4).
+const SPAN_VALUE = /^(?:[2-9]|[1-9][0-9]{1,2}|1000)$/;
+
+function checkSpanAttrs(el: WdfElement, path: string, c: ProfileChecker): void {
+  for (const name of ['colspan', 'rowspan']) {
+    const v = getAttr(el, name);
+    if (v !== undefined && !SPAN_VALUE.test(v)) {
+      c.report(
+        '§6.3.4',
+        path,
+        `${name} must be an integer between 2 and 1000 — the value 1 is expressed by omitting the attribute (got "${v}")`,
+      );
     }
   }
 }
@@ -470,7 +492,6 @@ function checkTable(el: WdfElement, path: string, c: ProfileChecker): void {
     c.report('§6.5.2', path, 'a dataset-bound table must not contain <tfoot>');
   }
 
-  const rows: WdfElement[] = [];
   const thead = children[1];
   if (thead !== undefined) {
     const headRows = elementChildren(thead);
@@ -478,22 +499,39 @@ function checkTable(el: WdfElement, path: string, c: ProfileChecker): void {
       c.report('§6.2.8', `${path}/thead[2]`, '<thead> must contain exactly one <tr>');
     }
     for (const tr of headRows) {
-      rows.push(tr);
       if (elementChildren(tr).some((cell) => cell.tag !== 'th')) {
         c.report('§6.2.8', `${path}/thead[2]`, 'the header row must contain only <th> cells');
       }
     }
   }
-  for (const sect of children.slice(2)) {
-    rows.push(...elementChildren(sect).filter((r) => r.tag === 'tr'));
+
+  // §6.5.2 — a dataset-bound table is a full grid: no merged cells.
+  const spanCells = (tr: WdfElement): SpanCell[] =>
+    elementChildren(tr).map((cell) => ({
+      colspan: parseSpan(getAttr(cell, 'colspan')),
+      rowspan: parseSpan(getAttr(cell, 'rowspan')),
+    }));
+  if (bound) {
+    const spanned = children
+      .flatMap((sect) => elementChildren(sect).filter((r) => r.tag === 'tr'))
+      .some((tr) =>
+        elementChildren(tr).some((cell) => hasAttr(cell, 'colspan') || hasAttr(cell, 'rowspan')),
+      );
+    if (spanned) {
+      c.report('§6.5.2', path, 'a dataset-bound table must not contain colspan or rowspan');
+    }
   }
-  const widths = new Set(rows.map((r) => elementChildren(r).length));
-  if (widths.size > 1) {
-    c.report(
-      '§6.2.8',
-      path,
-      `all table rows must have the same number of cells (got ${[...widths].join(', ')})`,
+
+  // §6.2.8 — the grid must be exactly rectangular.
+  const rowGroups = children
+    .filter((ch) => ch.tag === 'thead' || ch.tag === 'tbody' || ch.tag === 'tfoot')
+    .map((sect) =>
+      elementChildren(sect)
+        .filter((r) => r.tag === 'tr')
+        .map(spanCells),
     );
+  for (const problem of computeTableGrid(rowGroups).problems) {
+    c.report('§6.2.8', path, `table grid is not rectangular: ${problem}`);
   }
 }
 

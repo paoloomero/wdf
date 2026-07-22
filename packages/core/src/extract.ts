@@ -10,6 +10,7 @@ import {
   type WdfNode,
 } from './html/ast.js';
 import { parseHtml } from './html/parse.js';
+import { computeTableGrid, parseSpan } from './table.js';
 import type { WdfOutlineNode, WdfOutlineNodeType } from './types.js';
 
 /**
@@ -284,20 +285,33 @@ function serializeTable(el: WdfElement): Group[] {
   const id = getAttr(el, 'id');
   const captionGroup: Group = [id === undefined ? captionLine : appendAnchor(captionLine, id)];
 
-  const rows: WdfElement[] = [];
-  for (const section of children) {
-    if (section.tag === 'thead' || section.tag === 'tbody' || section.tag === 'tfoot') {
-      rows.push(...elementChildren(section).filter((r) => r.tag === 'tr'));
-    }
-  }
+  const rowGroups = children
+    .filter((s) => s.tag === 'thead' || s.tag === 'tbody' || s.tag === 'tfoot')
+    .map((section) => elementChildren(section).filter((r) => r.tag === 'tr'));
+  const rows = rowGroups.flat();
   if (rows.length === 0) return [captionGroup];
 
-  const renderRow = (tr: WdfElement): string => {
-    const cells = elementChildren(tr).map((cell) => renderSingleLine(cell.children));
-    return `| ${cells.join(' | ')} |`;
+  // §7.5.9 — every row emits one cell per grid column: a spanning cell's
+  // content in its origin slot, an empty cell in every slot it covers.
+  const grid = computeTableGrid(
+    rowGroups.map((group) =>
+      group.map((tr) =>
+        elementChildren(tr).map((cell) => ({
+          colspan: parseSpan(getAttr(cell, 'colspan')),
+          rowspan: parseSpan(getAttr(cell, 'rowspan')),
+        })),
+      ),
+    ),
+  );
+  const renderRow = (tr: WdfElement, rowIndex: number): string => {
+    const cells = elementChildren(tr);
+    const texts = (grid.rows[rowIndex] ?? []).map((slot) => {
+      const cell = slot === null ? undefined : cells[slot.cell];
+      return cell === undefined ? '' : renderSingleLine(cell.children);
+    });
+    return `| ${texts.join(' | ')} |`;
   };
-  const width = elementChildren(rows[0] as WdfElement).length;
-  const delimiter = `| ${Array.from({ length: width }, () => '---').join(' | ')} |`;
+  const delimiter = `| ${Array.from({ length: grid.columns }, () => '---').join(' | ')} |`;
   const [head, ...body] = rows.map(renderRow);
   return [captionGroup, [head ?? '', delimiter, ...body]];
 }

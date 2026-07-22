@@ -1,10 +1,13 @@
 import {
+  computeTableGrid,
   elementChildren,
   findChild,
   getAttr,
   isElement,
   normalizedText,
   parseHtml,
+  parseSpan,
+  type SpanCell,
   type WdfElement,
   type WdfNode,
 } from '@wdf/core';
@@ -205,18 +208,47 @@ function rebuildTable(node: WdfElement, report: string[]): MEl | undefined {
   const captionText = captionSrc === undefined ? '' : normalizedText(captionSrc);
   if (captionSrc === undefined) report.push('synthesized empty <caption> for a table');
 
+  // Merged cells survive when the grid is exactly rectangular (§6.2.8);
+  // otherwise every span is stripped and rows are padded as before (T11.3).
+  const spanOf = (cell: WdfElement, name: 'colspan' | 'rowspan'): number => {
+    const n = parseSpan(getAttr(cell, name));
+    return n >= 2 ? n : 1;
+  };
+  const spanCells = (tr: WdfElement): SpanCell[] =>
+    elementChildren(tr).map((cell) => ({
+      colspan: spanOf(cell, 'colspan'),
+      rowspan: spanOf(cell, 'rowspan'),
+    }));
+  const [firstRow, ...restRows] = rows;
+  const spanGroups = [[spanCells(firstRow as WdfElement)], restRows.map(spanCells)];
+  const spansPresent = spanGroups.flat(2).some((s) => s.colspan > 1 || s.rowspan > 1);
+  const keepSpans = spansPresent && computeTableGrid(spanGroups).problems.length === 0;
+  if (spansPresent) {
+    report.push(
+      keepSpans
+        ? 'kept merged cells (colspan/rowspan)'
+        : 'dropped colspan/rowspan (table grid could not be reconciled)',
+    );
+  }
+
   const width = Math.max(...rows.map((r) => elementChildren(r).length));
   const cellsOf = (tr: WdfElement, cellTag: 'th' | 'td'): MEl[] => {
     const cells = elementChildren(tr).map((cell) => {
-      if (cell.attrs.some((a) => a.name === 'colspan' || a.name === 'rowspan')) {
-        report.push('dropped colspan/rowspan (not permitted in WDF-HTML)');
-      }
       const content = phrasing(cell.children, report, false).filter(
         (n) => !(isEl(n) && (n.tag === 'br' || n.tag === 'img')),
       );
-      return el(cellTag, pickAttrs(cell, cellTag), content);
+      const attrs = pickAttrs(cell, cellTag);
+      if (keepSpans) {
+        for (const name of ['colspan', 'rowspan'] as const) {
+          const n = spanOf(cell, name);
+          if (n > 1) attrs[name] = String(n);
+        }
+      }
+      return el(cellTag, attrs, content);
     });
-    while (cells.length < width) cells.push(el(cellTag));
+    if (!keepSpans) {
+      while (cells.length < width) cells.push(el(cellTag));
+    }
     return cells;
   };
 

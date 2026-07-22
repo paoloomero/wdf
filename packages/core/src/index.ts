@@ -38,6 +38,13 @@ export {
 export { parseHtml } from './html/parse.js';
 export { parseHtmlDom } from './html/domparser.js';
 export { validateProfile, validateStylesheet, type Violation } from './profile.js';
+export {
+  computeTableGrid,
+  parseSpan,
+  type SpanCell,
+  type GridSlot,
+  type TableGrid,
+} from './table.js';
 export { readPackage, writePackage, checkPackageStructure, type WdfPackage } from './package.js';
 export {
   createSchemaValidators,
