@@ -33,6 +33,9 @@ writeFileSync(join(here, 'dist/viewer.html'), page.replace('<!--WDF:PACKAGE-->',
 
 const standalone = page
   .replace('<title>WDF Viewer</title>', '<title>__WDF_TITLE__</title>')
+  // A standalone file is a document artifact opened from file://, not the
+  // installable app: no manifest link.
+  .replace(/\s*<link rel="manifest"[^>]*\/>/, '')
   .replace(
     '<!--WDF:PACKAGE-->',
     '<script type="application/wdf+zip" id="wdf-package">__WDF_PACKAGE_BASE64__</script>',

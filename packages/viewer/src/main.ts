@@ -338,6 +338,31 @@ function init(): void {
     }
   });
 
+  // PWA (plan T8.1): offline shell + OS file handling for .wdf.
+  const isHttp = location.protocol === 'https:' || location.protocol === 'http:';
+  if (isHttp && 'serviceWorker' in navigator) {
+    void navigator.serviceWorker.register('sw.js').catch(() => undefined);
+  }
+  interface LaunchParamsLike {
+    files?: FileSystemHandle[];
+  }
+  const launchQueue = (
+    window as { launchQueue?: { setConsumer(cb: (params: LaunchParamsLike) => void): void } }
+  ).launchQueue;
+  if (launchQueue !== undefined) {
+    launchQueue.setConsumer((params) => {
+      const handle = params.files?.[0];
+      if (handle !== undefined && handle.kind === 'file') {
+        void (handle as FileSystemFileHandle)
+          .getFile()
+          .then((file) => file.arrayBuffer())
+          .then((buf) => {
+            openBytes(new Uint8Array(buf), handle.name);
+          });
+      }
+    });
+  }
+
   // Standalone distribution profile (spec §9): embedded package.
   const embedded = document.getElementById('wdf-package');
   if (embedded !== null) {

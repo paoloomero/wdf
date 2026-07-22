@@ -1,0 +1,30 @@
+{
+  "name": "WDF Reader",
+  "short_name": "WDF Reader",
+  "description": "Open Web Document Format (.wdf) packages: verifiable documents that humans and AI agents read identically.",
+  "id": "wdf-reader",
+  "start_url": "viewer.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f9",
+  "theme_color": "#16203a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "viewer.html",
+      "accept": {
+        "application/wdf+zip": [".wdf"]
+      }
+    }
+  ],
+  "launch_handler": { "client_mode": "focus-existing" }
+}

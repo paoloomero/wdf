@@ -3,7 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#16203a" />
     <title>WDF Viewer</title>
+    <link rel="manifest" href="manifest.webmanifest" />
     <!--WDF:CSS-->
   </head>
   <body>
@@ -19,6 +21,10 @@
           Choose a file
           <input type="file" id="file-input" accept=".wdf,application/wdf+zip" hidden />
         </label>
+        <p id="install-hint" class="drop-hint small">
+          Tip: install this page as an app (Chrome/Edge, install icon in the address bar) and
+          <code>.wdf</code> files will open with a double click — offline, like any reader.
+        </p>
         <p id="drop-error" class="drop-error" hidden></p>
       </div>
     </div>

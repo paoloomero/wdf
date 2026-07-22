@@ -30,6 +30,10 @@ for (const name of ['delibera-pa', 'report-dati', 'articolo-tecnico']) {
 cpSync(join(root, 'packages/viewer/dist/viewer.html'), join(site, 'viewer.html'));
 cpSync(join(root, 'site/index.html'), join(site, 'index.html'));
 cpSync(join(root, 'site/site.css'), join(site, 'site.css'));
+// PWA shell (plan T8.1): manifest with .wdf file_handlers, offline worker, icons.
+cpSync(join(root, 'site/manifest.webmanifest'), join(site, 'manifest.webmanifest'));
+cpSync(join(root, 'site/sw.js'), join(site, 'sw.js'));
+cpSync(join(root, 'site/icons'), join(site, 'icons'), { recursive: true });
 cpSync(join(root, 'spec/wdf-core-0.1.md'), join(site, 'wdf-core-0.1.md'));
 for (const doc of ['llm-extraction-comparison.md', 'mcp-demo.md']) {
   if (existsSync(join(root, 'docs', doc))) cpSync(join(root, 'docs', doc), join(site, doc));
