@@ -4,3 +4,7 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 _site/
+
+# Local project documents and IDE config (not part of the public repo)
+project-docs/
+.claude/
