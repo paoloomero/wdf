@@ -29,7 +29,7 @@ import {
   type LoadedAsset,
 } from './import/assets.js';
 import { decodeHtml } from './import/encoding.js';
-import { importHtml } from './import/html.js';
+import { importHtml, type HtmlImportOptions } from './import/html.js';
 import { importMarkdown } from './import/markdown.js';
 import { buildPackage, hasViewerTemplate, makeStandalone } from './lib/build.js';
 import { readDirFiles, writeDirFiles } from './lib/fsutil.js';
@@ -209,7 +209,13 @@ function urlBaseName(url: string): string {
 
 export async function cmdImport(
   input: string,
-  opts: { output?: string; title?: string; lang?: string; date?: string } = {},
+  opts: {
+    output?: string;
+    title?: string;
+    lang?: string;
+    date?: string;
+    withSource?: boolean;
+  } = {},
   ctx: Ctx = defaultCtx,
 ): Promise<number> {
   const isUrl = /^https?:\/\//i.test(input);
@@ -219,6 +225,10 @@ export async function cmdImport(
   let text: string;
   let loader: AssetLoader | undefined;
   let baseName: string;
+  // Original input, kept byte-for-byte for the `source` extension (WP13).
+  let sourceBytes: Uint8Array | undefined;
+  let sourceName = '';
+  let sourceEncoding = 'utf-8';
   if (isUrl) {
     try {
       const page = await fetchPage(input, DEFAULT_CAPS);
@@ -227,6 +237,9 @@ export async function cmdImport(
       if (decoded.encoding !== 'utf-8') report.push(`decoded page as ${decoded.encoding}`);
       loader = urlAssetLoader(page.baseUrl, DEFAULT_CAPS);
       baseName = urlBaseName(input);
+      sourceBytes = page.bytes;
+      sourceName = input;
+      sourceEncoding = decoded.encoding;
     } catch (e) {
       ctx.err(`error: cannot fetch ${input} (${String(e)})`);
       return 2;
@@ -239,6 +252,8 @@ export async function cmdImport(
       ctx.err(`error: cannot read ${input} (${String(e)})`);
       return 2;
     }
+    sourceBytes = bytes;
+    sourceName = basename(input);
     if (isMarkdown) {
       text = dec.decode(bytes);
     } else {
@@ -247,6 +262,7 @@ export async function cmdImport(
       if (decoded.encoding !== 'utf-8') {
         report.push(`decoded source as ${decoded.encoding} (declared or detected)`);
       }
+      sourceEncoding = decoded.encoding;
       loader = localAssetLoader(dirname(input), DEFAULT_CAPS);
     }
     baseName = basename(input).replace(/\.[^.]+$/, '');
@@ -257,17 +273,21 @@ export async function cmdImport(
   let sourceLang: string | undefined;
   let stylesheet: string | undefined;
   let assets: LoadedAsset[] = [];
+  let sourceMap: Record<string, string> = {};
   if (isMarkdown) {
     const result = importMarkdown(text);
     blocks = result.blocks;
     report.push(...result.report);
   } else {
-    const result = await importHtml(text, loader === undefined ? {} : { loadAsset: loader });
+    const options: HtmlImportOptions = loader === undefined ? {} : { loadAsset: loader };
+    if (opts.withSource === true) options.keepAllAssets = true;
+    const result = await importHtml(text, options);
     blocks = result.blocks;
     sourceTitle = result.title;
     sourceLang = result.language;
     stylesheet = result.stylesheet;
     assets = result.assets;
+    sourceMap = result.sourceMap;
     report.push(...result.report);
   }
 
@@ -301,6 +321,27 @@ export async function cmdImport(
     manifest.resources = assets.map((a) => ({ path: a.path, mediaType: a.mediaType }));
   }
 
+  // WP13 (plan §10.18): embed the original input byte-for-byte under
+  // ext/source/; images are not duplicated — source.json maps the original
+  // src values onto the content/assets/ copies.
+  const extFiles = new Map<string, Uint8Array>();
+  if (opts.withSource === true && sourceBytes !== undefined) {
+    const mainPath = `ext/source/${(await sha256Hex(sourceBytes)).slice(0, 16)}.${isMarkdown ? 'md' : 'html'}`;
+    const sourceJson = {
+      source: '0.1',
+      main: mainPath,
+      mainName: sourceName,
+      encoding: sourceEncoding,
+      resources: sourceMap,
+    };
+    manifest.extensions = [{ name: 'source', version: '0.1' }];
+    extFiles.set(mainPath, sourceBytes);
+    extFiles.set('ext/source/source.json', enc.encode(`${JSON.stringify(sourceJson, null, 2)}\n`));
+    report.push(
+      `embedded the original source as ${mainPath} (extension "source", docs/ext-source.md)`,
+    );
+  }
+
   const source = new Map<string, Uint8Array>([
     ['manifest.json', enc.encode(`${JSON.stringify(manifest, null, 2)}\n`)],
     ['content/index.html', htmlBytes],
@@ -310,6 +351,9 @@ export async function cmdImport(
   }
   for (const asset of assets) {
     source.set(asset.path, asset.bytes);
+  }
+  for (const [path, bytes] of extFiles) {
+    source.set(path, bytes);
   }
 
   try {

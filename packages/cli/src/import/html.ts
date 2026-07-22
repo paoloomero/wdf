@@ -488,6 +488,8 @@ export interface HtmlImportResult {
   stylesheet: string | undefined;
   /** Images pulled into content/assets/ (T7.3). */
   assets: LoadedAsset[];
+  /** Original `src` value → package path, for the `source` extension (WP13). */
+  sourceMap: Record<string, string>;
   report: string[];
 }
 
@@ -495,6 +497,8 @@ export interface HtmlImportOptions {
   /** When present, referenced images are resolved and packaged (T7.3). */
   loadAsset?: AssetLoader;
   caps?: AssetCaps;
+  /** Keep assets even when the canonical document drops them (WP13). */
+  keepAllAssets?: boolean;
 }
 
 /** Package paths of every content/assets/ image still referenced by blocks. */
@@ -520,6 +524,7 @@ export async function importHtml(
   const root = doc.html;
 
   let assets: LoadedAsset[] = [];
+  let sourceMap: Record<string, string> = {};
   if (root !== null && options.loadAsset !== undefined) {
     const resolved = await resolveDocumentAssets(
       root,
@@ -529,6 +534,9 @@ export async function importHtml(
     );
     assetMap = resolved.map;
     assets = resolved.assets;
+    sourceMap = Object.fromEntries(
+      [...resolved.map.entries()].sort(([a], [b]) => (a < b ? -1 : 1)),
+    );
   } else {
     assetMap = undefined;
   }
@@ -547,9 +555,12 @@ export async function importHtml(
   // T7.7: styled title paragraphs become headings while style signatures
   // are still attached (the heuristic reads resolved font sizes).
   promoteHeadings(blocks, report);
-  // Drop assets whose images did not survive the profile (e.g. table cells).
-  const used = usedAssetPaths(blocks);
-  assets = assets.filter((a) => used.has(a.path));
+  // Drop assets whose images did not survive the profile — unless the
+  // source extension needs them all for the original view (WP13).
+  if (options.keepAllAssets !== true) {
+    const used = usedAssetPaths(blocks);
+    assets = assets.filter((a) => used.has(a.path));
+  }
 
   const stylesheet = hoistStyles(blocks);
   if (stylesheet !== undefined) {
@@ -569,5 +580,5 @@ export async function importHtml(
   const titleEl = head === undefined ? undefined : findChild(head, 'title');
   const title = titleEl === undefined ? undefined : normalizedText(titleEl) || undefined;
   const language = root === null ? undefined : (getAttr(root, 'lang') ?? undefined);
-  return { blocks, title, language, stylesheet, assets, report };
+  return { blocks, title, language, stylesheet, assets, sourceMap, report };
 }

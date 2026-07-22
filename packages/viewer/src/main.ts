@@ -12,10 +12,13 @@ import {
 
 import {
   agentBlocks,
+  buildOriginalSrcdoc,
   buildSrcdoc,
   citation,
   outlineTree,
+  parseSourceExt,
   type OutlineTreeNode,
+  type SourceExt,
 } from './prepare.js';
 
 function $(id: string): HTMLElement {
@@ -30,6 +33,7 @@ interface Loaded {
   pkg: WdfPackage;
   outline: WdfOutline;
   markdown: string;
+  sourceExt: SourceExt | undefined;
 }
 
 let loaded: Loaded | undefined;
@@ -57,7 +61,7 @@ function openBytes(bytes: Uint8Array, name: string): void {
     const outline = JSON.parse(
       dec.decode(pkg.files.get('ai/outline.json') ?? new Uint8Array()),
     ) as WdfOutline;
-    loaded = { pkg, outline, markdown };
+    loaded = { pkg, outline, markdown, sourceExt: parseSourceExt(pkg.files) };
   } catch (e) {
     showDropError(`unreadable AI layer: ${String(e)}`);
     return;
@@ -71,7 +75,9 @@ function openBytes(bytes: Uint8Array, name: string): void {
 
   renderHuman(loaded);
   renderAgent(loaded);
+  renderOriginal(loaded);
   renderOutline(loaded);
+  setView('human');
   void verify(loaded);
 }
 
@@ -79,6 +85,20 @@ function renderHuman(doc: Loaded): void {
   const entry = dec.decode(doc.pkg.files.get(doc.pkg.manifest.entry) ?? new Uint8Array());
   const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
   ($('human') as HTMLIFrameElement).srcdoc = buildSrcdoc(entry, doc.pkg.files, nonce);
+}
+
+// "Original" view (WP13): the embedded source, shown untouched. The toggle
+// only appears when the package carries the `source` extension.
+function renderOriginal(doc: Loaded): void {
+  const frame = $('original') as HTMLIFrameElement;
+  const button = $('view-original');
+  if (doc.sourceExt === undefined) {
+    button.hidden = true;
+    frame.srcdoc = '';
+    return;
+  }
+  button.hidden = false;
+  frame.srcdoc = buildOriginalSrcdoc(doc.pkg.files, doc.sourceExt);
 }
 
 function renderAgent(doc: Loaded): void {
@@ -269,11 +289,13 @@ async function copyCitation(id: string, button?: HTMLElement): Promise<void> {
 // ---------------------------------------------------------------------------
 // Wiring
 
-function setView(view: 'human' | 'agent'): void {
+function setView(view: 'human' | 'agent' | 'original'): void {
   $('human').hidden = view !== 'human';
   $('agent').hidden = view !== 'agent';
+  $('original').hidden = view !== 'original';
   $('view-human').classList.toggle('active', view === 'human');
   $('view-agent').classList.toggle('active', view === 'agent');
+  $('view-original').classList.toggle('active', view === 'original');
   if (view === 'agent' && selectedId !== undefined) select(selectedId, 'outline');
 }
 
@@ -314,6 +336,9 @@ function init(): void {
   });
   $('view-agent').addEventListener('click', () => {
     setView('agent');
+  });
+  $('view-original').addEventListener('click', () => {
+    setView('original');
   });
   $('sidebar-toggle').addEventListener('click', () => {
     $('app').classList.toggle('sidebar-open');

@@ -110,6 +110,74 @@ export function buildSrcdoc(
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// `source` extension (WP13, docs/ext-source.md)
+
+export interface SourceExt {
+  main: string;
+  mainName: string;
+  encoding: string;
+  resources: Record<string, string>;
+}
+
+/** Reads ext/source/source.json, or undefined when absent or malformed. */
+export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceExt | undefined {
+  const raw = files.get('ext/source/source.json');
+  if (raw === undefined) return undefined;
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(raw)) as {
+      main?: unknown;
+      mainName?: unknown;
+      encoding?: unknown;
+      resources?: unknown;
+    };
+    if (typeof parsed.main !== 'string' || !files.has(parsed.main)) return undefined;
+    const resources: Record<string, string> = {};
+    if (typeof parsed.resources === 'object' && parsed.resources !== null) {
+      for (const [k, v] of Object.entries(parsed.resources)) {
+        if (typeof v === 'string') resources[k] = v;
+      }
+    }
+    return {
+      main: parsed.main,
+      mainName: typeof parsed.mainName === 'string' ? parsed.mainName : '',
+      encoding: typeof parsed.encoding === 'string' ? parsed.encoding : 'utf-8',
+      resources,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Builds the srcdoc for the "Original" view: the embedded source decoded
+ * with its declared encoding, mapped resources inlined as data: URIs, the
+ * same no-network CSP — and deliberately NO injected styling or controller:
+ * the point of the view is the untouched original (docs/ext-source.md).
+ */
+export function buildOriginalSrcdoc(
+  files: ReadonlyMap<string, Uint8Array>,
+  ext: SourceExt,
+): string {
+  const bytes = files.get(ext.main) ?? new Uint8Array();
+  let html: string;
+  try {
+    html = new TextDecoder(ext.encoding).decode(bytes);
+  } catch {
+    html = new TextDecoder().decode(bytes);
+  }
+  for (const [original, path] of Object.entries(ext.resources)) {
+    const data = files.get(path);
+    if (data === undefined) continue;
+    html = html.split(`src="${original}"`).join(`src="${toDataUri(path, data)}"`);
+  }
+  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'" />`;
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head([^>]*)>/i, (match) => `${match}${csp}`);
+  }
+  return csp + html;
+}
+
 export interface AgentBlock {
   text: string;
   ids: string[];

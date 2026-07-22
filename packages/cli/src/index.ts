@@ -57,10 +57,11 @@ program
   .option('--title <title>', 'document title (default: from the source)')
   .option('--lang <tag>', 'document language (default: from the source, or "en")')
   .option('--date <iso>', 'created/modified timestamp (default: now)')
+  .option('--with-source', 'embed the original input byte-for-byte (extension "source", §10)')
   .action(
     async (
       file: string,
-      opts: { output?: string; title?: string; lang?: string; date?: string },
+      opts: { output?: string; title?: string; lang?: string; date?: string; withSource?: boolean },
     ) => {
       process.exitCode = await cmdImport(file, opts);
     },
