@@ -47,6 +47,30 @@ export function inlineResources(html: string, files: ReadonlyMap<string, Uint8Ar
   return out;
 }
 
+/**
+ * Paper view (WP10, plan §10.20): an A4 "sheet" look for the screen,
+ * toggled by the controller via the wdf-paged class. Presentation only —
+ * the content flows continuously; true pagination happens in print/PDF.
+ */
+export const PAGED_CSS = `
+  html.wdf-paged body { background: #676d77; padding: 1.5rem 0; }
+  html.wdf-paged article {
+    background: #fff; width: 210mm; max-width: 210mm; box-sizing: border-box;
+    margin: 0 auto; padding: 20mm; min-height: 297mm;
+    box-shadow: 0 3px 18px rgba(0, 0, 0, 0.45);
+  }
+`;
+
+/** Paged-media sheet for print/PDF export (WP10): the browser paginates. */
+export const PRINT_CSS = `
+  @page { size: A4; margin: 20mm; }
+  body { margin: 0; padding: 0; background: #fff; }
+  article { max-width: none; margin: 0; }
+  h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+  figure, tr { break-inside: avoid; }
+  thead { display: table-header-group; }
+`;
+
 /** Base typography for packages without a stylesheet, plus selection flash. */
 export const BASE_CSS = `
   body { margin: 0; padding: 1.25rem; font: 17px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1a1f2b; }
@@ -82,6 +106,10 @@ export const CONTROLLER_JS = `
   });
   addEventListener('message', function (e) {
     var d = e.data || {};
+    if (d.type === 'wdf-paged') {
+      document.documentElement.classList.toggle('wdf-paged', d.on === true);
+      return;
+    }
     if (d.type === 'wdf-scroll' && typeof d.id === 'string') {
       var t = document.getElementById(d.id);
       if (t) {
@@ -124,11 +152,31 @@ export function buildSrcdoc(
   const fontStyle = fonts === undefined ? '' : `<style>${fonts}</style>`;
   out = out.replace(
     /<head([^>]*)>/,
-    (match) => `${match}${csp}<style>${BASE_CSS}</style>${fontStyle}`,
+    (match) => `${match}${csp}<style>${BASE_CSS}</style><style>${PAGED_CSS}</style>${fontStyle}`,
   );
   const controller = `<script nonce="${nonce}">${CONTROLLER_JS}</script>`;
   out = out.includes('</body>') ? out.replace('</body>', `${controller}</body>`) : out + controller;
   return out;
+}
+
+/**
+ * Builds the print/PDF document (WP10, plan §10.20): inlined resources,
+ * base styles, embedded fonts, and the paged-media sheet — no controller,
+ * and a CSP with no script-src at all. Rendered in a dedicated frame
+ * without allow-scripts; the browser's print engine does the pagination.
+ */
+export function buildPrintSrcdoc(
+  entryHtml: string,
+  files: ReadonlyMap<string, Uint8Array>,
+): string {
+  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:" />`;
+  const out = inlineResources(entryHtml, files);
+  const fonts = fontsCss(files);
+  const fontStyle = fonts === undefined ? '' : `<style>${fonts}</style>`;
+  return out.replace(
+    /<head([^>]*)>/,
+    (match) => `${match}${csp}<style>${BASE_CSS}</style>${fontStyle}<style>${PRINT_CSS}</style>`,
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -49,6 +49,12 @@
             Original
           </button>
         </nav>
+        <nav id="doc-actions" aria-label="Document actions">
+          <button id="paged-toggle" title="Paper view: A4 sheet look (rendering only)">
+            Paged
+          </button>
+          <button id="pdf-export" title="Print / export as PDF (browser print, A4)">PDF</button>
+        </nav>
       </header>
 
       <div id="details-panel" hidden>
@@ -65,6 +71,7 @@
           <iframe id="human" sandbox="allow-scripts" title="Document"></iframe>
           <div id="agent" hidden></div>
           <iframe id="original" sandbox="" title="Original source" hidden></iframe>
+          <iframe id="print-frame" sandbox="allow-same-origin allow-modals" title="Print"></iframe>
         </main>
       </div>
 

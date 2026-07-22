@@ -13,6 +13,7 @@ import {
 import {
   agentBlocks,
   buildOriginalSrcdoc,
+  buildPrintSrcdoc,
   buildSrcdoc,
   citation,
   outlineTree,
@@ -38,6 +39,8 @@ interface Loaded {
 
 let loaded: Loaded | undefined;
 let selectedId: string | undefined;
+// Paper view (WP10): rendering-only A4 sheet look for the Human view.
+let paged = false;
 
 // ---------------------------------------------------------------------------
 // Opening packages
@@ -85,6 +88,24 @@ function renderHuman(doc: Loaded): void {
   const entry = dec.decode(doc.pkg.files.get(doc.pkg.manifest.entry) ?? new Uint8Array());
   const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
   ($('human') as HTMLIFrameElement).srcdoc = buildSrcdoc(entry, doc.pkg.files, nonce);
+}
+
+// Print / export as PDF (WP10): a dedicated script-less frame with the
+// paged-media sheet; the browser's print engine does the pagination.
+function exportPdf(): void {
+  if (loaded === undefined) return;
+  const entry = dec.decode(loaded.pkg.files.get(loaded.pkg.manifest.entry) ?? new Uint8Array());
+  const frame = $('print-frame') as HTMLIFrameElement;
+  frame.onload = () => {
+    frame.contentWindow?.print();
+  };
+  frame.srcdoc = buildPrintSrcdoc(entry, loaded.pkg.files);
+}
+
+function setPaged(on: boolean): void {
+  paged = on;
+  $('paged-toggle').classList.toggle('active', on);
+  postToHuman({ type: 'wdf-paged', on });
 }
 
 // "Original" view (WP13): the embedded source, shown untouched. The toggle
@@ -339,6 +360,17 @@ function init(): void {
   });
   $('view-original').addEventListener('click', () => {
     setView('original');
+  });
+  $('paged-toggle').addEventListener('click', () => {
+    setView('human');
+    setPaged(!paged);
+  });
+  $('pdf-export').addEventListener('click', () => {
+    exportPdf();
+  });
+  // A reloaded Human frame starts unpaged: re-apply the paper view.
+  $('human').addEventListener('load', () => {
+    if (paged) postToHuman({ type: 'wdf-paged', on: true });
   });
   $('sidebar-toggle').addEventListener('click', () => {
     $('app').classList.toggle('sidebar-open');

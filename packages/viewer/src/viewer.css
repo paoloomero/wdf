@@ -159,6 +159,34 @@ code {
   background: var(--accent);
   color: #fff;
 }
+#doc-actions {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+#doc-actions button {
+  border: none;
+  background: var(--bg);
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+#doc-actions button.active {
+  background: var(--accent);
+  color: #fff;
+}
+/* Print frame: rendered (printable) but invisible — display:none frames
+   cannot print reliably. */
+#print-frame {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border: none;
+  visibility: hidden;
+}
 
 /* Layout */
 #layout {
