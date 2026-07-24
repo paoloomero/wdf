@@ -530,6 +530,31 @@ export interface HtmlImportOptions {
    * the page header/footer import (T14.1). Undefined = not available.
    */
   loadSibling?: (relPath: string) => Promise<Uint8Array | undefined>;
+  /** Import the whole body even when a main-content landmark exists (WP16). */
+  fullPage?: boolean;
+}
+
+/**
+ * Main-content landmark of a web page (WP16, plan §10.23): `<main>`, then
+ * `role="main"`, then `<article>`, searched depth-first. Word-processor
+ * exports have none, so they are never affected.
+ */
+function findLandmark(body: WdfElement): { el: WdfElement; label: string } | undefined {
+  const findDeep = (el: WdfElement, match: (e: WdfElement) => boolean): WdfElement | undefined => {
+    for (const child of elementChildren(el)) {
+      if (match(child)) return child;
+      const deep = findDeep(child, match);
+      if (deep !== undefined) return deep;
+    }
+    return undefined;
+  };
+  const main = findDeep(body, (e) => e.tag === 'main');
+  if (main !== undefined) return { el: main, label: 'main' };
+  const roleMain = findDeep(body, (e) => getAttr(e, 'role') === 'main');
+  if (roleMain !== undefined) return { el: roleMain, label: 'role="main"' };
+  const article = findDeep(body, (e) => e.tag === 'article');
+  if (article !== undefined) return { el: article, label: 'article' };
+  return undefined;
 }
 
 /** Package paths of every content/assets/ image still referenced by blocks. */
@@ -612,8 +637,19 @@ export async function importHtml(
           ...(headerRoot === null ? [] : collectStyleRules(headerRoot)),
         ]);
   const body = root === null ? undefined : findChild(root, 'body');
-  const article = body === undefined ? undefined : findChild(body, 'article');
-  const source = article ?? body;
+  let source = body;
+  if (body !== undefined && options.fullPage !== true) {
+    const landmark = findLandmark(body);
+    if (landmark !== undefined) {
+      source = landmark.el;
+      // Only announce an extraction when site chrome is actually dropped.
+      if (normalizedText(landmark.el) !== normalizedText(body)) {
+        report.push(
+          `extracted the main content from <${landmark.label}>; dropped the surrounding page chrome`,
+        );
+      }
+    }
+  }
   const raw = source === undefined ? [] : toBlocks(source.children, report);
 
   // T14.1 — page header/footer content enters the document once, as the

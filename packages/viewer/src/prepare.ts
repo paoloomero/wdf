@@ -196,6 +196,8 @@ export interface SourceExt {
   mainName: string;
   encoding: string;
   resources: Record<string, string>;
+  /** Original stylesheet href → embedded ext/source/*.css (WP15, v0.2). */
+  stylesheets: Record<string, string>;
 }
 
 /** Reads ext/source/source.json, or undefined when absent or malformed. */
@@ -208,19 +210,24 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
       mainName?: unknown;
       encoding?: unknown;
       resources?: unknown;
+      stylesheets?: unknown;
     };
     if (typeof parsed.main !== 'string' || !files.has(parsed.main)) return undefined;
-    const resources: Record<string, string> = {};
-    if (typeof parsed.resources === 'object' && parsed.resources !== null) {
-      for (const [k, v] of Object.entries(parsed.resources)) {
-        if (typeof v === 'string') resources[k] = v;
+    const stringMap = (value: unknown): Record<string, string> => {
+      const out: Record<string, string> = {};
+      if (typeof value === 'object' && value !== null) {
+        for (const [k, v] of Object.entries(value)) {
+          if (typeof v === 'string') out[k] = v;
+        }
       }
-    }
+      return out;
+    };
     return {
       main: parsed.main,
       mainName: typeof parsed.mainName === 'string' ? parsed.mainName : '',
       encoding: typeof parsed.encoding === 'string' ? parsed.encoding : 'utf-8',
-      resources,
+      resources: stringMap(parsed.resources),
+      stylesheets: stringMap(parsed.stylesheets),
     };
   } catch {
     return undefined;
@@ -248,6 +255,18 @@ export function buildOriginalSrcdoc(
     const data = files.get(path);
     if (data === undefined) continue;
     html = html.split(`src="${original}"`).join(`src="${toDataUri(path, data)}"`);
+  }
+  // WP15 (v0.2): the embedded stylesheets replace their <link> elements.
+  // Keys hold the DECODED href; the raw markup may entity-encode "&".
+  for (const [href, path] of Object.entries(ext.stylesheets)) {
+    const data = files.get(path);
+    if (data === undefined) continue;
+    const style = `<style>${new TextDecoder().decode(data)}</style>`;
+    const escaped = href
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .split('&')
+      .join('&(?:amp;)?');
+    html = html.replace(new RegExp(`<link\\b[^>]*href=["']${escaped}["'][^>]*>`, 'g'), () => style);
   }
   const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'" />`;
   if (/<head[^>]*>/i.test(html)) {

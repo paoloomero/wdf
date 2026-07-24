@@ -1,4 +1,4 @@
-# WDF extension: `source` (version 0.1)
+# WDF extension: `source` (version 0.2)
 
 Status: extension specification (outside WDF Core, per core spec §10).
 Producers MAY use it; conforming consumers MAY ignore it entirely (§10.3).
@@ -33,16 +33,26 @@ copies them unmodified into `content/assets/` under content-hashed names;
 using this extension keeps every loaded asset in the package, even assets
 the canonical document does not reference.
 
+**External stylesheets** (version 0.2): a web page's look lives in linked
+CSS files; they are embedded byte-for-byte as `ext/source/<hash>.css` and
+recorded in the `stylesheets` map, so a consumer can restore the original
+appearance offline. Declared limits: `url()` and `@import` _inside_ the
+CSS are not localized (site backgrounds and webfonts may be missing under
+the no-network CSP). Version 0.1 consumers ignore the extra field.
+
 ## `source.json`
 
 ```json
 {
-  "source": "0.1",
+  "source": "0.2",
   "main": "ext/source/8fda6be18a3c2f10.html",
   "mainName": "test doc accessibilit.html",
   "encoding": "windows-1252",
   "resources": {
     "test%20doc%20accessibilit.fld/image001.jpg": "content/assets/dba84c2ce51eb884.jpg"
+  },
+  "stylesheets": {
+    "styles/site.css": "ext/source/1a2b3c4d5e6f7081.css"
   }
 }
 ```
@@ -56,6 +66,8 @@ the canonical document does not reference.
   package path. Keys are sorted; serialization is canonical JSON with
   two-space indent and a trailing newline, so identical input produces
   identical bytes.
+- `stylesheets` — OPTIONAL (0.2). Original stylesheet `href` (verbatim) →
+  embedded `ext/source/*.css` path. Keys sorted, same canonical rules.
 
 ## Consumer guidance (viewers)
 

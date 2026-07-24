@@ -31,6 +31,7 @@ import {
 import { decodeHtml } from './import/encoding.js';
 import { embedFonts } from './import/fonts.js';
 import { importHtml, type HtmlImportOptions } from './import/html.js';
+import { collectSourceStylesheets, type CssFetcher } from './import/sourcecss.js';
 import { importMarkdown } from './import/markdown.js';
 import { buildPackage, hasViewerTemplate, makeStandalone } from './lib/build.js';
 import { readDirFiles, writeDirFiles } from './lib/fsutil.js';
@@ -217,6 +218,8 @@ export async function cmdImport(
     date?: string;
     withSource?: boolean;
     embedFonts?: boolean;
+    fetchRemote?: boolean;
+    fullPage?: boolean;
   } = {},
   ctx: Ctx = defaultCtx,
 ): Promise<number> {
@@ -229,6 +232,18 @@ export async function cmdImport(
   let baseName: string;
   // Word support folder access for page headers/footers (T14.1, local only).
   let loadSibling: ((relPath: string) => Promise<Uint8Array | undefined>) | undefined;
+  // External stylesheets for the source extension (WP15). Network policy:
+  // inherent for URL imports; opt-in (--fetch-remote) for local files.
+  let fetchCss: CssFetcher | undefined;
+  const asBytes = async (load: Promise<ReturnType<AssetLoader>> | ReturnType<AssetLoader>) => {
+    const result = await load;
+    return 'bytes' in result ? result.bytes : undefined;
+  };
+  const remoteUrl = (href: string): string | undefined => {
+    if (/^https?:\/\//i.test(href)) return href;
+    if (href.startsWith('//')) return `https:${href}`;
+    return undefined;
+  };
   // Original input, kept byte-for-byte for the `source` extension (WP13).
   let sourceBytes: Uint8Array | undefined;
   let sourceName = '';
@@ -244,6 +259,8 @@ export async function cmdImport(
       sourceBytes = page.bytes;
       sourceName = input;
       sourceEncoding = decoded.encoding;
+      const cssLoader = urlAssetLoader(page.baseUrl, DEFAULT_CAPS);
+      fetchCss = (href) => asBytes(cssLoader(href));
     } catch (e) {
       ctx.err(`error: cannot fetch ${input} (${String(e)})`);
       return 2;
@@ -277,6 +294,24 @@ export async function cmdImport(
           return Promise.resolve(undefined);
         }
       };
+      // WP15: remote references in a saved page resolve only with the
+      // explicit opt-in — a local import must not surprise with network.
+      const remote = urlAssetLoader('https://invalid.localhost/', DEFAULT_CAPS);
+      if (opts.fetchRemote === true) {
+        const local = loader;
+        loader = (src) => {
+          const url = remoteUrl(src);
+          return url === undefined ? local(src) : remote(url);
+        };
+      }
+      const sibling = loadSibling;
+      fetchCss = async (href) => {
+        const url = remoteUrl(href);
+        if (url !== undefined) {
+          return opts.fetchRemote === true ? asBytes(remote(url)) : undefined;
+        }
+        return sibling(href);
+      };
     }
     baseName = basename(input).replace(/\.[^.]+$/, '');
   }
@@ -295,6 +330,7 @@ export async function cmdImport(
     const options: HtmlImportOptions = loader === undefined ? {} : { loadAsset: loader };
     if (opts.withSource === true) options.keepAllAssets = true;
     if (loadSibling !== undefined) options.loadSibling = loadSibling;
+    if (opts.fullPage === true) options.fullPage = true;
     const result = await importHtml(text, options);
     blocks = result.blocks;
     sourceTitle = result.title;
@@ -357,14 +393,23 @@ export async function cmdImport(
 
   if (opts.withSource === true && sourceBytes !== undefined) {
     const mainPath = `ext/source/${(await sha256Hex(sourceBytes)).slice(0, 16)}.${isMarkdown ? 'md' : 'html'}`;
-    const sourceJson = {
-      source: '0.1',
+    // WP15: a web page's look lives in its external stylesheets — embed
+    // them so the Original view is not an unstyled skeleton.
+    let stylesheets: Record<string, string> = {};
+    if (!isMarkdown && fetchCss !== undefined) {
+      const collected = await collectSourceStylesheets(text, fetchCss, DEFAULT_CAPS, report);
+      for (const [path, bytes] of collected.files) extFiles.set(path, bytes);
+      stylesheets = collected.stylesheets;
+    }
+    const sourceJson: Record<string, unknown> = {
+      source: '0.2',
       main: mainPath,
       mainName: sourceName,
       encoding: sourceEncoding,
       resources: sourceMap,
     };
-    extensions.push({ name: 'source', version: '0.1' });
+    if (Object.keys(stylesheets).length > 0) sourceJson['stylesheets'] = stylesheets;
+    extensions.push({ name: 'source', version: '0.2' });
     extFiles.set(mainPath, sourceBytes);
     extFiles.set('ext/source/source.json', enc.encode(`${JSON.stringify(sourceJson, null, 2)}\n`));
     report.push(

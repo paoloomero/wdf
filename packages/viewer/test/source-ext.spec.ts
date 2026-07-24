@@ -63,6 +63,31 @@ describe('buildOriginalSrcdoc', () => {
     expect(srcdoc).not.toContain('wdf-flash');
   });
 
+  it('inlines embedded source stylesheets in place of their links (WP15)', () => {
+    const files = packageFiles();
+    const meta = {
+      source: '0.2',
+      main: 'ext/source/abc123.html',
+      mainName: 'saved.html',
+      encoding: 'utf-8',
+      resources: {},
+      stylesheets: { 'site_files/site.css': 'ext/source/cafecafecafecafe.css' },
+    };
+    files.set('ext/source/source.json', enc.encode(JSON.stringify(meta)));
+    files.set(
+      'ext/source/abc123.html',
+      enc.encode(
+        '<html><head><link rel="stylesheet" href="site_files/site.css"></head>' +
+          '<body><p>Ciao</p></body></html>',
+      ),
+    );
+    files.set('ext/source/cafecafecafecafe.css', enc.encode('body { color: #7a1f1f; }'));
+    const ext = parseSourceExt(files) as SourceExt;
+    const srcdoc = buildOriginalSrcdoc(files, ext);
+    expect(srcdoc).toContain('<style>body { color: #7a1f1f; }</style>');
+    expect(srcdoc).not.toContain('<link rel="stylesheet"');
+  });
+
   it('inlines embedded fonts as data: URIs in the sandbox (WP9)', () => {
     const files = new Map<string, Uint8Array>([
       [

@@ -62,6 +62,11 @@ program
     '--embed-fonts',
     'embed open metric-compatible clones of referenced fonts (extension "fonts", §10)',
   )
+  .option(
+    '--fetch-remote',
+    'for local inputs: fetch remote images and stylesheets over the network (WP15)',
+  )
+  .option('--full-page', 'skip main-content extraction and import the whole body (WP16)')
   .action(
     async (
       file: string,
@@ -72,6 +77,8 @@ program
         date?: string;
         withSource?: boolean;
         embedFonts?: boolean;
+        fetchRemote?: boolean;
+        fullPage?: boolean;
       },
     ) => {
       process.exitCode = await cmdImport(file, opts);
