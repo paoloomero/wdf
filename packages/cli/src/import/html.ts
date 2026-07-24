@@ -291,10 +291,15 @@ function blockOf(node: WdfElement, report: string[]): MNode[] {
   }
   switch (tag) {
     case 'section':
+      return [el(tag, pickAttrs(node, tag), toBlocks(node.children, report))];
     case 'header':
     case 'footer':
     case 'nav':
-      return [el(tag, pickAttrs(node, tag), toBlocks(node.children, report))];
+      // §6.2.2: transparent containers hold blocks only — real-world pages
+      // nest nav inside header (or nav inside nav); unwrap to their blocks.
+      return [
+        el(tag, pickAttrs(node, tag), flattenSectioning(toBlocks(node.children, report), report)),
+      ];
     case 'h1':
     case 'h2':
     case 'h3':
@@ -384,6 +389,15 @@ function blockOf(node: WdfElement, report: string[]): MNode[] {
       // div, main, aside, unknown containers: unwrap.
       return toBlocksNodes(node.children, report);
   }
+}
+
+/** Replaces nested sectioning elements with their block children (§6.2.2). */
+function flattenSectioning(blocks: MEl[], report: string[]): MEl[] {
+  return blocks.flatMap((block) => {
+    if (!SECTIONING.has(block.tag)) return [block];
+    report.push(`unwrapped <${block.tag}> nested in a transparent container (§6.2.2)`);
+    return flattenSectioning(block.children.filter(isEl), report);
+  });
 }
 
 function rebuildList(node: WdfElement, report: string[]): MEl {
