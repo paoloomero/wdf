@@ -105,7 +105,9 @@ export function promoteHeadings(blocks: MEl[], report: string[]): void {
         if (size !== undefined) headingSizes.push(size);
       }
       if (SECTIONING.has(block.tag)) {
-        scan(block.children.filter(isEl), promotable);
+        // Page headers/footers never hold the document title (T14.1):
+        // a big-font letterhead line must not become a heading.
+        scan(block.children.filter(isEl), promotable && block.tag === 'section');
         continue;
       }
       if (block.tag === 'blockquote') {

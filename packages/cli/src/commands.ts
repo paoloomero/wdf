@@ -227,6 +227,8 @@ export async function cmdImport(
   let text: string;
   let loader: AssetLoader | undefined;
   let baseName: string;
+  // Word support folder access for page headers/footers (T14.1, local only).
+  let loadSibling: ((relPath: string) => Promise<Uint8Array | undefined>) | undefined;
   // Original input, kept byte-for-byte for the `source` extension (WP13).
   let sourceBytes: Uint8Array | undefined;
   let sourceName = '';
@@ -266,6 +268,15 @@ export async function cmdImport(
       }
       sourceEncoding = decoded.encoding;
       loader = localAssetLoader(dirname(input), DEFAULT_CAPS);
+      loadSibling = (relPath) => {
+        try {
+          return Promise.resolve<Uint8Array | undefined>(
+            readFileSync(join(dirname(input), decodeURIComponent(relPath))),
+          );
+        } catch {
+          return Promise.resolve(undefined);
+        }
+      };
     }
     baseName = basename(input).replace(/\.[^.]+$/, '');
   }
@@ -283,6 +294,7 @@ export async function cmdImport(
   } else {
     const options: HtmlImportOptions = loader === undefined ? {} : { loadAsset: loader };
     if (opts.withSource === true) options.keepAllAssets = true;
+    if (loadSibling !== undefined) options.loadSibling = loadSibling;
     const result = await importHtml(text, options);
     blocks = result.blocks;
     sourceTitle = result.title;

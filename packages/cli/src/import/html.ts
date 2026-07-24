@@ -20,7 +20,14 @@ import {
   type AssetLoader,
   type LoadedAsset,
 } from './assets.js';
+import { decodeHtml } from './encoding.js';
 import { promoteHeadings } from './headings.js';
+import {
+  findFileListDir,
+  isPageResidue,
+  preprocessHeaderHtml,
+  selectPageParts,
+} from './pageheader.js';
 import { collectStyleRules, hoistStyles, StyleResolver, STYLE_TMP_ATTR } from './styles.js';
 
 /**
@@ -467,7 +474,12 @@ function pruneSpacerParagraphs(blocks: MEl[]): { blocks: MEl[]; removed: number 
           const inner = walk(block.children.filter(isEl));
           const text = block.children.filter((c) => !isEl(c));
           block.children = [...text, ...inner];
-          if (block.tag === 'blockquote' && inner.length === 0) {
+          const dropWhenEmpty =
+            block.tag === 'blockquote' ||
+            block.tag === 'header' ||
+            block.tag === 'footer' ||
+            block.tag === 'nav';
+          if (dropWhenEmpty && inner.length === 0) {
             removed += 1;
             return undefined;
           }
@@ -499,6 +511,11 @@ export interface HtmlImportOptions {
   caps?: AssetCaps;
   /** Keep assets even when the canonical document drops them (WP13). */
   keepAllAssets?: boolean;
+  /**
+   * Loads a file from the input's directory (Word support folders), for
+   * the page header/footer import (T14.1). Undefined = not available.
+   */
+  loadSibling?: (relPath: string) => Promise<Uint8Array | undefined>;
 }
 
 /** Package paths of every content/assets/ image still referenced by blocks. */
@@ -523,6 +540,22 @@ export async function importHtml(
   const doc = parseHtml(html);
   const root = doc.html;
 
+  // T14.1 — the Word support folder may carry page headers/footers.
+  let headerRoot: WdfElement | null = null;
+  let fldDir: string | undefined;
+  if (root !== null && options.loadSibling !== undefined) {
+    fldDir = findFileListDir(root);
+    if (fldDir !== undefined) {
+      for (const name of ['header.html', 'header.htm']) {
+        const bytes = await options.loadSibling(`${fldDir}/${name}`);
+        if (bytes !== undefined) {
+          headerRoot = parseHtml(preprocessHeaderHtml(decodeHtml(bytes).text)).html;
+          break;
+        }
+      }
+    }
+  }
+
   let assets: LoadedAsset[] = [];
   let sourceMap: Record<string, string> = {};
   if (root !== null && options.loadAsset !== undefined) {
@@ -537,18 +570,76 @@ export async function importHtml(
     sourceMap = Object.fromEntries(
       [...resolved.map.entries()].sort(([a], [b]) => (a < b ? -1 : 1)),
     );
+    // Header/footer images live in the support folder and are referenced
+    // relative to it: resolve them through a prefixed loader.
+    if (headerRoot !== null && fldDir !== undefined) {
+      const loadAsset = options.loadAsset;
+      const dir = fldDir;
+      const resolvedHeader = await resolveDocumentAssets(
+        headerRoot,
+        (src) => loadAsset(`${dir}/${src}`),
+        options.caps ?? DEFAULT_CAPS,
+        report,
+      );
+      for (const [key, value] of resolvedHeader.map) assetMap.set(key, value);
+      for (const asset of resolvedHeader.assets) {
+        if (!assets.some((a) => a.path === asset.path)) assets.push(asset);
+      }
+    }
   } else {
     assetMap = undefined;
   }
 
-  resolver = root === null ? undefined : new StyleResolver(collectStyleRules(root));
+  resolver =
+    root === null
+      ? undefined
+      : new StyleResolver([
+          ...collectStyleRules(root),
+          ...(headerRoot === null ? [] : collectStyleRules(headerRoot)),
+        ]);
   const body = root === null ? undefined : findChild(root, 'body');
   const article = body === undefined ? undefined : findChild(body, 'article');
   const source = article ?? body;
   const raw = source === undefined ? [] : toBlocks(source.children, report);
+
+  // T14.1 — page header/footer content enters the document once, as the
+  // article's <header> and <footer>; page-counter residue is dropped.
+  let withPage = raw;
+  if (headerRoot !== null) {
+    let residue = 0;
+    const parts = selectPageParts(headerRoot);
+    const convertPart = (
+      part: WdfElement | undefined,
+      tag: 'header' | 'footer',
+    ): MEl | undefined => {
+      if (part === undefined) return undefined;
+      const inner = toBlocks(part.children, report).filter((block) => {
+        if (block.tag !== 'p') return true;
+        const text = textOf(block).replace(/\s+/g, ' ').trim();
+        if (text === '' || !isPageResidue(text) || hasImg(block)) return true;
+        residue += 1;
+        return false;
+      });
+      return inner.length === 0 ? undefined : el(tag, {}, inner);
+    };
+    const pageHeader = convertPart(parts.header, 'header');
+    const pageFooter = convertPart(parts.footer, 'footer');
+    if (pageHeader !== undefined) {
+      withPage = [pageHeader, ...withPage];
+      report.push('imported the Word page header as <header> (T14.1)');
+    }
+    if (pageFooter !== undefined) {
+      withPage = [...withPage, pageFooter];
+      report.push('imported the Word page footer as <footer> (T14.1)');
+    }
+    if (residue > 0) {
+      report.push(`dropped ${String(residue)} page-number paragraph(s) (page-agnostic format)`);
+    }
+  }
+
   resolver = undefined;
   assetMap = undefined;
-  const { blocks, removed } = pruneSpacerParagraphs(raw);
+  const { blocks, removed } = pruneSpacerParagraphs(withPage);
   if (removed > 0) {
     report.push(`dropped ${String(removed)} empty spacer paragraph(s)`);
   }
