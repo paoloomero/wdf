@@ -14,6 +14,9 @@ describe('buildPrintSrcdoc (WP10)', () => {
     expect(out).toContain('@page { size: A4; margin: 20mm; }');
     expect(out).toContain('break-after: avoid');
     expect(out).toContain('display: table-header-group');
+    // Top-level sections start on a fresh page — never the first one.
+    expect(out).toContain('article > h1:not(:first-child)');
+    expect(out).toContain('break-before: page');
   });
 
   it('is script-free with a CSP that allows no scripts at all', () => {
@@ -41,5 +44,11 @@ describe('paper view on screen (WP10)', () => {
     expect(out).toContain('html.wdf-paged article');
     expect(out).toContain('width: 210mm');
     expect(CONTROLLER_JS).toContain("d.type === 'wdf-paged'");
+  });
+
+  it('gives section boundaries breathing space in the paper view', () => {
+    const out = buildSrcdoc(entry, new Map(), 'n');
+    expect(out).toContain('html.wdf-paged article > h1:not(:first-child)');
+    expect(out).toContain('margin-top: 3.5em');
   });
 });

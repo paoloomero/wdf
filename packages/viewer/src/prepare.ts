@@ -59,6 +59,11 @@ export const PAGED_CSS = `
     margin: 0 auto; padding: 20mm; min-height: 297mm;
     box-shadow: 0 3px 18px rgba(0, 0, 0, 0.45);
   }
+  /* Breathing space at section boundaries, mirroring the print breaks. */
+  html.wdf-paged article > h1:not(:first-child),
+  html.wdf-paged article > section:not(:first-child) { margin-top: 3.5em; }
+  html.wdf-paged article > h2:not(:first-child) { margin-top: 2.4em; }
+  html.wdf-paged table, html.wdf-paged figure { margin-top: 1.6em; margin-bottom: 1.6em; }
 `;
 
 /** Paged-media sheet for print/PDF export (WP10): the browser paginates. */
@@ -69,6 +74,10 @@ export const PRINT_CSS = `
   h1, h2, h3, h4, h5, h6 { break-after: avoid; }
   figure, tr { break-inside: avoid; }
   thead { display: table-header-group; }
+  /* A top-level section (or its h1) starts on a fresh page, like a Word
+     section break. Never the first one: the title stays with page one. */
+  article > h1:not(:first-child),
+  article > section:not(:first-child) { break-before: page; }
 `;
 
 /** Base typography for packages without a stylesheet, plus selection flash. */
