@@ -16,16 +16,38 @@
           Open a <strong>Web Document Format</strong> package: what the human reads and what an AI
           agent reads are the same thing — verifiably.
         </p>
-        <p class="drop-hint">Drop a <code>.wdf</code> file here, or</p>
+        <p class="drop-hint">
+          Drop a <code>.wdf</code> file here — or an HTML export from your word processor (with its
+          images folder) to convert it into one. Everything happens in your browser: no upload, no
+          network requests.
+        </p>
         <label class="file-button">
-          Choose a file
-          <input type="file" id="file-input" accept=".wdf,application/wdf+zip" hidden />
+          Choose files
+          <input type="file" id="file-input" multiple hidden />
         </label>
         <p id="install-hint" class="drop-hint small">
           Tip: install this page as an app (Chrome/Edge, install icon in the address bar) and
           <code>.wdf</code> files will open with a double click — offline, like any reader.
         </p>
         <p id="drop-error" class="drop-error" hidden></p>
+        <div id="convert-panel" hidden>
+          <h2 id="convert-title"></h2>
+          <p class="drop-hint small">
+            Converted entirely in your browser — the document never left your machine.
+          </p>
+          <div id="convert-actions">
+            <button id="convert-open" class="file-button">Open in Reader</button>
+            <a id="convert-download" class="file-button">Download .wdf</a>
+          </div>
+          <label class="drop-hint small convert-option">
+            <input type="checkbox" id="convert-source" checked />
+            Include the original source (adds the Original view)
+          </label>
+          <details id="convert-notes">
+            <summary>Conversion report</summary>
+            <ul id="convert-report"></ul>
+          </details>
+        </div>
       </div>
     </div>
 

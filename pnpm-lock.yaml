@@ -77,6 +77,9 @@ importers:
       '@wdf/core':
         specifier: workspace:*
         version: link:../core
+      '@wdf/import':
+        specifier: workspace:*
+        version: link:../import
     devDependencies:
       esbuild:
         specifier: ^0.24.2

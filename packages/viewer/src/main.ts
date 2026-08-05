@@ -10,6 +10,7 @@ import {
   type WdfPackage,
 } from '@wdf/core';
 
+import { convertFiles } from './convert.js';
 import {
   agentBlocks,
   buildOriginalSrcdoc,
@@ -49,6 +50,104 @@ function showDropError(message: string): void {
   const box = $('drop-error');
   box.textContent = message;
   box.hidden = false;
+}
+
+// ---------------------------------------------------------------------------
+// In-browser converter (T7.6, plan §10.24): an HTML export dropped on the
+// Reader converts to .wdf fully client-side — no upload, no network requests.
+
+// The last dropped file set, kept so toggling options re-runs the conversion.
+let droppedSet: Map<string, Uint8Array> | undefined;
+let convertedBytes: Uint8Array | undefined;
+let convertedName = 'document.wdf';
+let downloadUrl: string | undefined;
+
+function entryOf(item: DataTransferItem): FileSystemEntry | null {
+  return typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null;
+}
+
+/** Reads a drag-and-drop entry (file or directory) into the path map. */
+async function readEntry(
+  entry: FileSystemEntry,
+  prefix: string,
+  out: Map<string, Uint8Array>,
+): Promise<void> {
+  if (entry.name.startsWith('.')) return; // .DS_Store and friends
+  if (entry.isFile) {
+    const file = await new Promise<File>((res, rej) => {
+      (entry as FileSystemFileEntry).file(res, rej);
+    });
+    out.set(prefix + entry.name, new Uint8Array(await file.arrayBuffer()));
+  } else if (entry.isDirectory) {
+    const reader = (entry as FileSystemDirectoryEntry).createReader();
+    for (;;) {
+      // readEntries returns batches (Chrome: 100 per call) until empty.
+      const batch = await new Promise<FileSystemEntry[]>((res, rej) => {
+        reader.readEntries(res, rej);
+      });
+      if (batch.length === 0) break;
+      for (const child of batch) await readEntry(child, `${prefix}${entry.name}/`, out);
+    }
+  }
+}
+
+async function fileListToMap(files: Iterable<File>): Promise<Map<string, Uint8Array>> {
+  const out = new Map<string, Uint8Array>();
+  for (const file of files) {
+    if (file.name.startsWith('.')) continue;
+    out.set(file.name, new Uint8Array(await file.arrayBuffer()));
+  }
+  return out;
+}
+
+/** A dropped .wdf opens as before; anything else goes to the converter. */
+async function handleDropped(files: Map<string, Uint8Array>): Promise<void> {
+  const wdf = [...files.keys()].sort().find((p) => /\.wdf$/i.test(p));
+  if (wdf !== undefined) {
+    const bytes = files.get(wdf);
+    if (bytes !== undefined) openBytes(bytes, wdf.split('/').pop() ?? wdf);
+    return;
+  }
+  droppedSet = files;
+  await runConvert();
+}
+
+async function runConvert(): Promise<void> {
+  if (droppedSet === undefined) return;
+  $('drop-error').hidden = true;
+  const withSource = ($('convert-source') as HTMLInputElement).checked;
+  let result;
+  try {
+    result = await convertFiles(droppedSet, withSource ? { withSource: true } : {});
+  } catch (e) {
+    $('convert-panel').hidden = true;
+    showDropError(String(e));
+    return;
+  }
+  if (result === undefined) {
+    $('convert-panel').hidden = true;
+    showDropError('no representable content found in the input');
+    return;
+  }
+
+  convertedBytes = result.wdfBytes;
+  convertedName = result.fileName;
+  $('convert-title').textContent = `${result.title} → ${result.fileName}`;
+  const list = $('convert-report');
+  list.textContent = '';
+  for (const line of result.report) {
+    const li = document.createElement('li');
+    li.textContent = line;
+    list.append(li);
+  }
+  if (downloadUrl !== undefined) URL.revokeObjectURL(downloadUrl);
+  downloadUrl = URL.createObjectURL(
+    new Blob([result.wdfBytes.slice().buffer], { type: 'application/wdf+zip' }),
+  );
+  const download = $('convert-download') as HTMLAnchorElement;
+  download.href = downloadUrl;
+  download.download = result.fileName;
+  $('convert-panel').hidden = false;
 }
 
 function openBytes(bytes: Uint8Array, name: string): void {
@@ -325,11 +424,9 @@ function init(): void {
   const fileInput = $('file-input') as HTMLInputElement;
 
   fileInput.addEventListener('change', () => {
-    const file = fileInput.files?.[0];
-    if (file !== undefined) {
-      void file.arrayBuffer().then((buf) => {
-        openBytes(new Uint8Array(buf), file.name);
-      });
+    const files = fileInput.files;
+    if (files !== null && files.length > 0) {
+      void fileListToMap(files).then(handleDropped);
     }
   });
   for (const eventName of ['dragover', 'dragenter'] as const) {
@@ -344,12 +441,26 @@ function init(): void {
   dropCard.addEventListener('drop', (e) => {
     e.preventDefault();
     dropCard.classList.remove('dragover');
-    const file = e.dataTransfer?.files[0];
-    if (file !== undefined) {
-      void file.arrayBuffer().then((buf) => {
-        openBytes(new Uint8Array(buf), file.name);
-      });
+    const dt = e.dataTransfer;
+    if (dt === null) return;
+    // webkitGetAsEntry must be taken synchronously, before the event ends;
+    // it is the only way to receive dropped folders (Word's _files/.fld).
+    const entries = [...dt.items].map(entryOf).filter((en) => en !== null);
+    if (entries.length > 0) {
+      void (async () => {
+        const map = new Map<string, Uint8Array>();
+        for (const entry of entries) await readEntry(entry, '', map);
+        await handleDropped(map);
+      })();
+    } else {
+      void fileListToMap(dt.files).then(handleDropped);
     }
+  });
+  $('convert-open').addEventListener('click', () => {
+    if (convertedBytes !== undefined) openBytes(convertedBytes, convertedName);
+  });
+  $('convert-source').addEventListener('change', () => {
+    void runConvert();
   });
 
   $('view-human').addEventListener('click', () => {

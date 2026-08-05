@@ -86,6 +86,51 @@ code {
   font-size: 0.85rem;
 }
 
+/* In-browser converter result (T7.6) */
+#convert-panel {
+  margin-top: 1.4rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1.2rem;
+  text-align: left;
+}
+#convert-panel h2 {
+  font-size: 0.95rem;
+  margin: 0 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+#convert-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+#convert-actions .file-button {
+  border: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.convert-option {
+  display: block;
+  cursor: pointer;
+}
+#convert-notes summary {
+  font-size: 0.82rem;
+  color: #7a8494;
+  cursor: pointer;
+  margin-top: 0.9rem;
+}
+#convert-report {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-height: 11rem;
+  overflow: auto;
+}
+#convert-report li {
+  margin: 0.15rem 0;
+}
+
 /* App frame */
 #app {
   height: 100%;

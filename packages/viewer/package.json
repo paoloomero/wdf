@@ -12,7 +12,8 @@
     "build": "tsc --noEmit -p tsconfig.json && node build.mjs"
   },
   "dependencies": {
-    "@wdf/core": "workspace:*"
+    "@wdf/core": "workspace:*",
+    "@wdf/import": "workspace:*"
   },
   "devDependencies": {
     "esbuild": "^0.24.2"
