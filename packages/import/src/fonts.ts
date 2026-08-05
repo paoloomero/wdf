@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 /**
  * Fonts extension (WP9, plan §10.19, docs/ext-fonts.md): when the imported
  * document's stacks reference a well-known proprietary family, embed its
@@ -29,8 +26,11 @@ const FACES: { weight: 400 | 700; style: 'normal' | 'italic' }[] = [
   { weight: 700, style: 'italic' },
 ];
 
-/** The woff2 files ship with the CLI package (packages/cli/fonts/). */
-const FONTS_DIR = join(import.meta.dirname, '../../fonts');
+/**
+ * Supplies the woff2 bytes for a face file name. The CLI reads them from the
+ * files shipped in packages/cli/fonts/; a browser host would bundle them.
+ */
+export type FontReader = (fileName: string) => Uint8Array;
 
 export interface EmbeddedFonts {
   /** The stylesheet with clone families prepended to matched stacks. */
@@ -50,7 +50,7 @@ function faceFileName(clone: string, weight: number, style: string): string {
  * substitutable family of each stack wins; its clone is prepended unless
  * already present.
  */
-export function embedFonts(stylesheet: string): EmbeddedFonts | undefined {
+export function embedFonts(stylesheet: string, readFont: FontReader): EmbeddedFonts | undefined {
   const used = new Map<string, string>(); // clone → source family it substitutes
   const rewritten = stylesheet.replace(
     /(font-family:\s*)([^;\n]+)/g,
@@ -82,7 +82,7 @@ export function embedFonts(stylesheet: string): EmbeddedFonts | undefined {
     for (const { weight, style } of FACES) {
       const name = faceFileName(clone, weight, style);
       const path = `ext/fonts/${name}`;
-      files.set(path, readFileSync(join(FONTS_DIR, name)));
+      files.set(path, readFont(name));
       faces.push({
         family: clone,
         substitutesFor: used.get(clone) ?? '',

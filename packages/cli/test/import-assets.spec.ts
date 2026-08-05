@@ -8,12 +8,7 @@ import { parseHtml, readPackage } from '@wdf/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import {
-  DEFAULT_CAPS,
-  identifyImage,
-  resolveDocumentAssets,
-  type AssetLoad,
-} from '../src/import/assets.js';
+import { DEFAULT_CAPS, identifyImage, resolveDocumentAssets, type AssetLoad } from '@wdf/import';
 
 const dec = new TextDecoder();
 

@@ -8,6 +8,7 @@ export default defineConfig({
     // sources instead of dist.
     alias: {
       '@wdf/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
+      '@wdf/import': fileURLToPath(new URL('./packages/import/src/index.ts', import.meta.url)),
     },
   },
   test: {

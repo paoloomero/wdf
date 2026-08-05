@@ -6,7 +6,8 @@ import { readPackage } from '@wdf/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { embedFonts } from '../src/import/fonts.js';
+import { embedFonts } from '@wdf/import';
+import { fsFontReader } from '../src/lib/loaders.js';
 
 // WP9 acceptance (plan §10.19): --embed-fonts embeds metric-compatible open
 // clones of referenced families, prepends them to the stacks, and declares
@@ -114,12 +115,12 @@ describe('fonts extension (WP9)', () => {
 
 describe('embedFonts unit behavior', () => {
   it('does not double-prepend when the clone is already in the stack', () => {
-    const out = embedFonts('p { font-family: "Carlito", "Calibri", sans-serif; }');
+    const out = embedFonts('p { font-family: "Carlito", "Calibri", sans-serif; }', fsFontReader);
     expect(out).toBeUndefined();
   });
 
   it('matches case-insensitively and unquoted names', () => {
-    const out = embedFonts('p { font-family: times new roman, serif; }');
+    const out = embedFonts('p { font-family: times new roman, serif; }', fsFontReader);
     expect(out?.stylesheet).toContain('"Tinos", times new roman, serif');
   });
 });

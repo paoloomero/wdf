@@ -35,6 +35,9 @@ importers:
       '@wdf/core':
         specifier: workspace:*
         version: link:../core
+      '@wdf/import':
+        specifier: workspace:*
+        version: link:../import
       '@wdf/viewer':
         specifier: workspace:*
         version: link:../viewer
@@ -56,6 +59,12 @@ importers:
       parse5:
         specifier: ^7.2.1
         version: 7.3.0
+
+  packages/import:
+    dependencies:
+      '@wdf/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/mcp:
     dependencies:

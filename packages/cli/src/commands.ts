@@ -3,7 +3,6 @@ import { basename, dirname, join } from 'node:path';
 
 import {
   readPackage,
-  sha256Hex,
   validateDatasets,
   validateProfile,
   validateStylesheet,
@@ -14,27 +13,20 @@ import {
 } from '@wdf/core';
 
 import {
-  ensureIds,
-  fixDanglingFragments,
-  textOf,
-  serializeDocument,
-  type MEl,
-} from './import/ast.js';
-import {
+  buildPackage,
+  decodeHtml,
   DEFAULT_CAPS,
   fetchPage,
-  localAssetLoader,
+  importDocument,
   urlAssetLoader,
   type AssetLoader,
-  type LoadedAsset,
-} from './import/assets.js';
-import { decodeHtml } from './import/encoding.js';
-import { embedFonts } from './import/fonts.js';
-import { importHtml, type HtmlImportOptions } from './import/html.js';
-import { collectSourceStylesheets, type CssFetcher } from './import/sourcecss.js';
-import { importMarkdown } from './import/markdown.js';
-import { buildPackage, hasViewerTemplate, makeStandalone } from './lib/build.js';
+  type CssFetcher,
+  type ImportInput,
+} from '@wdf/import';
+
+import { hasViewerTemplate, makeStandalone } from './lib/build.js';
 import { readDirFiles, writeDirFiles } from './lib/fsutil.js';
+import { fsFontReader, localAssetLoader } from './lib/loaders.js';
 
 /** Output sinks, injectable for tests. `out` is raw stdout (no newline added). */
 export interface Ctx {
@@ -56,7 +48,6 @@ export const defaultCtx: Ctx = {
 };
 
 const dec = new TextDecoder('utf-8', { fatal: true });
-const enc = new TextEncoder();
 
 function formatViolation(v: Violation): string {
   return `  [${v.spec}] ${v.severity === 'warning' ? 'warning: ' : ''}${v.path} — ${v.message}`;
@@ -192,11 +183,6 @@ export function cmdExtract(
   }
 }
 
-function deterministicUuid(hex: string): string {
-  const variant = ((parseInt(hex[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
-  return `urn:uuid:${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-}
-
 function urlBaseName(url: string): string {
   try {
     const last = new URL(url).pathname
@@ -316,132 +302,40 @@ export async function cmdImport(
     baseName = basename(input).replace(/\.[^.]+$/, '');
   }
 
-  let blocks: MEl[];
-  let sourceTitle: string | undefined;
-  let sourceLang: string | undefined;
-  let stylesheet: string | undefined;
-  let assets: LoadedAsset[] = [];
-  let sourceMap: Record<string, string> = {};
-  if (isMarkdown) {
-    const result = importMarkdown(text);
-    blocks = result.blocks;
-    report.push(...result.report);
-  } else {
-    const options: HtmlImportOptions = loader === undefined ? {} : { loadAsset: loader };
-    if (opts.withSource === true) options.keepAllAssets = true;
-    if (loadSibling !== undefined) options.loadSibling = loadSibling;
-    if (opts.fullPage === true) options.fullPage = true;
-    const result = await importHtml(text, options);
-    blocks = result.blocks;
-    sourceTitle = result.title;
-    sourceLang = result.language;
-    stylesheet = result.stylesheet;
-    assets = result.assets;
-    sourceMap = result.sourceMap;
-    report.push(...result.report);
-  }
-
-  if (blocks.length === 0) {
-    ctx.err('error: no representable content found in the input');
-    return 1;
-  }
-  ensureIds(blocks, report);
-  fixDanglingFragments(blocks, report);
-
-  const firstHeading = blocks.find((b) => /^h[1-6]$/.test(b.tag));
-  const title =
-    opts.title ??
-    sourceTitle ??
-    (firstHeading === undefined ? baseName : textOf(firstHeading).trim());
-  const lang = opts.lang ?? sourceLang ?? 'en';
-  const html = serializeDocument(lang, title, blocks, stylesheet !== undefined);
-  const htmlBytes = enc.encode(html);
-
-  const date = opts.date ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-  const manifest: WdfManifest = {
-    wdf: '0.1',
-    id: deterministicUuid(await sha256Hex(htmlBytes)),
-    title,
-    language: lang,
-    created: date,
-    modified: date,
-    entry: 'content/index.html',
+  // The pipeline itself is the shared isomorphic path (T7.5): the CLI only
+  // resolves the input and supplies the filesystem/network loaders.
+  const docInput: ImportInput = {
+    kind: isMarkdown ? 'markdown' : 'html',
+    text,
+    baseName,
+    sourceName,
+    sourceEncoding,
   };
-  if (assets.length > 0) {
-    manifest.resources = assets.map((a) => ({ path: a.path, mediaType: a.mediaType }));
-  }
+  if (sourceBytes !== undefined) docInput.sourceBytes = sourceBytes;
 
-  // WP13 (plan §10.18): embed the original input byte-for-byte under
-  // ext/source/; images are not duplicated — source.json maps the original
-  // src values onto the content/assets/ copies.
-  const extFiles = new Map<string, Uint8Array>();
-  const extensions: { name: string; version: string }[] = [];
-
-  // WP9 (plan §10.19): embed metric-compatible open clones for well-known
-  // families and prepend them to the generated stacks.
-  if (opts.embedFonts === true && stylesheet !== undefined) {
-    const fonts = embedFonts(stylesheet);
-    if (fonts === undefined) {
-      report.push('no substitutable font family in the stylesheet — fonts extension not added');
-    } else {
-      stylesheet = fonts.stylesheet;
-      for (const [path, bytes] of fonts.files) extFiles.set(path, bytes);
-      extensions.push({ name: 'fonts', version: '0.1' });
-      report.push(...fonts.report);
-    }
-  }
-
-  if (opts.withSource === true && sourceBytes !== undefined) {
-    const mainPath = `ext/source/${(await sha256Hex(sourceBytes)).slice(0, 16)}.${isMarkdown ? 'md' : 'html'}`;
-    // WP15: a web page's look lives in its external stylesheets — embed
-    // them so the Original view is not an unstyled skeleton.
-    let stylesheets: Record<string, string> = {};
-    if (!isMarkdown && fetchCss !== undefined) {
-      const collected = await collectSourceStylesheets(text, fetchCss, DEFAULT_CAPS, report);
-      for (const [path, bytes] of collected.files) extFiles.set(path, bytes);
-      stylesheets = collected.stylesheets;
-    }
-    const sourceJson: Record<string, unknown> = {
-      source: '0.2',
-      main: mainPath,
-      mainName: sourceName,
-      encoding: sourceEncoding,
-      resources: sourceMap,
-    };
-    if (Object.keys(stylesheets).length > 0) sourceJson['stylesheets'] = stylesheets;
-    extensions.push({ name: 'source', version: '0.2' });
-    extFiles.set(mainPath, sourceBytes);
-    extFiles.set('ext/source/source.json', enc.encode(`${JSON.stringify(sourceJson, null, 2)}\n`));
-    report.push(
-      `embedded the original source as ${mainPath} (extension "source", docs/ext-source.md)`,
-    );
-  }
-  if (extensions.length > 0) {
-    manifest.extensions = extensions.sort((a, b) => (a.name < b.name ? -1 : 1));
-  }
-
-  const source = new Map<string, Uint8Array>([
-    ['manifest.json', enc.encode(`${JSON.stringify(manifest, null, 2)}\n`)],
-    ['content/index.html', htmlBytes],
-  ]);
-  if (stylesheet !== undefined) {
-    source.set('content/styles.css', enc.encode(stylesheet));
-  }
-  for (const asset of assets) {
-    source.set(asset.path, asset.bytes);
-  }
-  for (const [path, bytes] of extFiles) {
-    source.set(path, bytes);
-  }
+  const importOpts: Parameters<typeof importDocument>[1] = { readFont: fsFontReader };
+  if (opts.title !== undefined) importOpts.title = opts.title;
+  if (opts.lang !== undefined) importOpts.lang = opts.lang;
+  if (opts.date !== undefined) importOpts.date = opts.date;
+  if (opts.withSource === true) importOpts.withSource = true;
+  if (opts.embedFonts === true) importOpts.embedFonts = true;
+  if (opts.fullPage === true) importOpts.fullPage = true;
+  if (loader !== undefined) importOpts.loadAsset = loader;
+  if (loadSibling !== undefined) importOpts.loadSibling = loadSibling;
+  if (fetchCss !== undefined) importOpts.fetchCss = fetchCss;
 
   try {
-    const bytes = await buildPackage(source);
+    const result = await importDocument(docInput, importOpts, report);
+    if (result === undefined) {
+      ctx.err('error: no representable content found in the input');
+      return 1;
+    }
     const output = opts.output ?? `${baseName}.wdf`;
-    writeFileSync(output, bytes);
+    writeFileSync(output, result.wdfBytes);
     for (const line of report) ctx.log(`note: ${line}`);
-    ctx.log(`wrote ${output} (${String(bytes.length)} bytes)`);
+    ctx.log(`wrote ${output} (${String(result.wdfBytes.length)} bytes)`);
 
-    const check = validateProfile(html).filter((v) => v.severity === 'error');
+    const check = validateProfile(result.html).filter((v) => v.severity === 'error');
     if (check.length > 0) {
       for (const v of check) ctx.log(formatViolation(v));
       ctx.err(`import produced ${String(check.length)} profile error(s) — package written anyway`);

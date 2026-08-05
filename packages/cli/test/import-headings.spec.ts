@@ -6,10 +6,7 @@ import { readPackage } from '@wdf/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { el } from '../src/import/ast.js';
-import { promoteHeadings } from '../src/import/headings.js';
-import { importHtml } from '../src/import/html.js';
-import { STYLE_TMP_ATTR } from '../src/import/styles.js';
+import { el, promoteHeadings, importHtml, STYLE_TMP_ATTR } from '@wdf/import';
 
 // T7.7 acceptance (plan §10.15): styled title paragraphs from Word-like and
 // Google-Docs-like exports are promoted to h1..h6, fixing the flat outline;

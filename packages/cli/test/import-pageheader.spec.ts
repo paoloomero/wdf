@@ -6,10 +6,13 @@ import { readPackage } from '@wdf/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdExtract, cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { el } from '../src/import/ast.js';
-import { promoteHeadings } from '../src/import/headings.js';
-import { isPageResidue, preprocessHeaderHtml } from '../src/import/pageheader.js';
-import { STYLE_TMP_ATTR } from '../src/import/styles.js';
+import {
+  el,
+  promoteHeadings,
+  isPageResidue,
+  preprocessHeaderHtml,
+  STYLE_TMP_ATTR,
+} from '@wdf/import';
 
 // T14.1 acceptance (plan §10.21): Word page headers/footers from the
 // support folder's header.html enter the document once, as <header> and

@@ -6,7 +6,7 @@ import { readPackage, validateStylesheet } from '@wdf/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { parseStylesheet, sanitizeDeclarations, parseDeclarations } from '../src/import/styles.js';
+import { parseStylesheet, sanitizeDeclarations, parseDeclarations } from '@wdf/import';
 
 // T7.2 acceptance (plan §10.7): the imported document keeps its typographic
 // identity via a generated stylesheet; hostile constructs never survive;

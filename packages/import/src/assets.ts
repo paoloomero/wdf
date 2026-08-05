@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { isAbsolute, join, normalize } from 'node:path';
-
 import { getAttr, isElement, sha256Hex, type WdfElement } from '@wdf/core';
 
 /**
@@ -69,38 +66,6 @@ export function identifyImage(b: Uint8Array): { ext: string; mediaType: string }
     return { ext: 'svg', mediaType: 'image/svg+xml' };
   }
   return undefined;
-}
-
-/** Loads images referenced by relative paths from the input file's directory. */
-export function localAssetLoader(baseDir: string, caps: AssetCaps): AssetLoader {
-  return (src) => {
-    if (/^[a-z][a-z0-9+.-]*:/i.test(src)) {
-      return Promise.resolve({
-        reason: 'remote or non-file reference (skipped for a local import)',
-      });
-    }
-    const clean = (src.split(/[?#]/, 1)[0] ?? '').replace(/\\/g, '/');
-    // Word URL-encodes the companion-folder path (spaces → %20), but the
-    // folder on disk has literal spaces; decode before resolving.
-    let decoded: string;
-    try {
-      decoded = decodeURIComponent(clean);
-    } catch {
-      decoded = clean;
-    }
-    const rel = normalize(decoded);
-    if (isAbsolute(rel) || rel.split('/').includes('..')) {
-      return Promise.resolve({ reason: 'path escapes the document directory' });
-    }
-    try {
-      const bytes = new Uint8Array(readFileSync(join(baseDir, rel)));
-      if (bytes.length > caps.perFile)
-        return Promise.resolve({ reason: 'exceeds per-file size limit' });
-      return Promise.resolve({ bytes });
-    } catch {
-      return Promise.resolve({ reason: 'file not found' });
-    }
-  };
 }
 
 /**

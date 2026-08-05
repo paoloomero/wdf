@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { buildPackage } from '../../cli/src/lib/build.js';
+import { buildPackage } from '@wdf/import';
 import { readDirFiles } from '../../cli/src/lib/fsutil.js';
 import { handleMessage } from '../src/rpc.js';
 import { callTool, type McpState } from '../src/tools.js';

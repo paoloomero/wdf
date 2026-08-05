@@ -6,9 +6,7 @@ import { readPackage } from '@wdf/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { DEFAULT_CAPS } from '../src/import/assets.js';
-import { importHtml } from '../src/import/html.js';
-import { collectSourceStylesheets } from '../src/import/sourcecss.js';
+import { DEFAULT_CAPS, importHtml, collectSourceStylesheets } from '@wdf/import';
 
 // WP15 + WP16 acceptance (plan §10.23): a browser-saved page imports with
 // its main content extracted (site chrome dropped, reported) and its
