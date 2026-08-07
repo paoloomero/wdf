@@ -416,6 +416,10 @@ function setView(view: 'human' | 'agent' | 'original'): void {
   $('view-human').classList.toggle('active', view === 'human');
   $('view-agent').classList.toggle('active', view === 'agent');
   $('view-original').classList.toggle('active', view === 'original');
+  // Paper and PDF act on the document rendering: available only where they
+  // apply (the Human view). The paper state itself survives view switches.
+  ($('paged-toggle') as HTMLButtonElement).disabled = view !== 'human';
+  ($('pdf-export') as HTMLButtonElement).disabled = view !== 'human';
   if (view === 'agent' && selectedId !== undefined) select(selectedId, 'outline');
 }
 
@@ -473,7 +477,6 @@ function init(): void {
     setView('original');
   });
   $('paged-toggle').addEventListener('click', () => {
-    setView('human');
     setPaged(!paged);
   });
   $('pdf-export').addEventListener('click', () => {
@@ -486,6 +489,10 @@ function init(): void {
   $('sidebar-toggle').addEventListener('click', () => {
     $('app').classList.toggle('sidebar-open');
   });
+  // The outline column starts open on desktop, closed (overlay) on mobile.
+  if (window.matchMedia('(min-width: 761px)').matches) {
+    $('app').classList.add('sidebar-open');
+  }
   $('badge').addEventListener('click', () => {
     $('details-panel').hidden = false;
   });
