@@ -115,3 +115,24 @@ describe('source stylesheets (WP15)', () => {
     expect(report.some((l) => l.includes('size limit'))).toBe(true);
   });
 });
+
+describe('img dimension sanitization (§6.3.3, field test 7 Aug)', () => {
+  it('drops non-integer width/height and keeps valid ones', async () => {
+    const result = await importHtml(
+      '<html><body><main>' +
+        '<p><img src="x.png" width="auto" height="200" alt=""></p>' +
+        '<p><img src="y.png" width="0" alt=""></p>' +
+        '</main></body></html>',
+      {
+        loadAsset: () =>
+          Promise.resolve({ bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) }),
+      },
+    );
+    const html = result.blocks.map((b) => JSON.stringify(b)).join('');
+    expect(html).not.toContain('"width":"auto"');
+    expect(html).not.toContain('"width":"0"');
+    expect(html).toContain('"height":"200"');
+    expect(result.report.some((r) => r.includes('dropped img width="auto"'))).toBe(true);
+    expect(result.report.some((r) => r.includes('dropped img width="0"'))).toBe(true);
+  });
+});

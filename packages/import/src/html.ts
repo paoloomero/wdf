@@ -76,6 +76,8 @@ const RENAME: Record<string, string> = {
 let resolver: StyleResolver | undefined;
 // original img src → resolved content/assets/ path (T7.3).
 let assetMap: Map<string, string> | undefined;
+// Conversion report of the active run, for notes emitted deep in helpers.
+let activeReport: string[] | undefined;
 
 /** Resolved package path for an img src, or undefined if not packageable. */
 function resolveImgSrc(src: string): string | undefined {
@@ -133,6 +135,21 @@ function pickAttrs(node: WdfElement, tag: string): Record<string, string> {
   const attrs: Record<string, string> = {};
   for (const { name, value } of node.attrs) {
     if (allowed.has(name)) attrs[name] = value;
+  }
+  // §6.3.3: img width/height must be positive integers — real pages carry
+  // values like "auto" or percentages, which would make the package invalid.
+  if (tag === 'img') {
+    const valid = /^[1-9][0-9]*$/;
+    const width = attrs['width'];
+    if (width !== undefined && !valid.test(width)) {
+      delete attrs['width'];
+      activeReport?.push(`dropped img width="${width}" (must be a positive integer, §6.3.3)`);
+    }
+    const height = attrs['height'];
+    if (height !== undefined && !valid.test(height)) {
+      delete attrs['height'];
+      activeReport?.push(`dropped img height="${height}" (must be a positive integer, §6.3.3)`);
+    }
   }
   // T7.2 style translation: carry the resolved style signature until hoisting.
   const signature = resolver?.resolve(node);
@@ -576,6 +593,7 @@ export async function importHtml(
   options: HtmlImportOptions = {},
 ): Promise<HtmlImportResult> {
   const report: string[] = [];
+  activeReport = report;
   const doc = parseHtml(html);
   const root = doc.html;
 
@@ -689,6 +707,7 @@ export async function importHtml(
 
   resolver = undefined;
   assetMap = undefined;
+  activeReport = undefined;
   const { blocks, removed } = pruneSpacerParagraphs(withPage);
   if (removed > 0) {
     report.push(`dropped ${String(removed)} empty spacer paragraph(s)`);
