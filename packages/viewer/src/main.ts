@@ -10,6 +10,8 @@ import {
   type WdfPackage,
 } from '@wdf/core';
 
+import { aggregateReport } from '@wdf/import';
+
 import { convertFiles } from './convert.js';
 import {
   agentBlocks,
@@ -135,7 +137,7 @@ async function runConvert(): Promise<void> {
   $('convert-title').textContent = `${result.title} → ${result.fileName}`;
   const list = $('convert-report');
   list.textContent = '';
-  for (const line of result.report) {
+  for (const line of aggregateReport(result.report)) {
     const li = document.createElement('li');
     li.textContent = line;
     list.append(li);

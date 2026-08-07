@@ -13,6 +13,7 @@ import {
 } from '@wdf/core';
 
 import {
+  aggregateReport,
   buildPackage,
   decodeHtml,
   DEFAULT_CAPS,
@@ -206,6 +207,7 @@ export async function cmdImport(
     embedFonts?: boolean;
     fetchRemote?: boolean;
     fullPage?: boolean;
+    standalone?: boolean;
   } = {},
   ctx: Ctx = defaultCtx,
 ): Promise<number> {
@@ -332,8 +334,17 @@ export async function cmdImport(
     }
     const output = opts.output ?? `${baseName}.wdf`;
     writeFileSync(output, result.wdfBytes);
-    for (const line of report) ctx.log(`note: ${line}`);
+    for (const line of aggregateReport(report)) ctx.log(`note: ${line}`);
     ctx.log(`wrote ${output} (${String(result.wdfBytes.length)} bytes)`);
+
+    // T15.1 (plan §10.28): the sendable artifact in one step — the standalone
+    // distribution file (spec §9) next to the package.
+    if (opts.standalone === true) {
+      const html = makeStandalone(result.wdfBytes, result.title);
+      const htmlPath = output.replace(/\.wdf$/i, '') + '.html';
+      writeFileSync(htmlPath, html);
+      ctx.log(`wrote ${htmlPath} (standalone, ${String(result.wdfBytes.length)} bytes embedded)`);
+    }
 
     const check = validateProfile(result.html).filter((v) => v.severity === 'error');
     if (check.length > 0) {

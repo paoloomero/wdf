@@ -67,6 +67,10 @@ program
     'for local inputs: fetch remote images and stylesheets over the network (WP15)',
   )
   .option('--full-page', 'skip main-content extraction and import the whole body (WP16)')
+  .option(
+    '--standalone',
+    'also write a single self-contained HTML file next to the package (spec §9)',
+  )
   .action(
     async (
       file: string,
@@ -79,6 +83,7 @@ program
         embedFonts?: boolean;
         fetchRemote?: boolean;
         fullPage?: boolean;
+        standalone?: boolean;
       },
     ) => {
       process.exitCode = await cmdImport(file, opts);

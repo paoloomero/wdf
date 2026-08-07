@@ -136,3 +136,24 @@ describe('img dimension sanitization (§6.3.3, field test 7 Aug)', () => {
     expect(result.report.some((r) => r.includes('dropped img width="0"'))).toBe(true);
   });
 });
+
+describe('import --standalone (T15.1, plan §10.28)', () => {
+  it('writes the standalone HTML next to the package', async () => {
+    const work = mkdtempSync(join(tmpdir(), 'wdf-standalone-'));
+    const wdf = join(work, 'page.wdf');
+    const run = capture();
+    const code = await cmdImport(
+      join(fixturesDir, 'saved-page-css.html'),
+      { output: wdf, date: '2026-08-07T12:00:00Z', standalone: true },
+      run,
+    );
+    expect(code, run.logs.join('\n')).toBe(0);
+    const html = readFileSync(join(work, 'page.html'), 'utf8');
+    expect(html).toContain('application/wdf+zip');
+    expect(run.logs.some((l) => l.includes('standalone'))).toBe(true);
+    // Without the flag, no HTML appears (unchanged behavior).
+    const wdf2 = join(work, 'plain.wdf');
+    await cmdImport(join(fixturesDir, 'saved-page-css.html'), { output: wdf2 }, capture());
+    expect(() => readFileSync(join(work, 'plain.html'))).toThrow();
+  });
+});

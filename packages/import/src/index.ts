@@ -32,6 +32,7 @@ export { promoteHeadings } from './headings.js';
 export { importHtml, type HtmlImportOptions } from './html.js';
 export { importMarkdown } from './markdown.js';
 export { isPageResidue, preprocessHeaderHtml } from './pageheader.js';
+export { aggregateReport } from './report.js';
 export { collectSourceStylesheets, type CssFetcher } from './sourcecss.js';
 export {
   parseDeclarations,
