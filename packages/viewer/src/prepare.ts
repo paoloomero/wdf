@@ -78,6 +78,18 @@ export const PRINT_CSS = `
      section break. Never the first one: the title stays with page one. */
   article > h1:not(:first-child),
   article > section:not(:first-child) { break-before: page; }
+  /* Print shell (T14.2, plan §10.25): the imported page header/footer repeat
+     on every sheet via the print engine's thead/tfoot repetition — the only
+     mechanism that needs no script in the print frame. */
+  .wdf-print-shell { width: 100%; border-collapse: collapse; }
+  .wdf-print-shell > thead > tr > td,
+  .wdf-print-shell > tfoot > tr > td,
+  .wdf-print-shell > tbody > tr > td { border: none; padding: 0; background: none; }
+  .wdf-print-shell > thead { display: table-header-group; }
+  .wdf-print-shell > tfoot { display: table-footer-group; }
+  .wdf-print-shell > tbody > tr { break-inside: auto; }
+  .wdf-print-body > h1:not(:first-child),
+  .wdf-print-body > section:not(:first-child) { break-before: page; }
 `;
 
 /** Base typography for packages without a stylesheet, plus selection flash. */
@@ -169,6 +181,43 @@ export function buildSrcdoc(
 }
 
 /**
+ * Print shell (T14.2, plan §10.25): when the document carries a page header
+ * (first child of <article>) and/or footer (last child) imported by T14.1,
+ * the print document wraps the content in a single table whose thead/tfoot
+ * the print engine repeats on every sheet. Presentation only, print only:
+ * documents without header/footer pass through byte-identical.
+ */
+export function wrapPrintShell(html: string): string {
+  const openTag = '<article>';
+  const open = html.indexOf(openTag);
+  const close = html.lastIndexOf('</article>');
+  if (open === -1 || close === -1) return html;
+  let rest = html.slice(open + openTag.length, close);
+
+  let header = '';
+  const h = /^\s*<header>[\s\S]*?<\/header>/.exec(rest);
+  if (h !== null) {
+    header = h[0];
+    rest = rest.slice(h[0].length);
+  }
+  let footer = '';
+  const footerAt = rest.lastIndexOf('<footer>');
+  if (footerAt !== -1 && /^<footer>[\s\S]*<\/footer>\s*$/.test(rest.slice(footerAt))) {
+    footer = rest.slice(footerAt);
+    rest = rest.slice(0, footerAt);
+  }
+  if (header === '' && footer === '') return html;
+
+  const shell =
+    '<table class="wdf-print-shell">' +
+    (header === '' ? '' : `<thead><tr><td>${header}</td></tr></thead>`) +
+    `<tbody><tr><td class="wdf-print-body">${rest}</td></tr></tbody>` +
+    (footer === '' ? '' : `<tfoot><tr><td>${footer}</td></tr></tfoot>`) +
+    '</table>';
+  return html.slice(0, open + openTag.length) + shell + html.slice(close);
+}
+
+/**
  * Builds the print/PDF document (WP10, plan §10.20): inlined resources,
  * base styles, embedded fonts, and the paged-media sheet — no controller,
  * and a CSP with no script-src at all. Rendered in a dedicated frame
@@ -179,7 +228,7 @@ export function buildPrintSrcdoc(
   files: ReadonlyMap<string, Uint8Array>,
 ): string {
   const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:" />`;
-  const out = inlineResources(entryHtml, files);
+  const out = wrapPrintShell(inlineResources(entryHtml, files));
   const fonts = fontsCss(files);
   const fontStyle = fonts === undefined ? '' : `<style>${fonts}</style>`;
   return out.replace(
