@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 64 64">
+  <defs><clipPath id="t"><rect x="2" y="2" width="60" height="60" rx="14"></rect></clipPath></defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#FFFFFF"></rect>
+  <rect x="0" y="0" width="64" height="34" fill="#101418" clip-path="url(#t)"></rect>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="none" stroke="#101418" stroke-width="4"></rect>
+  <g fill="#FFFFFF"><rect x="14" y="13" width="6" height="12" rx="3"></rect><rect x="25" y="13" width="6" height="12" rx="3"></rect></g>
+  <g fill="#101418"><rect x="14" y="41" width="36" height="5.5" rx="2.75"></rect><rect x="14" y="51" width="22" height="5.5" rx="2.75"></rect></g>
+</svg>

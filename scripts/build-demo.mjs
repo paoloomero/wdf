@@ -31,6 +31,7 @@ for (const name of ['municipal-decree', 'energy-report', 'technical-article']) {
 cpSync(join(root, 'packages/viewer/dist/viewer.html'), join(site, 'viewer.html'));
 cpSync(join(root, 'site/index.html'), join(site, 'index.html'));
 cpSync(join(root, 'site/site.css'), join(site, 'site.css'));
+cpSync(join(root, 'site/favicon.ico'), join(site, 'favicon.ico'));
 // PWA shell (plan T8.1): manifest with .wdf file_handlers, offline worker, icons.
 cpSync(join(root, 'site/manifest.webmanifest'), join(site, 'manifest.webmanifest'));
 // Stamp the SW cache name with the viewer build hash (plan §10.18): a new

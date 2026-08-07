@@ -1,8 +1,8 @@
-// Generates the PWA icons (plan T8.1) as PNG screenshots of a sized HTML
-// page via headless Chrome — no image dependency needed. Committed artifacts;
-// regenerate with: node scripts/gen-icons.mjs
+// Rasterizes the PWA icons (plan T8.1) from the brand SVG sources in brand/svg/
+// as PNG screenshots via headless Chrome — no image dependency needed.
+// Committed artifacts; regenerate with: node scripts/gen-icons.mjs
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,22 +21,21 @@ if (chrome === undefined) {
   process.exit(1);
 }
 
-// maskable: full-bleed background (safe zone ≥ 80%); regular: rounded tile.
+const tileSvg = readFileSync(join(root, 'brand/svg/wdf-reader.svg'), 'utf8');
+const INK = '#101418';
+
+// Regular icons: the tile fills the canvas (its own rounded corners show on a
+// transparent background). Maskable: full-bleed ink square with the tile in
+// the ~80% safe zone — Android crops a circle out of it.
 function iconHtml(size, { maskable }) {
-  const radius = maskable ? 0 : Math.round(size * 0.18);
-  const font = Math.round(size * (maskable ? 0.28 : 0.32));
-  const sub = Math.round(size * 0.1);
+  const scale = maskable ? 0.8 : 1;
+  const bg = maskable ? INK : 'transparent';
   return `<!doctype html><html><head><meta charset="utf-8"><style>
   * { margin: 0; }
-  body { width: ${size}px; height: ${size}px; overflow: hidden; }
-  .tile { width: 100%; height: 100%; border-radius: ${radius}px;
-    background: linear-gradient(160deg, #16203a 0%, #1a56c4 100%);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-family: -apple-system, system-ui, sans-serif; }
-  .w { color: #fff; font-size: ${font}px; font-weight: 700; letter-spacing: 0.02em; }
-  .s { color: #9db9ea; font-size: ${sub}px; font-weight: 600; letter-spacing: 0.3em;
-    margin-top: ${Math.round(size * 0.02)}px; }
-  </style></head><body><div class="tile"><div class="w">WDF</div><div class="s">READER</div></div></body></html>`;
+  body { width: ${size}px; height: ${size}px; overflow: hidden; background: ${bg};
+    display: flex; align-items: center; justify-content: center; }
+  svg { width: ${Math.round(size * scale)}px; height: ${Math.round(size * scale)}px; display: block; }
+  </style></head><body>${tileSvg}</body></html>`;
 }
 
 const work = mkdtempSync(join(tmpdir(), 'wdf-icons-'));
@@ -68,4 +67,3 @@ for (const [name, size, opts] of targets) {
   }
   console.log(`${name} written`);
 }
-rmSync(work, { recursive: true, force: true });
