@@ -60,18 +60,18 @@ claude mcp add wdf -- node <repo>/packages/mcp/dist/index.js
   "params": {
     "name": "wdf_open",
     "arguments": {
-      "path": "/var/folders/qr/b8_044zd73l_f8nwrwlvhn200000gn/T/wdf-mcp-demo-HUB4jZ/delibera-pa.wdf"
+      "path": "/var/folders/qr/b8_044zd73l_f8nwrwlvhn200000gn/T/wdf-mcp-demo-me1Vn5/municipal-decree.wdf"
     }
   }
 }
 ```
 
 ```
-Opened: Determinazione n. 87/2026 — Affidamento servizi di digitalizzazione documentale
+Opened: Decree no. 87/2026 — Award of document digitisation services
 Document id: urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7
-Language: it · 22 citable elements · 16 blocks
+Language: en · 22 citable elements · 16 blocks
 Verification: VERIFIED (hashes ok, AI layer is the canonical extraction of the content)
-Top-level sections: sec-premesse — Premesse, sec-dispositivo — Dispositivo, sec-pubblicazione — Pubblicazione ed efficacia
+Top-level sections: sec-recitals — Recitals, sec-operative — Operative part, sec-publication — Publication and effect
 Use wdf_outline to navigate, wdf_read to read, wdf_cite for verifiable citations.
 ```
 
@@ -90,104 +90,107 @@ Use wdf_outline to navigate, wdf_read to read, wdf_cite for verifiable citations
 ```
 [
   {
-    "id": "p-intestazione",
+    "id": "p-letterhead",
     "type": "paragraph",
     "parent": null
   },
   {
-    "id": "h-titolo",
+    "id": "h-title",
     "type": "heading",
     "level": 1,
-    "title": "Determinazione n. 87/2026 — Affidamento servizi di digitalizzazione documentale",
+    "title": "Decree no. 87/2026 — Award of document digitisation services",
     "parent": null
   },
   {
-    "id": "p-data",
+    "id": "p-date",
     "type": "paragraph",
     "parent": null
   },
   {
-    "id": "sec-premesse",
+    "id": "sec-recitals",
     "type": "section",
-    "title": "Premesse",
+    "title": "Recitals",
     "parent": null
   },
   {
-    "id": "h-premesse",
+    "id": "h-recitals",
     "type": "heading",
     "level": 2,
-    "title": "Premesse",
-    "parent": "sec-premesse"
+    "title": "Recitals",
+    "parent": "sec-recitals"
   },
   {
     "id": "p-0001",
     "type": "paragraph",
-    "parent": "sec-premesse"
+    "parent": "sec-recitals"
   },
   {
-    "id": "bq-norma",
+    "id": "bq-law",
     "type": "blockquote",
-    "parent": "sec-premesse"
+    "parent": "sec-recitals"
   },
   {
     "id": "p-0002",
     "type": "paragraph",
-    "parent": "bq-norma"
+    "parent": "bq-law"
   },
   {
     "id": "p-0003",
     "type": "paragraph",
-    "parent": "sec-premesse"
+    "parent": "sec-recitals"
   },
   {
-    "id": "sec-dispositivo",
+    "id": "sec-operative",
     "type": "section",
-    "title": "Dispositivo",
+    "title": "Operative part",
     "parent": null
   },
   {
-    "id": "h-dispositivo",
+    "id": "h-operative",
     "type": "heading",
     "level": 2,
-    "title": "Dispositivo",
-    "parent": "sec-dispositivo"
+    "title": "Operative part",
+    "parent": "sec-operative"
   },
   {
     "id": "p-0004",
     "type": "paragraph",
-    "parent": "sec-dispositivo"
+    "parent": "sec-operative"
   },
   {
     "id": "li-0001",
     "type": "list-item",
-    "parent": "sec-dispositivo"
+    "parent": "sec-operative"
   },
   {
     "id": "li-0002",
     "type": "list-item",
-    "parent": "sec-dispositivo"
+    "parent": "sec-operative"
   },
   {
     "id": "li-0003",
     "type": "list-item",
-    "parent": "sec-dispositivo"
+    "parent": "sec-operative"
   },
   {
     "id": "li-0004",
     "type": "list-item",
-    "parent": "sec-dispositivo"
+    "parent": "sec-operative"
   },
   {
-    "id": "tbl-impegni",
+    "id": "tbl-commitments",
     "type": "table",
-    "title": "Impegni di spesa per capitolo ed esercizio",
-    "parent": "sec-dispositivo"
+    "title": "Spending commitments by chapter and year",
+    "parent": "sec-operative"
   },
   {
     "id": "p-0005",
     "type": "paragraph",
-    "parent": "sec-dispositi
-… (truncated; 2250 chars)
+    "parent": "sec-operative"
+  },
+  {
+    "id": "sec-publicatio
+… (truncated; 2200 chars)
 ```
 
 ## Read one section, precisely
@@ -205,24 +208,7 @@ Use wdf_outline to navigate, wdf_read to read, wdf_cite for verifiable citations
 ```
 
 ```
-## Dispositivo {#h-dispositivo} {#sec-dispositivo}
-
-Per le motivazioni espresse in premessa, che qui si intendono integralmente richiamate, il Responsabile **determina**: {#p-0004}
-
-1. di affidare a Esempio Digitale S.r.l. il servizio di digitalizzazione documentale per il periodo 2026-2027, per un corrispettivo complessivo di **24400 euro** oneri inclusi; {#li-0001}
-2. di impegnare la spesa come indicato nella tabella degli impegni, con esigibilità nelle annualità di riferimento; {#li-0002}
-3. di destinare una quota pari a **1830 euro** alla formazione del personale interno sull'utilizzo della piattaforma; {#li-0003}
-4. di dare atto che il presente provvedimento sarà pubblicato secondo quanto indicato nella sezione [Pubblicazione](<#sec-pubblicazione>). {#li-0004}
-
-Impegni di spesa per capitolo ed esercizio {#tbl-impegni}
-
-| capitolo | esercizio | importo | esigibile |
-| --- | --- | --- | --- |
-| 1042.3 — Servizi informatici | 2026 | 14640 | 2026-12-31 |
-| 1042.3 — Servizi informatici | 2027 | 9760 | 2027-06-30 |
-| 1015.1 — Formazione del personale | 2026 | 1830 | 2026-12-31 |
-
-Gli importi in tabella sono espressi in euro, IVA inclusa; la tabella è collegata al dataset tipizzato `data/impegni.json` del pacchetto: i valori visualizzati e i dati leggibili dalle macchine sono, verificabilmente, la stessa cosa. {#p-0005}
+No citable element "sec-dispositivo" in this document. Use wdf_outline to list elements.
 ```
 
 ## Cite a table, verifiably
@@ -233,17 +219,17 @@ Gli importi in tabella sono espressi in euro, IVA inclusa; la tabella è collega
   "params": {
     "name": "wdf_cite",
     "arguments": {
-      "id": "tbl-impegni"
+      "id": "tbl-commitments"
     }
   }
 }
 ```
 
 ```
-Citation: wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-impegni
+Citation: wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-commitments
 Verified: yes — the cited content is provably what the human-view document shows
 Resolves to:
-Impegni di spesa per capitolo ed esercizio {#tbl-impegni}
+Spending commitments by chapter and year {#tbl-commitments}
 ```
 
 **Why this matters:** the agent never parsed HTML or guessed at structure — it navigated by

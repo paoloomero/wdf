@@ -12,7 +12,7 @@ import { readDirFiles } from '../src/lib/fsutil.js';
 // pack into fully valid, verified packages.
 
 const examplesDir = resolve(import.meta.dirname, '../../../examples');
-const EXAMPLES = ['delibera-pa', 'report-dati', 'articolo-tecnico'];
+const EXAMPLES = ['municipal-decree', 'energy-report', 'technical-article'];
 
 function silent(): Ctx {
   return { log: () => undefined, err: () => undefined, out: () => undefined };
@@ -27,18 +27,18 @@ describe('example documents (T5.1 acceptance)', () => {
     expect(await cmdValidate(out, {}, silent())).toBe(0);
   });
 
-  it('delibera-pa exercises the dataset binding', async () => {
-    const out = join(work, 'delibera-check.wdf');
-    await cmdPack(join(examplesDir, 'delibera-pa'), { output: out }, silent());
+  it('municipal-decree exercises the dataset binding', async () => {
+    const out = join(work, 'decree-check.wdf');
+    await cmdPack(join(examplesDir, 'municipal-decree'), { output: out }, silent());
     const pkg = readPackage(readFileSync(out));
-    expect(pkg.manifest.datasets?.[0]?.path).toBe('data/impegni.json');
-    expect(pkg.files.has('data/impegni.json')).toBe(true);
+    expect(pkg.manifest.datasets?.[0]?.path).toBe('data/commitments.json');
+    expect(pkg.files.has('data/commitments.json')).toBe(true);
   });
 
   it('a broken dataset cell is caught end-to-end', async () => {
     // Copy the delibera and corrupt one displayed value: validation must fail.
-    const src = readDirFiles(join(examplesDir, 'delibera-pa'));
-    const dir = join(work, 'delibera-broken');
+    const src = readDirFiles(join(examplesDir, 'municipal-decree'));
+    const dir = join(work, 'decree-broken');
     for (const [path, data] of src) {
       const full = join(dir, ...path.split('/'));
       mkdirSync(join(full, '..'), { recursive: true });
@@ -51,7 +51,7 @@ describe('example documents (T5.1 acceptance)', () => {
           : data,
       );
     }
-    const out = join(work, 'delibera-broken.wdf');
+    const out = join(work, 'decree-broken.wdf');
     expect(await cmdPack(dir, { output: out }, silent())).toBe(0);
     expect(await cmdValidate(out, {}, silent())).toBe(1);
   });

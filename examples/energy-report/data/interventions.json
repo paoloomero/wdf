@@ -1,0 +1,13 @@
+{
+  "columns": [
+    { "name": "measure", "type": "string" },
+    { "name": "completed", "type": "date" },
+    { "name": "estimated_savings_kwh", "type": "integer" },
+    { "name": "verified", "type": "boolean" }
+  ],
+  "rows": [
+    ["LED relamping — primary school", "2024-03-15", 6200, true],
+    ["External insulation — public library", "2024-11-30", 9800, true],
+    ["Heat pumps — municipal gym", "2025-09-10", 12400, false]
+  ]
+}

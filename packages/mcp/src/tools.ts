@@ -79,7 +79,7 @@ export const TOOLS: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'Optional citable element id, e.g. "tbl-impegni"' },
+        id: { type: 'string', description: 'Optional citable element id, e.g. "tbl-commitments"' },
       },
     },
   },

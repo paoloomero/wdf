@@ -1,0 +1,27 @@
+{
+  "wdf": "0.1",
+  "id": "urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7",
+  "title": "Decree no. 87/2026 — Award of document digitisation services",
+  "language": "en",
+  "authors": [
+    { "name": "Municipality of Sample (fictional document for demonstration)", "role": "author" },
+    { "name": "Internal Services Area — Innovation Office", "role": "contributor" }
+  ],
+  "created": "2026-07-01T09:00:00Z",
+  "modified": "2026-07-01T09:00:00Z",
+  "entry": "content/index.html",
+  "datasets": [
+    {
+      "path": "data/commitments.json",
+      "title": "Spending commitments by chapter and year",
+      "schema": {
+        "columns": [
+          { "name": "chapter", "type": "string" },
+          { "name": "year", "type": "integer" },
+          { "name": "amount", "type": "number" },
+          { "name": "due", "type": "date" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "wdf": "0.1",
+  "id": "urn:uuid:3f21aa04-88b1-5c77-9d02-6e19c0a4d5b8",
+  "title": "Energy consumption report for municipal buildings 2023-2025",
+  "language": "en",
+  "authors": [
+    {
+      "name": "Municipality of Sample — Energy Office (fictional document for demonstration)",
+      "role": "author"
+    }
+  ],
+  "created": "2026-06-15T08:30:00Z",
+  "modified": "2026-06-15T08:30:00Z",
+  "entry": "content/index.html",
+  "resources": [{ "path": "content/assets/consumption.svg", "mediaType": "image/svg+xml" }],
+  "datasets": [
+    {
+      "path": "data/consumption.json",
+      "title": "Consumption and costs per year",
+      "schema": {
+        "columns": [
+          { "name": "year", "type": "integer" },
+          { "name": "kwh", "type": "integer" },
+          { "name": "cost_eur", "type": "number" }
+        ]
+      }
+    },
+    {
+      "path": "data/interventions.json",
+      "title": "Efficiency measures",
+      "schema": {
+        "columns": [
+          { "name": "measure", "type": "string" },
+          { "name": "completed", "type": "date" },
+          { "name": "estimated_savings_kwh", "type": "integer" },
+          { "name": "verified", "type": "boolean" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 {
   "columns": [
-    { "name": "anno", "type": "integer" },
+    { "name": "year", "type": "integer" },
     { "name": "kwh", "type": "integer" },
-    { "name": "costo_euro", "type": "number" }
+    { "name": "cost_eur", "type": "number" }
   ],
   "rows": [
     [2023, 182400, 43776],

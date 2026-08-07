@@ -19,7 +19,7 @@ const run = (args) => {
   if (result.status !== 0) process.exit(result.status ?? 1);
 };
 
-for (const name of ['delibera-pa', 'report-dati', 'articolo-tecnico']) {
+for (const name of ['municipal-decree', 'energy-report', 'technical-article']) {
   const src = join(root, 'examples', name);
   run([cli, 'pack', src, '-o', join(site, 'examples', `${name}.wdf`)]);
   run([cli, 'validate', join(site, 'examples', `${name}.wdf`)]);

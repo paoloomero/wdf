@@ -22,7 +22,7 @@
         engine.
       </p>
       <p class="cta">
-        <a class="button" href="viewer.html?doc=examples/delibera-pa.wdf">Open a document</a>
+        <a class="button" href="viewer.html?doc=examples/municipal-decree.wdf">Open a document</a>
         <a class="button ghost" href="viewer.html">Viewer (drop your own .wdf)</a>
         <a class="button ghost" href="wdf-core-0.1.md">Spec draft</a>
       </p>
@@ -38,47 +38,47 @@
         </p>
         <div class="cards">
           <div class="card">
-            <h3>Determina comunale</h3>
+            <h3>Municipal decree</h3>
             <p>
               A public-administration decree with a typed commitments table bound to
-              <code>data/impegni.json</code>.
+              <code>data/commitments.json</code>.
             </p>
             <p class="links">
-              <a href="viewer.html?doc=examples/delibera-pa.wdf">viewer</a>
-              <a href="examples/delibera-pa.wdf" download>.wdf</a>
-              <a href="examples/delibera-pa.html">standalone</a>
-              <a href="examples/delibera-pa.pdf">pdf</a>
+              <a href="viewer.html?doc=examples/municipal-decree.wdf">viewer</a>
+              <a href="examples/municipal-decree.wdf" download>.wdf</a>
+              <a href="examples/municipal-decree.html">standalone</a>
+              <a href="examples/municipal-decree.pdf">pdf</a>
             </p>
           </div>
           <div class="card">
-            <h3>Rapporto con dati</h3>
+            <h3>Data report</h3>
             <p>
               An energy report: two dataset-bound tables and an SVG chart generated from the same
               values.
             </p>
             <p class="links">
-              <a href="viewer.html?doc=examples/report-dati.wdf">viewer</a>
-              <a href="examples/report-dati.wdf" download>.wdf</a>
-              <a href="examples/report-dati.html">standalone</a>
-              <a href="examples/report-dati.pdf">pdf</a>
+              <a href="viewer.html?doc=examples/energy-report.wdf">viewer</a>
+              <a href="examples/energy-report.wdf" download>.wdf</a>
+              <a href="examples/energy-report.html">standalone</a>
+              <a href="examples/energy-report.pdf">pdf</a>
             </p>
           </div>
           <div class="card">
             <h3>Technical article</h3>
             <p>Code blocks, a figure, a glossary — and its own verification story.</p>
             <p class="links">
-              <a href="viewer.html?doc=examples/articolo-tecnico.wdf">viewer</a>
-              <a href="examples/articolo-tecnico.wdf" download>.wdf</a>
-              <a href="examples/articolo-tecnico.html">standalone</a>
-              <a href="examples/articolo-tecnico.pdf">pdf</a>
+              <a href="viewer.html?doc=examples/technical-article.wdf">viewer</a>
+              <a href="examples/technical-article.wdf" download>.wdf</a>
+              <a href="examples/technical-article.html">standalone</a>
+              <a href="examples/technical-article.pdf">pdf</a>
             </p>
           </div>
         </div>
         <p class="hint">
           In the viewer, toggle <strong>Human / Agent</strong> and click any paragraph: the same
           element highlights in both views, with a copyable citation like
-          <code>wdf:&lt;document-id&gt;#tbl-impegni</code>. The <strong>standalone</strong> files
-          open with a double click, offline, viewer included.
+          <code>wdf:&lt;document-id&gt;#tbl-commitments</code>. The
+          <strong>standalone</strong> files open with a double click, offline, viewer included.
         </p>
         <p class="hint">
           <strong>Install the Reader:</strong> the viewer is an installable app (Chrome/Edge —
@@ -149,7 +149,7 @@
             <p>
               Typed values (<code>integer</code>, <code>number</code>, <code>date</code>) from the
               dataset bound to the visible table, each with a resolvable citation:
-              <code>wdf:urn:uuid:7d44…#tbl-impegni</code>. The package verifies: hashes plus the
+              <code>wdf:urn:uuid:7d44…#tbl-commitments</code>. The package verifies: hashes plus the
               proof that the agent view is the canonical derivation of the human view.
             </p>
           </div>
@@ -169,12 +169,12 @@
           stable ids, never by parsing heuristics, and cites verifiably:
         </p>
         <pre class="transcript">
-&gt; wdf_cite { "id": "tbl-impegni" }
+&gt; wdf_cite { "id": "tbl-commitments" }
 
-Citation: wdf:urn:uuid:7d444840-…#tbl-impegni
+Citation: wdf:urn:uuid:7d444840-…#tbl-commitments
 Verified: yes — the cited content is provably what the human-view document shows
 Resolves to:
-Impegni di spesa per capitolo ed esercizio {#tbl-impegni}</pre>
+Spending commitments by chapter and year {#tbl-commitments}</pre>
         <p class="hint">
           Full recorded session: <a href="mcp-demo.md">MCP demo transcript</a>. Register it in
           Claude Code with <code>claude mcp add wdf -- node packages/mcp/dist/index.js</code>.
@@ -196,9 +196,9 @@ Impegni di spesa per capitolo ed esercizio {#tbl-impegni}</pre>
     <footer>
       <p>
         WDF is an open format under development by
-        <a href="https://www.infofactory.it/">infoFACTORY</a>. Spec: CC-BY 4.0 (planned) · Code:
-        open source license to be finalized. Built in the context of the European
-        <em>Open Internet Stack</em> / NLnet ecosystem.
+        <a href="https://www.infofactory.it/">infoFACTORY</a>. Spec: CC-BY 4.0 · Code: open source
+        license to be finalized. Built in the context of the European <em>Open Internet Stack</em> /
+        NLnet ecosystem.
       </p>
     </footer>
   </body>

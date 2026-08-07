@@ -1,13 +1,13 @@
 # LLM extraction comparison: WDF vs PDF (T5.3)
 
-**Method.** The same document — the example _Determinazione n. 87/2026_ (a fictional Italian
+**Method.** The same document — the example _Decree no. 87/2026_ (a fictional
 public-administration decree) — exists in two forms produced from the same source:
-`examples/delibera-pa/comparison.pdf` (printed via headless Chrome, a clean born-digital PDF:
-deliberately a _best case_ for PDF, not a strawman) and `delibera-pa.wdf` (canonical package).
-The same task was given to an LLM (Claude, July 2026) against each input:
+`examples/municipal-decree/comparison.pdf` (printed via headless Chrome, a clean born-digital
+PDF: deliberately a _best case_ for PDF, not a strawman) and `municipal-decree.wdf` (canonical
+package). The same task was given to an LLM (Claude, August 2026) against each input:
 
-> _«Estrai gli importi impegnati, per capitolo ed esercizio, e cita la fonte di ogni valore in modo
-> che un revisore possa verificarla.»_
+> _«Extract the committed amounts, by chapter and year, and cite the source of every value so
+> that an auditor can verify it.»_
 
 The PDF was ingested as a document attachment (standard multimodal ingestion); the WDF side used
 the output of `wdf extract` (`ai/content.md`, whose fidelity to the rendered document is
@@ -15,32 +15,32 @@ machine-verified, spec §7.1) plus the manifest id for citations.
 
 ## Answer from the PDF
 
-> Gli importi impegnati risultano (tabella a pagina 2):
+> The committed amounts are (table on page 2):
 >
-> - capitolo "1042.3 — Servizi informatici", esercizio 2026: 14640 euro
-> - capitolo "1042.3 — Servizi informatici", esercizio 2027: 9760 euro
-> - capitolo "1015.1 — Formazione del personale", esercizio 2026: 1830 euro
+> - chapter "1042.3 — IT services", year 2026: 14640 euros
+> - chapter "1042.3 — IT services", year 2027: 9760 euros
+> - chapter "1015.1 — Staff training", year 2026: 1830 euros
 >
-> **Fonte:** tabella "Impegni di spesa per capitolo ed esercizio", **pagina 2 del PDF**. Nota: nel
-> testo estratto le righe della tabella arrivano come testo piatto (es. `1042.3 — Servizi
-informatici 2026 14640 2026-12-31`), quindi l'attribuzione dei valori alle colonne è stata
-> _inferita_ dall'ordine; non esiste un identificatore stabile da citare, solo il numero di pagina,
-> e nulla garantisce che il testo estratto coincida con ciò che il documento mostra.
+> **Source:** table "Spending commitments by chapter and year", **page 2 of the PDF**. Note: in
+> the extracted text the table rows arrive as flat text (e.g. `1042.3 — IT services 2026 14640
+2026-12-31`), so the attribution of values to columns was _inferred_ from their order; there is
+> no stable identifier to cite, only the page number, and nothing guarantees that the extracted
+> text coincides with what the document displays.
 
 ## Answer from WDF (`wdf extract`)
 
-> Gli importi impegnati sono, dal dataset tipizzato collegato alla tabella `tbl-impegni`:
+> The committed amounts, from the typed dataset bound to table `tbl-commitments`, are:
 >
-> | capitolo                          | esercizio | importo (euro) | fonte                                                           |
-> | --------------------------------- | --------- | -------------- | --------------------------------------------------------------- |
-> | 1042.3 — Servizi informatici      | 2026      | 14640          | `wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-impegni` |
-> | 1042.3 — Servizi informatici      | 2027      | 9760           | `wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-impegni` |
-> | 1015.1 — Formazione del personale | 2026      | 1830           | `wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-impegni` |
+> | chapter                 | year | amount (euros) | source                                                              |
+> | ----------------------- | ---- | -------------- | ------------------------------------------------------------------- |
+> | 1042.3 — IT services    | 2026 | 14640          | `wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-commitments` |
+> | 1042.3 — IT services    | 2027 | 9760           | `wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-commitments` |
+> | 1015.1 — Staff training | 2026 | 1830           | `wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-commitments` |
 >
-> Il corrispettivo complessivo di 24400 euro è citabile come
-> `wdf:…#li-0001`; la quota formazione come `wdf:…#li-0003`. Ogni citazione si risolve
-> nell'elemento esatto, e il pacchetto è verificabile: gli hash coprono ogni file e
-> `ai/content.md` è _provatamente_ la derivazione canonica del documento renderizzato.
+> The total consideration of 24400 euros is citable as `wdf:…#li-0001`; the training share as
+> `wdf:…#li-0003`. Every citation resolves to the exact element, and the package is verifiable:
+> hashes cover every file and `ai/content.md` is _provably_ the canonical derivation of the
+> rendered document.
 
 ## Honest assessment
 
@@ -52,8 +52,8 @@ correctly — the difference is **not** raw text access. The differences that ma
    wrapped rows, or scanned documents. In WDF the table _is_ a typed dataset (`integer`, `number`,
    `date`), and validation proves the rendered cells equal the data.
 2. **Citations.** The PDF answer can only cite "page 2". The WDF answer cites
-   `wdf:<document-id>#tbl-impegni` — a stable identifier that survives re-pagination and resolves
-   to the exact element in the human view, the agent view, and the outline.
+   `wdf:<document-id>#tbl-commitments` — a stable identifier that survives re-pagination and
+   resolves to the exact element in the human view, the agent view, and the outline.
 3. **Verifiability.** Nothing ties the PDF's extracted text to its rendering. A WDF consumer
    re-runs the canonical extraction and compares byte-for-byte (spec §8.2): if human and agent
    views diverged, verification would fail.
@@ -61,6 +61,8 @@ correctly — the difference is **not** raw text access. The differences that ma
    chains; PDF extraction quality then collapses to OCR guesswork, while a WDF package either
    validates or is rejected.
 
-**Reproduce it:** `pnpm demo`, open `_site/examples/delibera-pa.pdf` and attach it to any LLM with
-the prompt above; then run `node packages/cli/dist/index.js extract _site/examples/delibera-pa.wdf`
-and give the model the output. (This file records a run performed with Claude in July 2026.)
+**Reproduce it:** `pnpm demo`, open `_site/examples/municipal-decree.pdf` and attach it to any
+LLM with the prompt above; then run
+`node packages/cli/dist/index.js extract _site/examples/municipal-decree.wdf` and give the model
+the output. (This file records a run performed with Claude in August 2026, on the English
+example; an earlier run on the original Italian version, July 2026, gave equivalent results.)

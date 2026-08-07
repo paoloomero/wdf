@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Energy consumption report for municipal buildings 2023-2025</title>
+    <link rel="stylesheet" href="content/styles.css" />
+  </head>
+  <body>
+    <article>
+      <header>
+        <p id="p-letterhead" class="ente">
+          Municipality of Sample — Energy Office <em>(fictional document for demonstration)</em>
+        </p>
+        <h1 id="h-title">Energy consumption report for municipal buildings 2023-2025</h1>
+      </header>
+
+      <section id="sec-summary">
+        <h2 id="h-summary">Summary</h2>
+        <p id="p-0001">
+          Over the 2023-2025 period the electricity consumption of municipal buildings fell from
+          <strong>182400 kWh</strong> to <strong>158300 kWh</strong> (about 13 per cent), while
+          spending rose from <strong>43776 euros</strong> to <strong>52239 euros</strong> due to the
+          increase in unit prices. Completed efficiency measures delivered verified savings; for the
+          most recent measure the verification is scheduled for 2026.
+        </p>
+      </section>
+
+      <section id="sec-consumption">
+        <h2 id="h-consumption">Consumption and costs</h2>
+        <p id="p-0002">
+          The following table is bound to the typed dataset <code>data/consumption.json</code>:
+          every displayed value coincides, verifiably, with the machine-readable data.
+        </p>
+        <table id="tbl-consumption" data-wdf-dataset="data/consumption.json">
+          <caption>
+            Consumption and costs per year
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">year</th>
+              <th scope="col">kwh</th>
+              <th scope="col">cost_eur</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2023</td>
+              <td>182400</td>
+              <td>43776</td>
+            </tr>
+            <tr>
+              <td>2024</td>
+              <td>171100</td>
+              <td>47908</td>
+            </tr>
+            <tr>
+              <td>2025</td>
+              <td>158300</td>
+              <td>52239</td>
+            </tr>
+          </tbody>
+        </table>
+        <figure id="fig-consumption">
+          <img
+            src="content/assets/consumption.svg"
+            alt="Bar chart of annual electricity consumption: 182400 kWh in 2023, 171100 in 2024, 158300 in 2025"
+            width="480"
+            height="300"
+          />
+          <figcaption>
+            Figure 1 — Electricity consumption per year. The chart is generated from the same values
+            as the dataset.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section id="sec-interventions">
+        <h2 id="h-interventions">Efficiency measures</h2>
+        <table id="tbl-interventions" data-wdf-dataset="data/interventions.json">
+          <caption>
+            Efficiency measures
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">measure</th>
+              <th scope="col">completed</th>
+              <th scope="col">estimated_savings_kwh</th>
+              <th scope="col">verified</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>LED relamping — primary school</td>
+              <td>2024-03-15</td>
+              <td>6200</td>
+              <td>true</td>
+            </tr>
+            <tr>
+              <td>External insulation — public library</td>
+              <td>2024-11-30</td>
+              <td>9800</td>
+              <td>true</td>
+            </tr>
+            <tr>
+              <td>Heat pumps — municipal gym</td>
+              <td>2025-09-10</td>
+              <td>12400</td>
+              <td>false</td>
+            </tr>
+          </tbody>
+        </table>
+        <ul>
+          <li id="li-0001">
+            measures with a <em>verified</em> outcome confirmed the estimated savings within a 10
+            per cent margin;
+          </li>
+          <li id="li-0002">
+            verifying the heat-pump installation requires a full heating season of operation.
+          </li>
+        </ul>
+      </section>
+
+      <section id="sec-method">
+        <h2 id="h-method">Methodological note</h2>
+        <p id="p-0003">
+          Values are expressed in canonical units (whole kWh, euros with a dot decimal separator) as
+          the format requires: locale-specific formatting of amounts is left to future extensions.
+          Data source: internal monitoring system, readings taken on 31 December of each year.
+        </p>
+      </section>
+    </article>
+  </body>
+</html>

@@ -12,11 +12,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Build the example package the agent will read.
 const work = mkdtempSync(join(tmpdir(), 'wdf-mcp-demo-'));
-const wdfPath = join(work, 'delibera-pa.wdf');
+const wdfPath = join(work, 'municipal-decree.wdf');
 const pack = spawnSync(process.execPath, [
   join(root, 'packages/cli/dist/index.js'),
   'pack',
-  join(root, 'examples/delibera-pa'),
+  join(root, 'examples/municipal-decree'),
   '-o',
   wdfPath,
 ]);
@@ -66,7 +66,7 @@ await step('Read one section, precisely', 'tools/call', {
 });
 await step('Cite a table, verifiably', 'tools/call', {
   name: 'wdf_cite',
-  arguments: { id: 'tbl-impegni' },
+  arguments: { id: 'tbl-commitments' },
 });
 server.stdin.end();
 
