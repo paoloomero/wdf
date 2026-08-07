@@ -63,6 +63,39 @@ describe('buildOriginalSrcdoc', () => {
     expect(srcdoc).not.toContain('wdf-flash');
   });
 
+  it('inlines images whose src is entity-encoded and drops srcset/lazy (web pages)', () => {
+    // A Next.js-style page: src carries &amp; in the raw markup while the
+    // resources map holds the decoded URL, and srcSet would override the
+    // inlined src with remote candidates the CSP blocks.
+    const src = '/_next/image?url=https%3A%2F%2Fcdn.example%2Fa.png&w=3840&q=75';
+    const meta = {
+      source: '0.2',
+      main: 'ext/source/abc123.html',
+      mainName: 'page.html',
+      encoding: 'utf-8',
+      resources: { [src]: 'content/assets/deadbeef.png' },
+    };
+    const files = new Map([
+      ['ext/source/source.json', enc.encode(JSON.stringify(meta))],
+      [
+        'ext/source/abc123.html',
+        enc.encode(
+          '<html><head><title>x</title></head><body>' +
+            '<img loading="lazy" srcSet="/_next/image?url=x&amp;w=1920 1x, /_next/image?url=x&amp;w=3840 2x" ' +
+            'src="/_next/image?url=https%3A%2F%2Fcdn.example%2Fa.png&amp;w=3840&amp;q=75">' +
+            '</body></html>',
+        ),
+      ],
+      ['content/assets/deadbeef.png', new Uint8Array([137, 80, 78, 71])],
+    ]);
+    const ext = parseSourceExt(files) as SourceExt;
+    const srcdoc = buildOriginalSrcdoc(files, ext);
+    expect(srcdoc).toContain('src="data:image/png;base64,');
+    expect(srcdoc).not.toContain('srcSet');
+    expect(srcdoc).not.toContain('srcset');
+    expect(srcdoc).not.toContain('loading="lazy"');
+  });
+
   it('inlines embedded source stylesheets in place of their links (WP15)', () => {
     const files = packageFiles();
     const meta = {

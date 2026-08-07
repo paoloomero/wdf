@@ -569,8 +569,20 @@ export function buildOriginalSrcdoc(
   for (const [original, path] of Object.entries(ext.resources)) {
     const data = files.get(path);
     if (data === undefined) continue;
-    html = html.split(`src="${original}"`).join(`src="${toDataUri(path, data)}"`);
+    // Keys hold the DECODED src; the raw markup may entity-encode "&"
+    // (same tolerance as the stylesheet hrefs below).
+    const escaped = original
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .split('&')
+      .join('&(?:amp;)?');
+    html = html.replace(
+      new RegExp(`src="${escaped}"`, 'g'),
+      () => `src="${toDataUri(path, data)}"`,
+    );
   }
+  // A srcset would override the inlined src with remote candidates the CSP
+  // blocks — drop it (and lazy loading) so the Original renders offline.
+  html = html.replace(/\s+srcset="[^"]*"/gi, '').replace(/\s+loading="lazy"/gi, '');
   // WP15 (v0.2): the embedded stylesheets replace their <link> elements.
   // Keys hold the DECODED href; the raw markup may entity-encode "&".
   for (const [href, path] of Object.entries(ext.stylesheets)) {
