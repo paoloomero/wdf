@@ -486,13 +486,10 @@ function init(): void {
   $('human').addEventListener('load', () => {
     if (paged) postToHuman({ type: 'wdf-paged', on: true });
   });
+  // The outline column starts closed everywhere; the ☰ icon opens it.
   $('sidebar-toggle').addEventListener('click', () => {
     $('app').classList.toggle('sidebar-open');
   });
-  // The outline column starts open on desktop, closed (overlay) on mobile.
-  if (window.matchMedia('(min-width: 761px)').matches) {
-    $('app').classList.add('sidebar-open');
-  }
   $('badge').addEventListener('click', () => {
     $('details-panel').hidden = false;
   });
