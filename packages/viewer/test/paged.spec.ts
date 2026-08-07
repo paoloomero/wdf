@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildPrintSrcdoc, buildSrcdoc, CONTROLLER_JS } from '../src/prepare.js';
+import {
+  buildPrintSrcdoc,
+  buildSrcdoc,
+  CONTROLLER_JS,
+  paginatePlan,
+  type PlanUnit,
+} from '../src/prepare.js';
 
 // WP10 (plan §10.20): paper view on screen, real pagination in print/PDF.
 
@@ -38,17 +44,49 @@ describe('buildPrintSrcdoc (WP10)', () => {
   });
 });
 
-describe('paper view on screen (WP10)', () => {
-  it('ships the wdf-paged sheet and the controller toggle', () => {
+describe('paper view on screen (WP17, plan §10.26)', () => {
+  it('ships the sheet styles, the paginator and the controller toggle', () => {
     const out = buildSrcdoc(entry, new Map(), 'n');
-    expect(out).toContain('html.wdf-paged article');
+    expect(out).toContain('.wdf-sheet {');
     expect(out).toContain('width: 210mm');
+    expect(out).toContain('wdfSetPaged');
     expect(CONTROLLER_JS).toContain("d.type === 'wdf-paged'");
   });
 
-  it('gives section boundaries breathing space in the paper view', () => {
+  it('measures at the print content width so line breaks match the PDF', () => {
     const out = buildSrcdoc(entry, new Map(), 'n');
-    expect(out).toContain('html.wdf-paged article > h1:not(:first-child)');
-    expect(out).toContain('margin-top: 3.5em');
+    expect(out).toContain('article.wdf-measure');
+    expect(out).toContain('width: 170mm');
+  });
+});
+
+describe('paginatePlan (WP17)', () => {
+  const u = (h: number, extra: Partial<PlanUnit> = {}): PlanUnit => ({ h, ...extra });
+
+  it('fills a sheet and overflows to the next', () => {
+    expect(paginatePlan([u(30), u(30), u(30)], 100)).toEqual([0]);
+    expect(paginatePlan([u(40), u(40), u(40)], 90)).toEqual([0, 2]);
+  });
+
+  it('opens a fresh sheet on breakBefore, but never for the first unit', () => {
+    expect(paginatePlan([u(10, { breakBefore: true }), u(10)], 100)).toEqual([0]);
+    expect(paginatePlan([u(10), u(10, { breakBefore: true }), u(10)], 100)).toEqual([0, 1]);
+  });
+
+  it('keeps a heading with its following block', () => {
+    // heading (keepWithNext) would be the last unit of sheet 1 → moves over.
+    expect(paginatePlan([u(40), u(30, { keepWithNext: true }), u(50)], 100)).toEqual([0, 1]);
+  });
+
+  it('gives up pulling a keep-with-next chain that fills the whole sheet', () => {
+    const plan = paginatePlan(
+      [u(50, { keepWithNext: true }), u(40, { keepWithNext: true }), u(30)],
+      100,
+    );
+    expect(plan).toEqual([0, 2]);
+  });
+
+  it('gives an oversized unit a sheet of its own', () => {
+    expect(paginatePlan([u(10), u(500), u(10)], 100)).toEqual([0, 1, 2]);
   });
 });

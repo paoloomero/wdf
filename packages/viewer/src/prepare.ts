@@ -48,22 +48,26 @@ export function inlineResources(html: string, files: ReadonlyMap<string, Uint8Ar
 }
 
 /**
- * Paper view (WP10, plan §10.20): an A4 "sheet" look for the screen,
- * toggled by the controller via the wdf-paged class. Presentation only —
- * the content flows continuously; true pagination happens in print/PDF.
+ * Paper view (WP17, plan §10.26): a true paginated preview — distinct A4
+ * sheets on a grey desk, the imported page header/footer repeated on every
+ * sheet, "Pag. N di M" labels. Built in-frame by the paginator below; the
+ * exported PDF (browser print engine) remains the reference layout.
  */
 export const PAGED_CSS = `
   html.wdf-paged body { background: #676d77; padding: 1.5rem 0; }
-  html.wdf-paged article {
-    background: #fff; width: 210mm; max-width: 210mm; box-sizing: border-box;
-    margin: 0 auto; padding: 20mm; min-height: 297mm;
+  .wdf-desk { display: flex; flex-direction: column; align-items: center; }
+  .wdf-sheet {
+    background: #fff; width: 210mm; height: 297mm; box-sizing: border-box;
+    padding: 20mm; overflow: hidden; display: flex; flex-direction: column;
     box-shadow: 0 3px 18px rgba(0, 0, 0, 0.45);
   }
-  /* Breathing space at section boundaries, mirroring the print breaks. */
-  html.wdf-paged article > h1:not(:first-child),
-  html.wdf-paged article > section:not(:first-child) { margin-top: 3.5em; }
-  html.wdf-paged article > h2:not(:first-child) { margin-top: 2.4em; }
-  html.wdf-paged table, html.wdf-paged figure { margin-top: 1.6em; margin-bottom: 1.6em; }
+  .wdf-sheet > footer { margin-top: auto; }
+  .wdf-sheet-body { flex: 0 1 auto; overflow: hidden; min-height: 0; }
+  .wdf-sheet-body > :first-child { margin-top: 0; }
+  .wdf-page-label { color: #dfe3ea; font: 12px/1 system-ui, sans-serif; margin: 0.5rem 0 1.4rem; }
+  /* Measurement pass: the article at the exact print content width (A4
+     minus 20mm margins), so line breaks match the print engine's. */
+  article.wdf-measure { width: 170mm !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
 `;
 
 /** Paged-media sheet for print/PDF export (WP10): the browser paginates. */
@@ -111,6 +115,268 @@ export const BASE_CSS = `
   .wdf-flash { outline: 2px solid #1a56c4; outline-offset: 4px; border-radius: 2px; }
 `;
 
+export interface PlanUnit {
+  /** Rendered height in px, margins included. */
+  h: number;
+  /** Must open a fresh sheet (top-level section/h1 start, never the first). */
+  breakBefore?: boolean;
+  /** Never the last unit of a sheet (headings stay with what follows). */
+  keepWithNext?: boolean;
+}
+
+/**
+ * Pure pagination plan (WP17, plan §10.26): assigns measured units to sheets,
+ * mirroring the print rules (fresh page before non-first top-level sections,
+ * headings kept with their following block). Returns the index of the first
+ * unit of every sheet. Single source of truth: unit-tested here and injected
+ * into the frame via toString() — keep it fully self-contained.
+ */
+export function paginatePlan(units: readonly PlanUnit[], bodyH: number): number[] {
+  const starts: number[] = [0];
+  let pageStart = 0;
+  let used = 0;
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i];
+    if (u === undefined) continue;
+    let fresh = used > 0 && u.breakBefore === true;
+    if (!fresh && used > 0 && used + u.h > bodyH) fresh = true;
+    if (fresh) {
+      // Pull a trailing keep-with-next chain onto the new sheet — unless the
+      // chain is the whole sheet, in which case we give up and break here.
+      let j = i;
+      while (j > pageStart && units[j - 1]?.keepWithNext === true) j--;
+      if (j === pageStart) j = i;
+      starts.push(j);
+      pageStart = j;
+      used = 0;
+      for (let k = j; k < i; k++) used += units[k]?.h ?? 0;
+    }
+    used += u.h;
+  }
+  return starts;
+}
+
+/**
+ * In-frame paginator (WP17): measures the article at print content width,
+ * plans the sheets with paginatePlan, and rebuilds the document as A4 sheets
+ * with the page header/footer cloned onto each. The original article leaves
+ * the DOM while paged (so ids stay unique for citations) and is restored
+ * intact when the toggle goes off.
+ */
+export const PAGINATE_JS = `
+  var wdfPlan = ${paginatePlan.toString()};
+  var wdfPagedState = { token: 0, desk: null, article: null, anchor: null };
+  var WDF_MM = 96 / 25.4;
+  var WDF_CONTENT_H = (297 - 40) * (96 / 25.4);
+  var WDF_SAFETY = 3;
+
+  function wdfMeasureH(el) {
+    var cs = getComputedStyle(el);
+    return (
+      el.getBoundingClientRect().height +
+      (parseFloat(cs.marginTop) || 0) +
+      (parseFloat(cs.marginBottom) || 0)
+    );
+  }
+
+  function wdfSplitChildren(el) {
+    if (el.tagName === 'TABLE') {
+      var rows = el.querySelectorAll(':scope > tbody > tr');
+      return rows.length > 1 ? Array.prototype.slice.call(rows) : null;
+    }
+    if (el.tagName === 'UL' || el.tagName === 'OL') {
+      var lis = el.querySelectorAll(':scope > li');
+      return lis.length > 1 ? Array.prototype.slice.call(lis) : null;
+    }
+    return null;
+  }
+
+  function wdfCollectUnits(article, bodyH) {
+    var units = [];
+    function pushUnit(node, wrappers, breakBefore) {
+      units.push({
+        node: node,
+        wrappers: wrappers,
+        h: wdfMeasureH(node),
+        breakBefore: breakBefore === true,
+        keepWithNext: /^H[1-6]$/.test(node.tagName),
+      });
+    }
+    function walk(el, wrappers, breakBefore) {
+      if (el.tagName === 'SECTION') {
+        var kids = Array.prototype.slice.call(el.children);
+        for (var i = 0; i < kids.length; i++) {
+          walk(kids[i], wrappers.concat([el]), breakBefore && i === 0);
+        }
+        return;
+      }
+      var parts = wdfMeasureH(el) > bodyH ? wdfSplitChildren(el) : null;
+      if (parts !== null) {
+        for (var j = 0; j < parts.length; j++) {
+          pushUnit(parts[j], wrappers.concat([el]), breakBefore && j === 0);
+        }
+        return;
+      }
+      pushUnit(el, wrappers, breakBefore);
+    }
+    var top = Array.prototype.filter.call(article.children, function (el) {
+      return el.tagName !== 'HEADER' && el.tagName !== 'FOOTER';
+    });
+    for (var i = 0; i < top.length; i++) {
+      var el = top[i];
+      walk(el, [], i > 0 && (el.tagName === 'SECTION' || el.tagName === 'H1'));
+    }
+    return units;
+  }
+
+  /* Clones a structural shell for continuation on a new sheet: tables keep
+     caption/colgroup/thead and get an empty tbody; other wrappers clone
+     shallow. */
+  function wdfCloneShell(el) {
+    if (el.tagName === 'TABLE') {
+      var t = el.cloneNode(false);
+      var kids = el.children;
+      for (var i = 0; i < kids.length; i++) {
+        var k = kids[i];
+        if (k.tagName === 'CAPTION' || k.tagName === 'COLGROUP' || k.tagName === 'THEAD') {
+          t.appendChild(k.cloneNode(true));
+        }
+      }
+      var tb = document.createElement('tbody');
+      t.appendChild(tb);
+      return { outer: t, slot: tb };
+    }
+    var c = el.cloneNode(false);
+    return { outer: c, slot: c };
+  }
+
+  function wdfBuildSheets(units, starts, header, footer) {
+    var desk = document.createElement('div');
+    desk.className = 'wdf-desk';
+    for (var p = 0; p < starts.length; p++) {
+      var from = starts[p];
+      var to = p + 1 < starts.length ? starts[p + 1] : units.length;
+      var sheet = document.createElement('div');
+      sheet.className = 'wdf-sheet';
+      if (header) sheet.appendChild(header.cloneNode(true));
+      var bodyBox = document.createElement('div');
+      bodyBox.className = 'wdf-sheet-body';
+      sheet.appendChild(bodyBox);
+      var chain = [];
+      for (var i = from; i < to; i++) {
+        var u = units[i];
+        var common = 0;
+        while (
+          common < chain.length &&
+          common < u.wrappers.length &&
+          chain[common].src === u.wrappers[common]
+        ) {
+          common++;
+        }
+        chain.length = common;
+        for (var w = common; w < u.wrappers.length; w++) {
+          var shell = wdfCloneShell(u.wrappers[w]);
+          var host = chain.length > 0 ? chain[chain.length - 1].clone.slot : bodyBox;
+          host.appendChild(shell.outer);
+          chain.push({ src: u.wrappers[w], clone: shell });
+        }
+        var slot = chain.length > 0 ? chain[chain.length - 1].clone.slot : bodyBox;
+        slot.appendChild(u.node.cloneNode(true));
+      }
+      if (footer) sheet.appendChild(footer.cloneNode(true));
+      desk.appendChild(sheet);
+      var label = document.createElement('div');
+      label.className = 'wdf-page-label';
+      label.textContent = 'Pag. ' + (p + 1) + ' di ' + starts.length;
+      desk.appendChild(label);
+    }
+    return desk;
+  }
+
+  /* Structural clones (header/footer per sheet, continued shells) would
+     duplicate ids: only the first occurrence keeps it, so citations and
+     scrolling stay unambiguous. */
+  function wdfDedupIds(desk) {
+    var seen = {};
+    var all = desk.querySelectorAll('[id]');
+    for (var i = 0; i < all.length; i++) {
+      var id = all[i].id;
+      if (seen[id]) all[i].removeAttribute('id');
+      else seen[id] = true;
+    }
+  }
+
+  function wdfImagesReady(scope) {
+    var imgs = Array.prototype.slice.call(scope.querySelectorAll('img'));
+    return Promise.all(
+      imgs.map(function (im) {
+        if (im.complete) return null;
+        return new Promise(function (res) {
+          im.addEventListener('load', res);
+          im.addEventListener('error', res);
+        });
+      })
+    );
+  }
+
+  function wdfSetPaged(on) {
+    var token = ++wdfPagedState.token;
+    document.documentElement.classList.toggle('wdf-paged', on);
+    if (!on) {
+      if (wdfPagedState.desk) {
+        wdfPagedState.desk.remove();
+        wdfPagedState.desk = null;
+      }
+      if (wdfPagedState.article && wdfPagedState.anchor) {
+        wdfPagedState.anchor.parentNode.insertBefore(wdfPagedState.article, wdfPagedState.anchor);
+        wdfPagedState.anchor.remove();
+        wdfPagedState.article = null;
+        wdfPagedState.anchor = null;
+      }
+      return;
+    }
+    var article = document.querySelector('article');
+    if (!article || wdfPagedState.desk) return;
+    var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    fontsReady
+      .then(function () {
+        return wdfImagesReady(article);
+      })
+      .then(function () {
+        if (token !== wdfPagedState.token) return;
+        article.classList.add('wdf-measure');
+        var header = null;
+        var footer = null;
+        var first = article.firstElementChild;
+        var last = article.lastElementChild;
+        if (first && first.tagName === 'HEADER') header = first;
+        if (last && last.tagName === 'FOOTER') footer = last;
+        var bodyH =
+          WDF_CONTENT_H -
+          (header ? wdfMeasureH(header) : 0) -
+          (footer ? wdfMeasureH(footer) : 0) -
+          WDF_SAFETY;
+        var units = wdfCollectUnits(article, bodyH);
+        var starts = wdfPlan(
+          units.map(function (u) {
+            return { h: u.h, breakBefore: u.breakBefore, keepWithNext: u.keepWithNext };
+          }),
+          bodyH
+        );
+        var desk = wdfBuildSheets(units, starts, header, footer);
+        article.classList.remove('wdf-measure');
+        wdfDedupIds(desk);
+        var anchor = document.createComment('wdf-article');
+        article.parentNode.insertBefore(anchor, article);
+        article.remove();
+        wdfPagedState.article = article;
+        wdfPagedState.anchor = anchor;
+        document.body.appendChild(desk);
+        wdfPagedState.desk = desk;
+      });
+  }
+`;
+
 /** Controller injected into the sandboxed frame (the only script its CSP allows). */
 export const CONTROLLER_JS = `
   document.addEventListener('click', function (e) {
@@ -128,7 +394,7 @@ export const CONTROLLER_JS = `
   addEventListener('message', function (e) {
     var d = e.data || {};
     if (d.type === 'wdf-paged') {
-      document.documentElement.classList.toggle('wdf-paged', d.on === true);
+      wdfSetPaged(d.on === true);
       return;
     }
     if (d.type === 'wdf-scroll' && typeof d.id === 'string') {
@@ -175,7 +441,7 @@ export function buildSrcdoc(
     /<head([^>]*)>/,
     (match) => `${match}${csp}<style>${BASE_CSS}</style><style>${PAGED_CSS}</style>${fontStyle}`,
   );
-  const controller = `<script nonce="${nonce}">${CONTROLLER_JS}</script>`;
+  const controller = `<script nonce="${nonce}">${PAGINATE_JS}${CONTROLLER_JS}</script>`;
   out = out.includes('</body>') ? out.replace('</body>', `${controller}</body>`) : out + controller;
   return out;
 }
