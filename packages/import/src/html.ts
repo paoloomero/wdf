@@ -13,6 +13,7 @@ import {
 } from '@wdf/core';
 
 import { el, isEl, textOf, type MEl, type MNode } from './ast.js';
+import { replaceEmbeds, type EmbedPlaceholderOptions } from './embeds.js';
 import { pruneCaptureMarks } from './prefilter.js';
 import {
   DEFAULT_CAPS,
@@ -558,6 +559,13 @@ export interface HtmlImportOptions {
    * strips every capture marker.
    */
   captureExclusions?: ReadonlySet<number>;
+  /**
+   * Embed placeholders for dom-snapshot inputs (T18.4, ext-capture §5):
+   * iframes/video/audio become a figure (poster available) or a paragraph
+   * carrying the embed URL as a link — before the whitelist would drop
+   * them as unrepresentable.
+   */
+  captureEmbeds?: EmbedPlaceholderOptions;
 }
 
 /**
@@ -612,6 +620,9 @@ export async function importHtml(
         `geometric pre-filter: removed ${String(pruned.removed)} element subtree(s) invisible in the rendered page`,
       );
     }
+  }
+  if (options.captureEmbeds !== undefined) {
+    doc = replaceEmbeds(doc, options.captureEmbeds, report);
   }
   const root = doc.html;
 

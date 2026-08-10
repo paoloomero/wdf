@@ -31,7 +31,17 @@ export interface DownloadReply {
   filename: string;
   mediaType: string;
   base64: string;
+  /** Aggregated conversion report — surfaced by the popup UX (T18.5). */
+  report: string[];
 }
+
+/** Background's reply when the conversion could not produce a document. */
+export interface ErrorReply {
+  type: 'wdf-error';
+  message: string;
+}
+
+export type ConvertReply = DownloadReply | ErrorReply;
 
 export function bytesToBase64(bytes: Uint8Array): string {
   let bin = '';

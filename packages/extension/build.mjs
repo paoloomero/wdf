@@ -23,6 +23,9 @@ await build({
   minify: false,
   target: ['chrome110'],
   legalComments: 'none',
+  // The viewer's standalone template ships inside the background bundle
+  // (T18.4): the extension is fully client-side, no template fetch ever.
+  loader: { '.html': 'text' },
   outdir: out,
 });
 

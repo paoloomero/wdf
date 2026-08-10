@@ -1,8 +1,9 @@
-import { sha256Hex, type WdfManifest } from '@wdf/core';
+import { sha256Hex, type WdfCapture, type WdfManifest } from '@wdf/core';
 
 import { ensureIds, fixDanglingFragments, serializeDocument, textOf, type MEl } from './ast.js';
 import { DEFAULT_CAPS, type AssetCaps, type AssetLoader, type LoadedAsset } from './assets.js';
 import { buildPackage } from './build.js';
+import { type EmbedPlaceholderOptions } from './embeds.js';
 import { embedFonts, type FontReader } from './fonts.js';
 import { importHtml, type HtmlImportOptions } from './html.js';
 import { importMarkdown } from './markdown.js';
@@ -48,6 +49,14 @@ export interface ImportDocumentOptions {
   fullPage?: boolean;
   /** Geometric pre-filter for dom-snapshot inputs (T18.3, prefilter.ts). */
   captureExclusions?: ReadonlySet<number>;
+  /** Embed placeholders for dom-snapshot inputs (T18.4, embeds.ts). */
+  captureEmbeds?: EmbedPlaceholderOptions;
+  /**
+   * Capture provenance to record in the package (extension `capture` 0.1,
+   * docs/ext-capture.md §4): emitted as ext/capture/capture.json and
+   * declared in the manifest, hashed like every other file.
+   */
+  capture?: WdfCapture;
   /** Resolves an image src to bytes; absent → external images are dropped. */
   loadAsset?: AssetLoader;
   /** Word support-folder access for page headers/footers (T14.1). */
@@ -93,6 +102,7 @@ export async function importDocument(
     if (opts.loadSibling !== undefined) options.loadSibling = opts.loadSibling;
     if (opts.fullPage === true) options.fullPage = true;
     if (opts.captureExclusions !== undefined) options.captureExclusions = opts.captureExclusions;
+    if (opts.captureEmbeds !== undefined) options.captureEmbeds = opts.captureEmbeds;
     const result = await importHtml(input.text, options);
     blocks = result.blocks;
     sourceTitle = result.title;
@@ -178,6 +188,16 @@ export async function importDocument(
     report.push(
       `embedded the original source as ${mainPath} (extension "source", docs/ext-source.md)`,
     );
+  }
+  // T18.4 (docs/ext-capture.md §4): capture provenance travels in the
+  // package, hashed like every other file.
+  if (opts.capture !== undefined) {
+    extFiles.set(
+      'ext/capture/capture.json',
+      enc.encode(`${JSON.stringify(opts.capture, null, 2)}\n`),
+    );
+    extensions.push({ name: 'capture', version: '0.1' });
+    report.push('recorded capture provenance (extension "capture", docs/ext-capture.md)');
   }
   if (extensions.length > 0) {
     manifest.extensions = extensions.sort((a, b) => (a.name < b.name ? -1 : 1));

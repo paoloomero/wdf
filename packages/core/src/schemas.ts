@@ -2,6 +2,12 @@ import type { ValidateFunction } from 'ajv';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
+import {
+  validateCapture,
+  validateHashes,
+  validateManifest,
+  validateOutline,
+} from './schemas.compiled.js';
 import { captureSchema, hashesSchema, manifestSchema, outlineSchema } from './schemas.data.js';
 import type { WdfCapture, WdfHashes, WdfManifest, WdfOutline } from './types.js';
 
@@ -50,9 +56,20 @@ export const wdfSchemas: SchemaSet = {
   capture: captureSchema,
 };
 
-let defaultValidators: SchemaValidators | undefined;
-
-/** Memoized validators for the embedded WDF Core 0.1 schemas. */
+/**
+ * Validators for the embedded schemas — PRECOMPILED with ajv standalone
+ * (scripts/compile-schemas.mjs): no code generation at runtime, so they
+ * run where eval/new Function is forbidden (MV3 service workers, strict
+ * CSP). `createSchemaValidators` above stays the runtime path for custom
+ * schema sets; a parity test keeps the two in agreement on every fixture.
+ */
 export function getSchemaValidators(): SchemaValidators {
-  return (defaultValidators ??= createSchemaValidators(wdfSchemas));
+  return compiledValidators;
 }
+
+const compiledValidators: SchemaValidators = {
+  manifest: validateManifest as unknown as ValidateFunction<WdfManifest>,
+  outline: validateOutline as unknown as ValidateFunction<WdfOutline>,
+  hashes: validateHashes as unknown as ValidateFunction<WdfHashes>,
+  capture: validateCapture as unknown as ValidateFunction<WdfCapture>,
+};

@@ -1,26 +1,30 @@
-// T18.2 acceptance: the real capture — DOM snapshot + geometry, CSSOM and
-// fetch-fallback stylesheets, canvas images, cross-origin limits in the
-// report — exercised with the REAL extension loaded in Chromium.
+// T18.4 acceptance: the REAL extension converts a live page whose video
+// embed is MOUNTED BY JAVASCRIPT (the §10.27 dossier case: the content
+// does not exist in the served HTML) into a standalone HTML download whose
+// embedded .wdf is VALID and verified, carries the capture provenance and
+// the dom-snapshot source, and renders the embed as a placeholder link.
 //
-// Two local origins: the page lives on 127.0.0.1, a second server on
-// `localhost` (a DIFFERENT origin) serves a stylesheet and an image
-// WITHOUT CORS headers — so the sheet's CSSOM is blocked and its fetch is
-// CORS-denied (report), and the image taints the canvas and its fetch is
-// denied too (report). That is the declared activeTab cost (§10.31).
+// Two local origins: the page lives on 127.0.0.1; a second server on
+// `localhost` (a DIFFERENT origin, no CORS headers) hosts the video embed
+// page, a stylesheet and an image — exercising the declared cross-origin
+// report paths of §10.31 alongside the happy paths.
 //
 // Run with: pnpm --filter @wdf/extension test:e2e
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(here, '../../..');
 const extensionDir = join(here, '../dist/chrome-e2e');
 
-const PAGE_TITLE = 'Cattura — Città di Périgueux';
+const PAGE_TITLE = 'La conferenza, annotata';
 // 1×1 red PNG.
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -29,9 +33,12 @@ const PNG = Buffer.from(
 
 const listen = (server) => new Promise((res) => server.listen(0, '127.0.0.1', res));
 
-// Cross-origin server (reached as http://localhost:<port>): no CORS headers.
+// Cross-origin server (reached as http://localhost:<port>): no CORS.
 const foreign = createServer((req, res) => {
-  if (req.url === '/theme.css') {
+  if (req.url?.startsWith('/embed/')) {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end('<!doctype html><html><body>player</body></html>');
+  } else if (req.url === '/theme.css') {
     res.writeHead(200, { 'content-type': 'text/css' });
     res.end('h1 { letter-spacing: 1px; }');
   } else if (req.url === '/pixel.png') {
@@ -43,11 +50,12 @@ const foreign = createServer((req, res) => {
 });
 await listen(foreign);
 const foreignBase = `http://localhost:${foreign.address().port}`;
+const embedUrl = `${foreignBase}/embed/talk-42`;
 
 const site = createServer((req, res) => {
   if (req.url === '/app.css') {
     res.writeHead(200, { 'content-type': 'text/css' });
-    res.end('p { color: rgb(1, 2, 3); }\n.hero { margin: 0; }');
+    res.end('p { color: rgb(1, 2, 3); }');
   } else if (req.url === '/photo.png') {
     res.writeHead(200, { 'content-type': 'image/png' });
     res.end(PNG);
@@ -57,17 +65,22 @@ const site = createServer((req, res) => {
 <html lang="it"><head><title>${PAGE_TITLE}</title>
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="${foreignBase}/theme.css">
-<style>body { font-family: serif; }</style>
 </head><body>
-<header id="stick" style="position:sticky;top:0">sticky header</header>
-<div id="banner" style="position:fixed;bottom:0">cookie banner</div>
-<nav id="hidden-menu" style="display:none"><a href="/x">menu</a></nav>
-<div id="offscreen" style="position:absolute;left:-9999px">skip link trap</div>
-<article><h1>Il documento</h1><p>Testo.</p>
-<img id="same" src="/photo.png" srcset="/photo.png 1x, /photo.png 2x" alt="foto">
-<img id="foreign" src="${foreignBase}/pixel.png" alt="pixel">
-<iframe src="about:blank" title="embed"></iframe>
-</article>
+<div id="banner" style="position:fixed;bottom:0">Questo sito usa i cookie — Accetta</div>
+<nav id="hidden-menu" style="display:none"><a href="/x">menu nascosto</a></nav>
+<main><article><h1>La conferenza, annotata</h1>
+<p>Guarda la registrazione e leggi le note.</p>
+<figure><img src="/photo.png" alt="copertina"></figure>
+<div id="video-slot"></div>
+<img src="${foreignBase}/pixel.png" alt="pixel estraneo">
+</article></main>
+<script>
+  // The dossier case: the embed does NOT exist in the served HTML.
+  const f = document.createElement('iframe');
+  f.src = ${JSON.stringify(embedUrl)};
+  f.title = 'video';
+  document.getElementById('video-slot').appendChild(f);
+</script>
 </body></html>`);
   } else {
     res.writeHead(404).end();
@@ -88,7 +101,13 @@ try {
   worker ??= await context.waitForEvent('serviceworker', { timeout: 15000 });
 
   const page = await context.newPage();
+  page.on('console', (msg) => console.log(`  [page ${msg.type()}] ${msg.text()}`));
+  page.on('dialog', (d) => {
+    console.log(`  [page dialog] ${d.message()}`);
+    void d.dismiss();
+  });
   await page.goto(pageUrl, { waitUntil: 'networkidle' });
+  await page.waitForSelector('#video-slot iframe');
 
   const tabId = await worker.evaluate(
     (url) =>
@@ -99,63 +118,70 @@ try {
   );
   assert.notEqual(tabId, undefined, 'fixture tab not found from the service worker');
 
-  const downloadPromise = page.waitForEvent('download', { timeout: 20000 });
+  const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
   await worker.evaluate((id) => globalThis.wdfStartCapture(id), tabId);
   const download = await downloadPromise;
 
-  assert.equal(download.suggestedFilename(), `${PAGE_TITLE}.capture.json`);
-  const d = JSON.parse(readFileSync(await download.path(), 'utf8'));
+  // Default output: the sendable standalone HTML (T15.1 / §10.31 UX).
+  assert.equal(download.suggestedFilename(), `${PAGE_TITLE}.html`);
+  const standalone = readFileSync(await download.path(), 'utf8');
+  assert.ok(standalone.includes('<title>La conferenza, annotata</title>'), 'standalone title');
 
-  // Provenance (the future capture.json, docs/ext-capture.md §4).
-  assert.equal(d.provenance.url, pageUrl);
-  assert.ok(d.provenance.userAgent.includes('Chrome'), 'user agent missing');
-  assert.ok(d.provenance.viewport.width > 0 && d.provenance.viewport.height > 0);
-  assert.match(d.provenance.capturedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
-
-  // Snapshot.
-  assert.equal(d.page.title, PAGE_TITLE);
-  assert.equal(d.page.lang, 'it');
-  assert.ok(d.page.snapshotBytes > 500, 'snapshot suspiciously small');
-
-  // Geometry facts for the T18.3 pre-filter.
-  assert.ok(d.geometry.elements > 10, 'too few elements measured');
-  assert.ok(d.geometry.hidden >= 2, `hidden count: ${d.geometry.hidden}`); // nav + its child a
-  assert.ok(d.geometry.fixedOrSticky >= 2, `fixed/sticky count: ${d.geometry.fixedOrSticky}`);
-
-  // Stylesheets: same-origin via CSSOM; cross-origin without CORS ends in
-  // the report (CSSOM blocked AND fetch CORS-denied).
-  const sameSheet = d.stylesheets.find((s) => s.href.endsWith('/app.css'));
-  assert.equal(sameSheet?.origin, 'cssom');
-  assert.ok(sameSheet.bytes > 20);
-  assert.ok(
-    d.report.some((line) => line.includes('theme.css')),
-    `cross-origin sheet not reported: ${JSON.stringify(d.report)}`,
+  // Extract the embedded package and put it through the REAL validator.
+  const b64 = /<script type="application\/wdf\+zip" id="wdf-package">([^<]*)<\/script>/.exec(
+    standalone,
+  )?.[1];
+  assert.ok(b64 !== undefined && b64.length > 0, 'embedded package not found in standalone');
+  const wdfBytes = Buffer.from(b64, 'base64');
+  const work = mkdtempSync(join(tmpdir(), 'wdf-e2e-'));
+  const wdfPath = join(work, 'capture.wdf');
+  writeFileSync(wdfPath, wdfBytes);
+  const cli = spawnSync(
+    process.execPath,
+    [join(repoRoot, 'packages/cli/dist/index.js'), 'validate', wdfPath],
+    {
+      encoding: 'utf8',
+    },
   );
+  assert.equal(cli.status, 0, `CLI validate failed:\n${cli.stdout}\n${cli.stderr}`);
+  assert.ok(cli.stdout.includes('VALID'), cli.stdout);
 
-  // Images: same-origin from the render (canvas → PNG); cross-origin
-  // without CORS taints the canvas and its fetch is denied → report.
-  const sameImg = d.images.find((i) => i.url.endsWith('/photo.png'));
-  assert.equal(sameImg?.origin, 'canvas');
-  assert.equal(sameImg?.mediaType, 'image/png');
-  assert.ok(
-    d.report.some((line) => line.includes('pixel.png')),
-    `cross-origin image not reported: ${JSON.stringify(d.report)}`,
-  );
+  // Inspect the package with the reference implementation.
+  const core = await import(pathToFileURL(join(repoRoot, 'packages/core/dist/index.js')).href);
+  const pkg = core.readPackage(new Uint8Array(wdfBytes));
+  const verify = await core.verifyPackage(pkg);
+  assert.equal(verify.verified, true, JSON.stringify(verify.problems));
+  assert.deepEqual(core.validateCaptureExt(pkg), []);
 
-  // The iframe is announced as a future placeholder (ext-capture §5).
-  assert.ok(d.report.some((line) => line.includes('iframe')));
+  const dec = new TextDecoder();
+  const captureJson = JSON.parse(dec.decode(pkg.files.get('ext/capture/capture.json')));
+  assert.equal(captureJson.capture, '0.1');
+  assert.equal(captureJson.url, pageUrl);
+  assert.equal(captureJson.mode, 'article');
+  assert.ok(captureJson.viewport.width > 0);
 
-  console.log('e2e capture OK: snapshot + geometry + stylesheets + images + report');
+  const sourceJson = JSON.parse(dec.decode(pkg.files.get('ext/source/source.json')));
+  assert.equal(sourceJson.kind, 'dom-snapshot');
+  const original = dec.decode(pkg.files.get(sourceJson.main));
+  assert.ok(!original.includes('data-wdf-cap'), 'markers leaked into the embedded source');
+  assert.ok(original.includes('<iframe'), 'the snapshot must keep the mounted iframe');
+
+  const html = dec.decode(pkg.files.get('content/index.html'));
+  assert.ok(html.includes(`href="${embedUrl}"`), 'embed URL lost');
+  assert.ok(html.includes('Open on localhost'), 'placeholder link text missing');
+  assert.ok(!html.includes('<iframe'), 'iframe leaked into the canonical');
+  assert.ok(!html.includes('cookie'), 'fixed banner leaked into the canonical');
+  assert.ok(!html.includes('menu nascosto'), 'hidden menu leaked into the canonical');
+  assert.ok(/content\/assets\/[0-9a-f]{16}\.png/.test(html), 'captured image not packaged');
+
   console.log(
-    `  elements: ${d.geometry.elements}, hidden: ${d.geometry.hidden}, fixed/sticky: ${d.geometry.fixedOrSticky}`,
+    'e2e T18.4 OK: JS-mounted video → standalone download, embedded .wdf VALID & verified',
   );
+  console.log(`  ${download.suggestedFilename()} (${standalone.length} bytes)`);
   console.log(
-    `  stylesheets: ${d.stylesheets.map((s) => `${s.href.split('/').pop()}[${s.origin}]`).join(', ')}`,
+    `  capture.json: ${captureJson.url} @ ${captureJson.capturedAt} [${captureJson.mode}]`,
   );
-  console.log(
-    `  images: ${d.images.map((i) => `${i.url.split('/').pop()}[${i.origin}]`).join(', ')}`,
-  );
-  for (const line of d.report) console.log(`  | ${line}`);
+  console.log(`  placeholder: Open on localhost → ${embedUrl}`);
 } finally {
   await context.close();
   site.close();

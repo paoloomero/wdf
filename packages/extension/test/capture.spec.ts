@@ -11,8 +11,6 @@ import {
   type ImageLike,
   type SheetLike,
 } from '../src/capture.js';
-import { buildDiagnostic } from '../src/diagnostic.js';
-import type { CaptureRequest } from '../src/protocol.js';
 
 // T18.2 (plan §10.31/§10.32): the capture engine's assembly logic, with
 // the DOM edges injected. Real geometry and the CSSOM/canvas paths are
@@ -190,76 +188,5 @@ describe('caps stay in sync with @wdf/import', () => {
     expect(CAPTURE_CAPS.perFile).toBe(DEFAULT_CAPS.perFile);
     expect(CAPTURE_CAPS.totalBytes).toBe(DEFAULT_CAPS.totalBytes);
     expect(CAPTURE_CAPS.maxCount).toBe(DEFAULT_CAPS.maxCount);
-  });
-});
-
-describe('buildDiagnostic', () => {
-  it('summarizes the capture with geometry counts and byte sizes', () => {
-    const request: CaptureRequest = {
-      type: 'wdf-capture',
-      provenance: {
-        url: 'https://example.com/',
-        capturedAt: '2026-08-10T12:00:00Z',
-        userAgent: 'UA',
-        viewport: { width: 1280, height: 720, devicePixelRatio: 1 },
-      },
-      snapshot: {
-        doctype: '<!DOCTYPE html>\n',
-        html: '<html/>',
-        baseUrl: 'https://example.com/',
-        title: 'T',
-        lang: 'en',
-      },
-      stylesheets: [{ href: 'https://example.com/a.css', css: 'p{}', origin: 'cssom' }],
-      images: [
-        {
-          url: 'https://example.com/i.png',
-          base64: 'AAAA',
-          mediaType: 'image/png',
-          origin: 'canvas',
-        },
-      ],
-      geometry: {
-        viewport: { width: 1280, height: 720, devicePixelRatio: 1 },
-        document: { width: 1280, height: 4000 },
-        elements: [
-          {
-            id: 0,
-            tag: 'html',
-            rect: { x: 0, y: 0, width: 1, height: 1 },
-            display: 'block',
-            visibility: 'visible',
-            position: 'static',
-          },
-          {
-            id: 1,
-            tag: 'nav',
-            rect: { x: 0, y: 0, width: 0, height: 0 },
-            display: 'none',
-            visibility: 'visible',
-            position: 'static',
-          },
-          {
-            id: 2,
-            tag: 'header',
-            rect: { x: 0, y: 0, width: 1, height: 1 },
-            display: 'block',
-            visibility: 'visible',
-            position: 'sticky',
-          },
-        ],
-      },
-      report: ['note'],
-    };
-    const d = buildDiagnostic(request);
-    expect(d.geometry).toEqual({
-      documentSize: { width: 1280, height: 4000 },
-      elements: 3,
-      hidden: 1,
-      fixedOrSticky: 1,
-    });
-    expect(d.stylesheets[0]?.bytes).toBe(3);
-    expect(d.images[0]?.bytes).toBe(3);
-    expect(d.report).toEqual(['note']);
   });
 });

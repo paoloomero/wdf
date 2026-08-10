@@ -3,7 +3,12 @@ import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { createSchemaValidators, wdfSchemas, type SchemaValidators } from '../src/schemas.js';
+import {
+  createSchemaValidators,
+  getSchemaValidators,
+  wdfSchemas,
+  type SchemaValidators,
+} from '../src/schemas.js';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const schemasDir = join(repoRoot, 'spec/schemas');
@@ -35,6 +40,28 @@ function fixtureFiles(schema: string, kind: 'valid' | 'invalid'): string[] {
     .filter((f) => f.startsWith(`${kind}-`) && f.endsWith('.json'))
     .sort();
 }
+
+// The default validators are PRECOMPILED (ajv standalone, MV3-safe — no
+// runtime code generation); this parity check keeps them in agreement
+// with the runtime compiler on every fixture, both accepted and rejected.
+describe('precompiled validators (schemas.compiled.ts)', () => {
+  it.each(['manifest', 'outline', 'hashes', 'capture'] as const)(
+    '%s: agrees with the runtime-compiled validator on all fixtures',
+    (schema) => {
+      const compiled = getSchemaValidators()[schema];
+      const runtime = validators[schema];
+      for (const kind of ['valid', 'invalid'] as const) {
+        for (const file of fixtureFiles(schema, kind)) {
+          const data = loadJson(join(fixturesDir, schema, file));
+          expect(
+            compiled(data),
+            `${schema}/${file} — run \`pnpm sync:schemas\` to regenerate`,
+          ).toBe(runtime(data));
+        }
+      }
+    },
+  );
+});
 
 describe.each(['manifest', 'outline', 'hashes', 'capture'] as const)('%s.schema.json', (schema) => {
   const validate = validators[schema as keyof SchemaValidators];

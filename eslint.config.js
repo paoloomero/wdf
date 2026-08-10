@@ -3,7 +3,8 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**'],
+    // schemas.compiled.ts is GENERATED (ajv standalone, pnpm sync:schemas).
+    ignores: ['**/dist/**', '**/node_modules/**', 'packages/core/src/schemas.compiled.ts'],
   },
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,

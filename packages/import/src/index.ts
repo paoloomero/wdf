@@ -32,10 +32,12 @@ export { promoteHeadings } from './headings.js';
 export { importHtml, type HtmlImportOptions } from './html.js';
 export { importMarkdown } from './markdown.js';
 export { isPageResidue, preprocessHeaderHtml } from './pageheader.js';
+export { replaceEmbeds, type EmbedPlaceholderOptions } from './embeds.js';
 export {
   CAPTURE_MARK,
   geometryExclusions,
   pruneCaptureMarks,
+  stripCaptureMarks,
   type CaptureRect,
   type CaptureElementGeometry,
   type CapturePageGeometry,

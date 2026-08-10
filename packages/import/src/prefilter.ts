@@ -94,6 +94,17 @@ export function geometryExclusions(geometry: CapturePageGeometry): CaptureExclus
 }
 
 /**
+ * Strips capture markers from a snapshot SERIALIZATION — for embedding the
+ * marker-free snapshot as the `source` original (the marker is transport,
+ * never content). Anchored to the exact attribute our own serializer
+ * emits; a script body containing the literal pattern would be altered
+ * too — vanishingly rare and cosmetic only, accepted.
+ */
+export function stripCaptureMarks(html: string): string {
+  return html.replaceAll(new RegExp(` ${CAPTURE_MARK}="\\d+"`, 'g'), '');
+}
+
+/**
  * Applies exclusions to a parsed dom-snapshot: marked subtrees whose id is
  * excluded are dropped, and every surviving element loses its capture
  * marker (the attribute is transport, never content). Pure — returns a new

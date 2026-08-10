@@ -62,9 +62,15 @@ importers:
 
   packages/extension:
     dependencies:
+      '@wdf/core':
+        specifier: workspace:*
+        version: link:../core
       '@wdf/import':
         specifier: workspace:*
         version: link:../import
+      '@wdf/viewer':
+        specifier: workspace:*
+        version: link:../viewer
     devDependencies:
       '@types/chrome':
         specifier: ^0.0.287

@@ -16,7 +16,7 @@ import {
   base64ToBytes,
   bytesToBase64,
   type CaptureRequest,
-  type DownloadReply,
+  type ConvertReply,
 } from './protocol.js';
 
 async function capturePage(): Promise<CaptureRequest> {
@@ -97,7 +97,18 @@ async function capturePage(): Promise<CaptureRequest> {
 void (async () => {
   const request = await capturePage();
   const reply: unknown = await chrome.runtime.sendMessage(request);
-  const r = reply as Partial<DownloadReply>;
+  const r = reply as Partial<ConvertReply> & {
+    message?: string;
+    base64?: string;
+    filename?: string;
+    mediaType?: string;
+  };
+  if (r.type === 'wdf-error') {
+    // Interim surface until the popup UX (T18.5) reports properly.
+    console.error(`WDF: ${r.message ?? 'conversion failed'}`);
+    alert(`WDF — ${r.message ?? 'conversion failed'}`);
+    return;
+  }
   if (r.type !== 'wdf-download' || typeof r.base64 !== 'string' || typeof r.filename !== 'string')
     return;
   const blob = new Blob([base64ToBytes(r.base64) as BlobPart], {
