@@ -6,7 +6,7 @@
   "description": "Browser extension: save the page you are reading as a verifiable WDF document — fully client-side.",
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json && node build.mjs",
-    "test:e2e": "node build.mjs && node e2e/smoke.mjs"
+    "test:e2e": "node build.mjs && node e2e/capture.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",

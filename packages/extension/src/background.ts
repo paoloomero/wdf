@@ -1,5 +1,7 @@
-// Background service worker (MV3). T18.1: the conversion stage is a plain
-// text receipt proving the pipe; @wdf/import takes its place in T18.4.
+// Background service worker (MV3). T18.2: the conversion stage answers a
+// capture with an observable diagnostic (.capture.json); @wdf/import takes
+// this seat in T18.4.
+import { buildDiagnostic } from './diagnostic.js';
 import {
   bytesToBase64,
   downloadFilename,
@@ -18,19 +20,20 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 // The toolbar action cannot be clicked by automation: the e2e smoke test
-// (e2e/smoke.mjs) triggers the same entry point through this hook.
+// (e2e/capture.mjs) triggers the same entry point through this hook.
 (globalThis as Record<string, unknown>)['wdfStartCapture'] = startCapture;
 
 chrome.runtime.onMessage.addListener(
   (message: unknown, _sender, sendResponse: (reply: DownloadReply) => void) => {
     const request = message as Partial<CaptureRequest>;
     if (request.type !== 'wdf-capture') return false;
-    const text = `WDF capture pipe check\ntitle: ${request.title ?? ''}\nurl: ${request.url ?? ''}\n`;
+    const diagnostic = buildDiagnostic(request as CaptureRequest);
+    const json = `${JSON.stringify(diagnostic, null, 2)}\n`;
     sendResponse({
       type: 'wdf-download',
-      filename: downloadFilename(request.title ?? '', 'txt'),
-      mediaType: 'text/plain',
-      base64: bytesToBase64(new TextEncoder().encode(text)),
+      filename: downloadFilename(request.snapshot?.title ?? '', 'capture.json'),
+      mediaType: 'application/json',
+      base64: bytesToBase64(new TextEncoder().encode(json)),
     });
     return false;
   },

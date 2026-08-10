@@ -3,11 +3,26 @@
 // base64 — the declared fallback if this proves too slow on real pages is
 // converting in the content script (§10.31 "Architettura").
 
+import type { CaptureGeometry, CapturedImage, CapturedStylesheet, DomSnapshot } from './capture.js';
+
+/** Provenance of the capture — the future ext/capture/capture.json fields
+ *  (docs/ext-capture.md §4); `mode` is decided at conversion (T18.4/T18.5). */
+export interface CaptureProvenance {
+  url: string;
+  capturedAt: string;
+  userAgent: string;
+  viewport: { width: number; height: number; devicePixelRatio: number };
+}
+
 /** Sent by the injected content script after capturing the page. */
 export interface CaptureRequest {
   type: 'wdf-capture';
-  title: string;
-  url: string;
+  provenance: CaptureProvenance;
+  snapshot: DomSnapshot;
+  stylesheets: CapturedStylesheet[];
+  images: CapturedImage[];
+  geometry: CaptureGeometry;
+  report: string[];
 }
 
 /** Background's reply: the bytes the content script downloads in-page. */
@@ -41,7 +56,6 @@ export function base64ToBytes(b64: string): Uint8Array {
  */
 export function downloadFilename(title: string, extension: string): string {
   const cleaned = title
-    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
