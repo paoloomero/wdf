@@ -64,3 +64,20 @@ export interface WdfHashes {
   /** package path → lowercase hex SHA-256; every file except integrity/hashes.json itself. */
   files: Record<string, string>;
 }
+
+/** Layout viewport at capture time (extension `capture`, docs/ext-capture.md §4). */
+export interface WdfCaptureViewport {
+  width: number;
+  height: number;
+  devicePixelRatio?: number;
+}
+
+/** ext/capture/capture.json — provenance of a live-page capture (docs/ext-capture.md §4). */
+export interface WdfCapture {
+  capture: '0.1';
+  url: string;
+  capturedAt: string;
+  userAgent: string;
+  viewport: WdfCaptureViewport;
+  mode: 'article' | 'full-page';
+}

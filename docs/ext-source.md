@@ -1,4 +1,4 @@
-# WDF extension: `source` (version 0.2)
+# WDF extension: `source` (version 0.3)
 
 Status: extension specification (outside WDF Core, per core spec §10).
 Producers MAY use it; conforming consumers MAY ignore it entirely (§10.3).
@@ -15,7 +15,7 @@ the package integrity hashes like any other file (§10.2).
 ## Manifest declaration
 
 ```json
-"extensions": [{ "name": "source", "version": "0.1" }]
+"extensions": [{ "name": "source", "version": "0.3" }]
 ```
 
 ## Files
@@ -40,11 +40,20 @@ appearance offline. Declared limits: `url()` and `@import` _inside_ the
 CSS are not localized (site backgrounds and webfonts may be missing under
 the no-network CSP). Version 0.1 consumers ignore the extra field.
 
+**Kind of source** (version 0.3): not every original is a served file. A
+browser-extension capture embeds a **serialization of the rendered DOM**
+— what one browser displayed at one moment, not what the server sent.
+The `kind` field declares which of the two the embedded main file is, so
+consumers never present a DOM snapshot as the server's bytes. Absent
+`kind` means `"fetched-html"` (the pre-0.3 behavior — older packages
+stay valid unchanged, older consumers ignore the field).
+
 ## `source.json`
 
 ```json
 {
-  "source": "0.2",
+  "source": "0.3",
+  "kind": "fetched-html",
   "main": "ext/source/8fda6be18a3c2f10.html",
   "mainName": "test doc accessibilit.html",
   "encoding": "windows-1252",
@@ -58,6 +67,12 @@ the no-network CSP). Version 0.1 consumers ignore the extra field.
 ```
 
 - `source` — extension version.
+- `kind` — OPTIONAL (0.3). How the embedded original was obtained:
+  `"fetched-html"` (a file obtained as bytes — downloaded, exported or
+  provided; the default when absent) or `"dom-snapshot"` (a
+  serialization of the rendered DOM captured from a live page, e.g. by
+  the browser extension; see docs/ext-capture.md). Any other value is
+  reserved.
 - `main` — package path of the embedded original main file.
 - `mainName` — the original file name (or URL, for `wdf import <url>`).
 - `encoding` — the encoding detected at import time (WHATWG label);

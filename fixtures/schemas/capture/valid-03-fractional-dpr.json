@@ -1,0 +1,8 @@
+{
+  "capture": "0.1",
+  "url": "https://en.wikipedia.org/wiki/Document",
+  "capturedAt": "2026-08-10T09:30:00.123Z",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+  "viewport": { "width": 1920, "height": 1080, "devicePixelRatio": 1.25 },
+  "mode": "article"
+}

@@ -82,7 +82,7 @@ describe('main-content extraction (WP16)', () => {
 
 describe('source stylesheets (WP15)', () => {
   it('embeds the local stylesheet and maps it in source.json', () => {
-    expect(sourceJson.source).toBe('0.2');
+    expect(sourceJson.source).toBe('0.3');
     const mapped = sourceJson.stylesheets?.['saved-page-css_files/site.css'];
     expect(mapped).toMatch(/^ext\/source\/[0-9a-f]{16}\.css$/);
     const css = new TextDecoder().decode(pkg.files.get(mapped ?? ''));

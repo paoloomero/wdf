@@ -187,6 +187,16 @@ code {
 .badge-warn {
   background: var(--warn);
 }
+/* WP18: nature of a live-page capture, next to the badge (ext-capture §6). */
+#capture-note {
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: none;
+  max-width: 18rem;
+}
 #view-toggle {
   display: flex;
   border: 1px solid var(--line);

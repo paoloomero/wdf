@@ -1,0 +1,8 @@
+{
+  "capture": "0.1",
+  "url": "https://example.com/2026/some-article",
+  "capturedAt": "2026-08-10T15:04:05Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+  "viewport": { "width": 1440, "height": 900, "devicePixelRatio": 2 },
+  "mode": "article"
+}

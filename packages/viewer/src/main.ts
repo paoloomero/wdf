@@ -1,11 +1,14 @@
 import {
+  parseCaptureExt,
   readPackage,
+  validateCaptureExt,
   validateDatasets,
   validateProfile,
   validateStylesheet,
   verifyPackage,
   WdfError,
   type Violation,
+  type WdfCapture,
   type WdfOutline,
   type WdfPackage,
 } from '@wdf/core';
@@ -18,6 +21,8 @@ import {
   buildOriginalSrcdoc,
   buildPrintSrcdoc,
   buildSrcdoc,
+  captureDetails,
+  captureNote,
   citation,
   outlineTree,
   parseSourceExt,
@@ -38,6 +43,7 @@ interface Loaded {
   outline: WdfOutline;
   markdown: string;
   sourceExt: SourceExt | undefined;
+  captureExt: WdfCapture | undefined;
 }
 
 let loaded: Loaded | undefined;
@@ -165,7 +171,13 @@ function openBytes(bytes: Uint8Array, name: string): void {
     const outline = JSON.parse(
       dec.decode(pkg.files.get('ai/outline.json') ?? new Uint8Array()),
     ) as WdfOutline;
-    loaded = { pkg, outline, markdown, sourceExt: parseSourceExt(pkg.files) };
+    loaded = {
+      pkg,
+      outline,
+      markdown,
+      sourceExt: parseSourceExt(pkg.files),
+      captureExt: parseCaptureExt(pkg.files),
+    };
   } catch (e) {
     showDropError(`unreadable AI layer: ${String(e)}`);
     return;
@@ -176,6 +188,11 @@ function openBytes(bytes: Uint8Array, name: string): void {
   document.title = `${pkg.manifest.title} — WDF`;
   $('doc-title').textContent = pkg.manifest.title;
   $('doc-title').title = name;
+  // WP18: a live-page capture declares its nature next to the badge
+  // (docs/ext-capture.md §6); the full provenance is in the badge details.
+  const note = $('capture-note');
+  note.hidden = loaded.captureExt === undefined;
+  note.textContent = loaded.captureExt === undefined ? '' : captureNote(loaded.captureExt);
 
   renderHuman(loaded);
   renderAgent(loaded);
@@ -336,9 +353,16 @@ async function verify(doc: Loaded): Promise<void> {
       result.determinism ? 'ok' : 'bad',
     );
     for (const p of result.problems) add(`[${p.spec}] ${p.path} — ${p.message}`, 'bad');
+    if (doc.captureExt !== undefined) {
+      for (const line of captureDetails(doc.captureExt)) add(line, '');
+    }
 
     const entry = dec.decode(doc.pkg.files.get(doc.pkg.manifest.entry) ?? new Uint8Array());
-    const violations: Violation[] = [...validateProfile(entry), ...validateDatasets(doc.pkg)];
+    const violations: Violation[] = [
+      ...validateProfile(entry),
+      ...validateDatasets(doc.pkg),
+      ...validateCaptureExt(doc.pkg),
+    ];
     const styles = doc.pkg.files.get('content/styles.css');
     if (styles !== undefined) violations.push(...validateStylesheet(dec.decode(styles)));
     const errors = violations.filter((v) => v.severity === 'error');

@@ -28,6 +28,7 @@ function capture(): Capture {
 
 interface SourceJson {
   source: string;
+  kind: string;
   main: string;
   mainName: string;
   encoding: string;
@@ -65,7 +66,7 @@ beforeAll(async () => {
 
 describe('the source extension (WP13)', () => {
   it('declares the extension in the manifest', () => {
-    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.2' }]);
+    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.3' }]);
   });
 
   it('embeds the original main file byte-for-byte', () => {
@@ -75,6 +76,7 @@ describe('the source extension (WP13)', () => {
     expect(Buffer.from(embedded ?? new Uint8Array()).equals(original)).toBe(true);
     expect(sourceJson.mainName).toBe('cell-image-it.html');
     expect(sourceJson.encoding).toBe('utf-8');
+    expect(sourceJson.kind).toBe('fetched-html');
   });
 
   it('maps original references onto the content/assets copies (no duplication)', () => {

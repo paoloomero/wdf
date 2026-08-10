@@ -752,6 +752,11 @@ The _standalone distribution profile_ addresses this for dissemination:
 - **10.4** Anticipated extensions (non-normative): digital
   signatures/C2PA provenance, live-data refresh, multilingual variants,
   MathML content, vertical profiles (PA, scientific, legal).
+- **10.5** Published extensions (non-normative): the reference
+  distribution ships extension specifications alongside this document,
+  as `docs/ext-*.md` — currently `source` (byte-for-byte embedding of
+  the conversion input), `fonts` (embedded metric-compatible font
+  clones) and `capture` (provenance of a live-page capture).
 
 ## 11. Security considerations
 

@@ -95,7 +95,7 @@ describe('fonts extension (WP9)', () => {
     const both = await imp('word-headings-it', { embedFonts: true, withSource: true });
     expect(both.pkg.manifest.extensions).toEqual([
       { name: 'fonts', version: '0.1' },
-      { name: 'source', version: '0.2' },
+      { name: 'source', version: '0.3' },
     ]);
   });
 

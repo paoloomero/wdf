@@ -30,6 +30,12 @@ export interface ImportInput {
   sourceName?: string;
   /** Encoding the original bytes are stored in (source.json). */
   sourceEncoding?: string;
+  /**
+   * How the original was obtained (source.json v0.3 `kind`): a file
+   * obtained as bytes (default) or a serialization of the rendered DOM
+   * captured from a live page (docs/ext-source.md, docs/ext-capture.md).
+   */
+  sourceKind?: 'fetched-html' | 'dom-snapshot';
 }
 
 export interface ImportDocumentOptions {
@@ -155,14 +161,15 @@ export async function importDocument(
       stylesheets = collected.stylesheets;
     }
     const sourceJson: Record<string, unknown> = {
-      source: '0.2',
+      source: '0.3',
+      kind: input.sourceKind ?? 'fetched-html',
       main: mainPath,
       mainName: input.sourceName ?? '',
       encoding: input.sourceEncoding ?? 'utf-8',
       resources: sourceMap,
     };
     if (Object.keys(stylesheets).length > 0) sourceJson['stylesheets'] = stylesheets;
-    extensions.push({ name: 'source', version: '0.2' });
+    extensions.push({ name: 'source', version: '0.3' });
     extFiles.set(mainPath, input.sourceBytes);
     extFiles.set('ext/source/source.json', enc.encode(`${JSON.stringify(sourceJson, null, 2)}\n`));
     report.push(

@@ -1,0 +1,8 @@
+{
+  "capture": "0.1",
+  "url": "http://intranet.local/page?id=7",
+  "capturedAt": "2026-01-01T00:00:00+01:00",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/142.0",
+  "viewport": { "width": 375, "height": 812 },
+  "mode": "full-page"
+}

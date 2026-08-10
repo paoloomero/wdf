@@ -1,0 +1,8 @@
+{
+  "capture": "0.2",
+  "url": "https://example.com/",
+  "capturedAt": "2026-08-10T15:04:05Z",
+  "userAgent": "UA",
+  "viewport": { "width": 1440, "height": 900 },
+  "mode": "article"
+}

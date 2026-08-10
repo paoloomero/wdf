@@ -17,10 +17,11 @@ const validators = createSchemaValidators({
   manifest: loadJson(join(schemasDir, 'manifest.schema.json')) as object,
   outline: loadJson(join(schemasDir, 'outline.schema.json')) as object,
   hashes: loadJson(join(schemasDir, 'hashes.schema.json')) as object,
+  capture: loadJson(join(schemasDir, 'capture.schema.json')) as object,
 });
 
 describe('embedded schemas', () => {
-  it.each(['manifest', 'outline', 'hashes'] as const)(
+  it.each(['manifest', 'outline', 'hashes', 'capture'] as const)(
     'schemas.data.ts matches spec/schemas/%s.schema.json (source of truth)',
     (name) => {
       const specSchema = loadJson(join(schemasDir, `${name}.schema.json`));
@@ -35,7 +36,7 @@ function fixtureFiles(schema: string, kind: 'valid' | 'invalid'): string[] {
     .sort();
 }
 
-describe.each(['manifest', 'outline', 'hashes'] as const)('%s.schema.json', (schema) => {
+describe.each(['manifest', 'outline', 'hashes', 'capture'] as const)('%s.schema.json', (schema) => {
   const validate = validators[schema as keyof SchemaValidators];
 
   it('has enough fixtures (≥3 valid, ≥5 invalid)', () => {

@@ -17,6 +17,8 @@ export const manifestSchema: object = ${load('manifest.schema.json')};
 export const outlineSchema: object = ${load('outline.schema.json')};
 
 export const hashesSchema: object = ${load('hashes.schema.json')};
+
+export const captureSchema: object = ${load('capture.schema.json')};
 `;
 
 writeFileSync(join(root, 'packages/core/src/schemas.data.ts'), out);

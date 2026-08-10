@@ -1,4 +1,4 @@
-import type { WdfOutline, WdfOutlineNode } from '@wdf/core';
+import type { WdfCapture, WdfOutline, WdfOutlineNode } from '@wdf/core';
 
 /** Pure helpers of the viewer — kept DOM-free so they are unit-testable. */
 
@@ -507,6 +507,8 @@ export function buildPrintSrcdoc(
 // `source` extension (WP13, docs/ext-source.md)
 
 export interface SourceExt {
+  /** How the original was obtained (v0.3): absent means "fetched-html". */
+  kind: 'fetched-html' | 'dom-snapshot';
   main: string;
   mainName: string;
   encoding: string;
@@ -521,6 +523,7 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
   if (raw === undefined) return undefined;
   try {
     const parsed = JSON.parse(new TextDecoder().decode(raw)) as {
+      kind?: unknown;
       main?: unknown;
       mainName?: unknown;
       encoding?: unknown;
@@ -538,6 +541,7 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
       return out;
     };
     return {
+      kind: parsed.kind === 'dom-snapshot' ? 'dom-snapshot' : 'fetched-html',
       main: parsed.main,
       mainName: typeof parsed.mainName === 'string' ? parsed.mainName : '',
       encoding: typeof parsed.encoding === 'string' ? parsed.encoding : 'utf-8',
@@ -547,6 +551,28 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
   } catch {
     return undefined;
   }
+}
+
+// ---------------------------------------------------------------------------
+// `capture` extension (WP18, docs/ext-capture.md): the viewer states the
+// nature of a live-page capture next to the badge, and exposes the full
+// provenance in the verification details (§6 of the extension spec).
+
+/** The one-line nature note shown next to the verification badge. */
+export function captureNote(c: WdfCapture): string {
+  return `captured from live page on ${c.capturedAt}`;
+}
+
+/** The verification-panel lines for capture provenance. */
+export function captureDetails(c: WdfCapture): string[] {
+  const dpr = c.viewport.devicePixelRatio;
+  return [
+    `Capture: ${c.mode === 'article' ? 'extracted article' : 'full page'} from a live, rendered page — integrity is not authenticity (§11.4)`,
+    `Captured URL: ${c.url}`,
+    `Captured at: ${c.capturedAt}`,
+    `User agent: ${c.userAgent}`,
+    `Viewport: ${String(c.viewport.width)}×${String(c.viewport.height)}${dpr === undefined ? '' : ` @${String(dpr)}x`}`,
+  ];
 }
 
 /**

@@ -48,6 +48,28 @@ describe('parseSourceExt', () => {
     files.delete('ext/source/abc123.html');
     expect(parseSourceExt(files)).toBeUndefined();
   });
+
+  it('defaults kind to "fetched-html" (v0.3 retro-compatibility)', () => {
+    // The 0.1-style fixture above has no `kind`.
+    expect(parseSourceExt(packageFiles())?.kind).toBe('fetched-html');
+  });
+
+  it('reads kind "dom-snapshot" and normalizes unknown values (v0.3)', () => {
+    const files = packageFiles();
+    const meta = JSON.parse(
+      new TextDecoder().decode(files.get('ext/source/source.json')),
+    ) as Record<string, unknown>;
+    files.set(
+      'ext/source/source.json',
+      enc.encode(JSON.stringify({ ...meta, source: '0.3', kind: 'dom-snapshot' })),
+    );
+    expect(parseSourceExt(files)?.kind).toBe('dom-snapshot');
+    files.set(
+      'ext/source/source.json',
+      enc.encode(JSON.stringify({ ...meta, source: '0.3', kind: 'reserved-future-value' })),
+    );
+    expect(parseSourceExt(files)?.kind).toBe('fetched-html');
+  });
 });
 
 describe('buildOriginalSrcdoc', () => {

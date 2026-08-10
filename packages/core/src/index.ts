@@ -1,6 +1,7 @@
 export const WDF_VERSION = '0.1';
 
 export { WdfError } from './errors.js';
+export { validateCaptureExt, parseCaptureExt, CAPTURE_PATH } from './capture.js';
 export {
   parseDatasetFile,
   canonicalCellText,
@@ -62,4 +63,6 @@ export type {
   WdfOutline,
   WdfOutlineNode,
   WdfHashes,
+  WdfCapture,
+  WdfCaptureViewport,
 } from './types.js';

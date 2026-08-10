@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wdf.dev/schemas/ext/capture/0.1/capture.schema.json",
+  "title": "WDF extension `capture` 0.1 — capture.json",
+  "description": "Provenance metadata of a live-page capture (docs/ext-capture.md §4). An extension schema, not part of WDF Core.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["capture", "url", "capturedAt", "userAgent", "viewport", "mode"],
+  "properties": {
+    "capture": {
+      "description": "Version of the capture extension the file conforms to.",
+      "const": "0.1"
+    },
+    "url": {
+      "description": "Page address at capture time (http/https only).",
+      "type": "string",
+      "pattern": "^https?://[^\\s<>]+$"
+    },
+    "capturedAt": {
+      "description": "Capture instant (RFC 3339 date-time).",
+      "type": "string",
+      "format": "date-time"
+    },
+    "userAgent": {
+      "description": "User agent string of the capturing browser.",
+      "type": "string",
+      "minLength": 1
+    },
+    "viewport": {
+      "description": "Layout viewport at capture time (CSS pixels).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "devicePixelRatio": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "mode": {
+      "description": "What was captured: the extracted article or the whole page.",
+      "enum": ["article", "full-page"]
+    }
+  }
+}

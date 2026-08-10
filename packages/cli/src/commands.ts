@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path';
 
 import {
   readPackage,
+  validateCaptureExt,
   validateDatasets,
   validateProfile,
   validateStylesheet,
@@ -78,6 +79,7 @@ export async function cmdValidate(
     const styles = pkg.files.get('content/styles.css');
     if (styles !== undefined) violations.push(...validateStylesheet(dec.decode(styles)));
     violations.push(...validateDatasets(pkg));
+    violations.push(...validateCaptureExt(pkg));
     const verify = await verifyPackage(pkg);
     integrity = verify.integrity;
     determinism = verify.determinism;
