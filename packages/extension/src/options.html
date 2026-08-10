@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font:
+          13px/1.5 system-ui,
+          sans-serif;
+        margin: 0;
+        padding: 1rem;
+        width: 22rem;
+        color: #1a1f2b;
+      }
+      h1 {
+        font-size: 0.95rem;
+        margin: 0 0 0.6rem;
+      }
+      button {
+        font: inherit;
+        border: 1px solid #16203a;
+        border-radius: 6px;
+        background: #fff;
+        padding: 0.4rem 0.7rem;
+        cursor: pointer;
+      }
+      p {
+        margin: 0.4rem 0;
+      }
+      .hint {
+        color: #5b6472;
+        font-size: 0.72rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Save as WDF — options</h1>
+    <p>
+      The privacy notice is shown once, before your first capture (<span id="ack-state">…</span>).
+    </p>
+    <button id="reset-privacy">Show the privacy notice again</button>
+    <p class="hint">
+      This extension collects no data and makes no network requests of its own: everything is
+      converted on your machine, from what the page already loaded.
+    </p>
+    <script src="options.js"></script>
+  </body>
+</html>

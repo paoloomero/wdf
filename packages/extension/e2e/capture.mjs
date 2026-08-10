@@ -74,6 +74,7 @@ const site = createServer((req, res) => {
 <div id="video-slot"></div>
 <img src="${foreignBase}/pixel.png" alt="pixel estraneo">
 </article></main>
+<footer><p>Pubblicato da Esempio SRL</p></footer>
 <script>
   // The dossier case: the embed does NOT exist in the served HTML.
   const f = document.createElement('iframe');
@@ -122,8 +123,8 @@ try {
   await worker.evaluate((id) => globalThis.wdfStartCapture(id), tabId);
   const download = await downloadPromise;
 
-  // Default output: the sendable standalone HTML (T15.1 / §10.31 UX).
-  assert.equal(download.suggestedFilename(), `${PAGE_TITLE}.html`);
+  // Default output: the sendable standalone HTML, double-suffixed (§10.38).
+  assert.equal(download.suggestedFilename(), `${PAGE_TITLE}.wdf.html`);
   const standalone = readFileSync(await download.path(), 'utf8');
   assert.ok(standalone.includes('<title>La conferenza, annotata</title>'), 'standalone title');
 
@@ -172,16 +173,56 @@ try {
   assert.ok(!html.includes('<iframe'), 'iframe leaked into the canonical');
   assert.ok(!html.includes('cookie'), 'fixed banner leaked into the canonical');
   assert.ok(!html.includes('menu nascosto'), 'hidden menu leaked into the canonical');
+  assert.ok(!html.includes('Pubblicato da'), 'article mode must extract the landmark only');
   assert.ok(/content\/assets\/[0-9a-f]{16}\.png/.test(html), 'captured image not packaged');
 
-  console.log(
-    'e2e T18.4 OK: JS-mounted video → standalone download, embedded .wdf VALID & verified',
+  // ---- Second run: full page, bare .wdf (the popup's options, T18.5). ----
+  const wdfDownloadPromise = page.waitForEvent('download', { timeout: 30000 });
+  await worker.evaluate(({ id, options }) => globalThis.wdfStartCapture(id, options), {
+    id: tabId,
+    options: { mode: 'full-page', output: 'wdf' },
+  });
+  const wdfDownload = await wdfDownloadPromise;
+  assert.equal(wdfDownload.suggestedFilename(), `${PAGE_TITLE}.wdf`);
+  const rawWdf = readFileSync(await wdfDownload.path());
+  const cliWdf = spawnSync(
+    process.execPath,
+    [join(repoRoot, 'packages/cli/dist/index.js'), 'validate', await wdfDownload.path()],
+    { encoding: 'utf8' },
   );
-  console.log(`  ${download.suggestedFilename()} (${standalone.length} bytes)`);
+  assert.equal(cliWdf.status, 0, `CLI validate (.wdf) failed:\n${cliWdf.stdout}\n${cliWdf.stderr}`);
+  const fullPkg = core.readPackage(new Uint8Array(rawWdf));
+  const fullCapture = JSON.parse(dec.decode(fullPkg.files.get('ext/capture/capture.json')));
+  assert.equal(fullCapture.mode, 'full-page');
+  const fullHtml = dec.decode(fullPkg.files.get('content/index.html'));
+  assert.ok(fullHtml.includes('Pubblicato da Esempio SRL'), 'full-page must keep the footer');
+  assert.ok(!fullHtml.includes('cookie'), 'pre-filter must still drop the fixed banner');
+
+  // ---- Popup: one-time privacy notice, ack, restore from options. ----
+  const extensionId = new URL(worker.url()).host;
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+  assert.ok(await popup.isVisible('#privacy-notice'), 'first open must show the privacy notice');
+  assert.ok(await popup.isHidden('#controls'), 'controls hidden until acknowledged');
+  await popup.click('#privacy-ack');
+  await popup.waitForSelector('#controls', { state: 'visible' });
+  await popup.reload();
+  assert.ok(await popup.isHidden('#privacy-notice'), 'notice must not reappear after ack');
+  assert.ok(await popup.isVisible('#controls'), 'controls visible after ack');
+  await popup.goto(`chrome-extension://${extensionId}/options.html`);
+  await popup.click('#reset-privacy');
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+  assert.ok(await popup.isVisible('#privacy-notice'), 'options page must restore the notice');
+  await popup.close();
+
+  console.log('e2e OK: capture → convert → download, all three UX paths');
+  console.log(`  default:   ${download.suggestedFilename()} (${standalone.length} bytes)`);
+  console.log(`  option:    ${wdfDownload.suggestedFilename()} [${fullCapture.mode}]`);
   console.log(
     `  capture.json: ${captureJson.url} @ ${captureJson.capturedAt} [${captureJson.mode}]`,
   );
   console.log(`  placeholder: Open on localhost → ${embedUrl}`);
+  console.log('  popup: privacy notice shown once, acknowledged, restored from options');
 } finally {
   await context.close();
   site.close();

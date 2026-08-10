@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font:
+          13px/1.5 system-ui,
+          sans-serif;
+        margin: 0;
+        padding: 0.9rem;
+        width: 21rem;
+        color: #1a1f2b;
+      }
+      h1 {
+        font-size: 0.95rem;
+        margin: 0 0 0.6rem;
+      }
+      fieldset {
+        border: 1px solid #e3e6ea;
+        border-radius: 6px;
+        margin: 0 0 0.7rem;
+        padding: 0.4rem 0.6rem 0.6rem;
+      }
+      legend {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #5b6472;
+        padding: 0 0.25rem;
+      }
+      label {
+        display: block;
+        margin: 0.15rem 0;
+      }
+      button {
+        font: inherit;
+        border-radius: 6px;
+        padding: 0.45rem 0.7rem;
+        cursor: pointer;
+        border: 1px solid #16203a;
+        width: 100%;
+      }
+      #save-standalone {
+        background: #16203a;
+        color: #fff;
+        margin-bottom: 0.4rem;
+      }
+      #save-wdf {
+        background: #fff;
+        color: #16203a;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .hint {
+        color: #5b6472;
+        font-size: 0.72rem;
+        margin: 0.15rem 0 0;
+      }
+      #status {
+        margin-top: 0.7rem;
+      }
+      #status ul {
+        margin: 0.3rem 0 0;
+        padding-left: 1.1rem;
+        max-height: 9rem;
+        overflow-y: auto;
+      }
+      #status li {
+        margin: 0.1rem 0;
+      }
+      #status .error {
+        color: #a11212;
+      }
+      #privacy-notice {
+        border: 1px solid #d9b44a;
+        background: #fdf7e7;
+        border-radius: 6px;
+        padding: 0.6rem 0.7rem;
+        margin-bottom: 0.7rem;
+      }
+      #privacy-notice p {
+        margin: 0 0 0.5rem;
+      }
+      #privacy-ack {
+        border-color: #8a6d1a;
+        background: #fff;
+        color: #1a1f2b;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Save as WDF</h1>
+
+    <div id="privacy-notice" hidden>
+      <p>
+        <strong>A capture is what <em>your</em> browser shows.</strong> If you are logged in, the
+        page may include your name, messages or other personal data — and a WDF document is made to
+        be shared. Check what you send.
+      </p>
+      <p class="hint">Shown once. You can re-read it any time from the extension options.</p>
+      <button id="privacy-ack">I understand — continue</button>
+    </div>
+
+    <div id="controls" hidden>
+      <fieldset>
+        <legend>Capture</legend>
+        <label><input type="radio" name="mode" value="article" checked /> Extracted article</label>
+        <label><input type="radio" name="mode" value="full-page" /> Full page</label>
+      </fieldset>
+      <button id="save-standalone">Download standalone HTML (.wdf.html)</button>
+      <p class="hint">Opens in any browser, offline — the verifiable .wdf is embedded inside.</p>
+      <button id="save-wdf">Download .wdf</button>
+      <p class="hint">The bare package, for the WDF Reader and tooling.</p>
+      <div id="status" hidden></div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

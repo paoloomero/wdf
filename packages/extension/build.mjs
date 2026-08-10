@@ -17,7 +17,12 @@ rmSync(join(here, 'dist'), { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
 await build({
-  entryPoints: [join(here, 'src/background.ts'), join(here, 'src/content.ts')],
+  entryPoints: [
+    join(here, 'src/background.ts'),
+    join(here, 'src/content.ts'),
+    join(here, 'src/popup.ts'),
+    join(here, 'src/options.ts'),
+  ],
   bundle: true,
   format: 'iife',
   minify: false,
@@ -30,6 +35,8 @@ await build({
 });
 
 cpSync(join(here, 'src/manifest.json'), join(out, 'manifest.json'));
+cpSync(join(here, 'src/popup.html'), join(out, 'popup.html'));
+cpSync(join(here, 'src/options.html'), join(out, 'options.html'));
 
 const manifest = JSON.parse(readFileSync(join(here, 'src/manifest.json'), 'utf8'));
 manifest.name += ' (e2e)';

@@ -14,6 +14,35 @@ export interface CaptureProvenance {
   viewport: { width: number; height: number; devicePixelRatio: number };
 }
 
+/** chrome.storage.local key of the one-time privacy notice (§10.31). */
+export const PRIVACY_ACK_KEY = 'privacyNoticeAcknowledged';
+
+/** What the user asked for in the popup (T18.5, §10.31 "UX"). */
+export interface CaptureOptions {
+  /** Extracted article (default) or the whole page. */
+  mode: 'article' | 'full-page';
+  /** Standalone .wdf.html (the sendable default, §10.38) or raw .wdf. */
+  output: 'standalone' | 'wdf';
+}
+
+export const DEFAULT_OPTIONS: CaptureOptions = { mode: 'article', output: 'standalone' };
+
+/** Popup → background: start a capture of the given tab. */
+export interface StartRequest {
+  type: 'wdf-start';
+  tabId: number;
+  options: CaptureOptions;
+}
+
+/** Background → popup: outcome of a conversion (fire-and-forget). */
+export interface StatusMessage {
+  type: 'wdf-status';
+  tabId: number;
+  ok: boolean;
+  /** Aggregated conversion report (ok) or the error message (not ok). */
+  lines: string[];
+}
+
 /** Sent by the injected content script after capturing the page. */
 export interface CaptureRequest {
   type: 'wdf-capture';

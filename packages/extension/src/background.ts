@@ -17,29 +17,47 @@ import standaloneTemplate from '@wdf/viewer/standalone.html';
 import {
   base64ToBytes,
   bytesToBase64,
+  DEFAULT_OPTIONS,
   downloadFilename,
+  type CaptureOptions,
   type CaptureRequest,
   type ConvertReply,
+  type StartRequest,
+  type StatusMessage,
 } from './protocol.js';
 import { fillStandalone } from './standalone.js';
 
 const enc = new TextEncoder();
 
-/** Injects the content script into the clicked tab (activeTab grant). */
-async function startCapture(tabId: number | undefined): Promise<void> {
+// Options chosen in the popup, keyed by tab: set by wdf-start, consumed
+// when that tab's content script delivers its capture payload.
+const pendingOptions = new Map<number, CaptureOptions>();
+
+/** Injects the content script into the given tab (activeTab grant). */
+async function startCapture(
+  tabId: number | undefined,
+  options: CaptureOptions = DEFAULT_OPTIONS,
+): Promise<void> {
   if (tabId === undefined) return;
+  pendingOptions.set(tabId, options);
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
 }
 
-chrome.action.onClicked.addListener((tab) => {
-  void startCapture(tab.id);
-});
-
-// The toolbar action cannot be clicked by automation: the e2e smoke test
-// (e2e/capture.mjs) triggers the same entry point through this hook.
+// The toolbar action opens the popup (T18.5); automation cannot click
+// either, so the e2e smoke test (e2e/capture.mjs) triggers the same entry
+// point the popup uses through this hook.
 (globalThis as Record<string, unknown>)['wdfStartCapture'] = startCapture;
 
-async function convertCapture(request: CaptureRequest): Promise<ConvertReply> {
+/** Best-effort status broadcast to the popup (it may be closed). */
+function notify(tabId: number, ok: boolean, lines: string[]): void {
+  const status: StatusMessage = { type: 'wdf-status', tabId, ok, lines };
+  chrome.runtime.sendMessage(status).catch(() => undefined);
+}
+
+async function convertCapture(
+  request: CaptureRequest,
+  options: CaptureOptions,
+): Promise<ConvertReply> {
   const report = [...request.report];
   const baseUrl = request.snapshot.baseUrl;
   const resolve = (url: string): string => {
@@ -75,9 +93,7 @@ async function convertCapture(request: CaptureRequest): Promise<ConvertReply> {
       height: request.provenance.viewport.height,
       devicePixelRatio: request.provenance.viewport.devicePixelRatio,
     },
-    // The popup UX (T18.5) adds the full-page choice; article is the
-    // ratified default (§10.31 "UX").
-    mode: 'article',
+    mode: options.mode,
   };
 
   const result = await importDocument(
@@ -99,6 +115,7 @@ async function convertCapture(request: CaptureRequest): Promise<ConvertReply> {
       withSource: true,
       loadAsset,
       fetchCss,
+      fullPage: options.mode === 'full-page',
       // Provenance over wall clock: the manifest dates the capture instant.
       date: request.provenance.capturedAt,
     },
@@ -108,6 +125,15 @@ async function convertCapture(request: CaptureRequest): Promise<ConvertReply> {
     return { type: 'wdf-error', message: 'no representable content found on this page' };
   }
 
+  if (options.output === 'wdf') {
+    return {
+      type: 'wdf-download',
+      filename: downloadFilename(result.title, 'wdf'),
+      mediaType: 'application/wdf+zip',
+      base64: bytesToBase64(result.wdfBytes),
+      report: aggregateReport(report),
+    };
+  }
   const standalone = fillStandalone(
     standaloneTemplate,
     result.title,
@@ -115,7 +141,8 @@ async function convertCapture(request: CaptureRequest): Promise<ConvertReply> {
   );
   return {
     type: 'wdf-download',
-    filename: downloadFilename(result.title, 'html'),
+    // Double suffix (§10.38): says what it is, opens anywhere.
+    filename: downloadFilename(result.title, 'wdf.html'),
     mediaType: 'text/html',
     base64: bytesToBase64(enc.encode(standalone)),
     report: aggregateReport(report),
@@ -123,13 +150,25 @@ async function convertCapture(request: CaptureRequest): Promise<ConvertReply> {
 }
 
 chrome.runtime.onMessage.addListener(
-  (message: unknown, _sender, sendResponse: (reply: ConvertReply) => void) => {
-    const request = message as Partial<CaptureRequest>;
-    if (request.type !== 'wdf-capture') return false;
-    convertCapture(request as CaptureRequest)
-      .then(sendResponse)
+  (message: unknown, sender, sendResponse: (reply: ConvertReply) => void) => {
+    const typed = message as { type?: string; tabId?: number; options?: StartRequest['options'] };
+    if (typed.type === 'wdf-start') {
+      void startCapture(typed.tabId, typed.options);
+      return false;
+    }
+    if (typed.type !== 'wdf-capture') return false;
+    const tabId = sender.tab?.id ?? -1;
+    const options = pendingOptions.get(tabId) ?? DEFAULT_OPTIONS;
+    pendingOptions.delete(tabId);
+    convertCapture(message as CaptureRequest, options)
+      .then((reply) => {
+        sendResponse(reply);
+        if (reply.type === 'wdf-download') notify(tabId, true, reply.report);
+        else notify(tabId, false, [reply.message]);
+      })
       .catch((e: unknown) => {
         sendResponse({ type: 'wdf-error', message: `conversion failed: ${String(e)}` });
+        notify(tabId, false, [`conversion failed: ${String(e)}`]);
       });
     return true; // async sendResponse: keep the channel open
   },
