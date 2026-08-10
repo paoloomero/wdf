@@ -13,6 +13,7 @@ import {
 } from '@wdf/core';
 
 import { el, isEl, textOf, type MEl, type MNode } from './ast.js';
+import { pruneCaptureMarks } from './prefilter.js';
 import {
   DEFAULT_CAPS,
   resolveDocumentAssets,
@@ -549,6 +550,14 @@ export interface HtmlImportOptions {
   loadSibling?: (relPath: string) => Promise<Uint8Array | undefined>;
   /** Import the whole body even when a main-content landmark exists (WP16). */
   fullPage?: boolean;
+  /**
+   * Geometric pre-filter for dom-snapshot inputs (T18.3): ids of marked
+   * elements (data-wdf-cap) to drop before anything else looks at the
+   * tree — upstream of the WP16 landmark, so noise inside `main` (the
+   * §10.27 interlanguage list) goes too. Passing a set (even empty) also
+   * strips every capture marker.
+   */
+  captureExclusions?: ReadonlySet<number>;
 }
 
 /**
@@ -594,7 +603,16 @@ export async function importHtml(
 ): Promise<HtmlImportResult> {
   const report: string[] = [];
   activeReport = report;
-  const doc = parseHtml(html);
+  let doc = parseHtml(html);
+  if (options.captureExclusions !== undefined) {
+    const pruned = pruneCaptureMarks(doc, options.captureExclusions);
+    doc = pruned.doc;
+    if (pruned.removed > 0) {
+      report.push(
+        `geometric pre-filter: removed ${String(pruned.removed)} element subtree(s) invisible in the rendered page`,
+      );
+    }
+  }
   const root = doc.html;
 
   // T14.1 — the Word support folder may carry page headers/footers.

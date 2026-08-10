@@ -32,6 +32,16 @@ export { promoteHeadings } from './headings.js';
 export { importHtml, type HtmlImportOptions } from './html.js';
 export { importMarkdown } from './markdown.js';
 export { isPageResidue, preprocessHeaderHtml } from './pageheader.js';
+export {
+  CAPTURE_MARK,
+  geometryExclusions,
+  pruneCaptureMarks,
+  type CaptureRect,
+  type CaptureElementGeometry,
+  type CapturePageGeometry,
+  type CaptureExclusion,
+  type ExclusionReason,
+} from './prefilter.js';
 export { aggregateReport } from './report.js';
 export { collectSourceStylesheets, type CssFetcher } from './sourcecss.js';
 export {

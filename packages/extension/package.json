@@ -8,6 +8,9 @@
     "build": "tsc --noEmit -p tsconfig.json && node build.mjs",
     "test:e2e": "node build.mjs && node e2e/capture.mjs"
   },
+  "dependencies": {
+    "@wdf/import": "workspace:*"
+  },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
     "esbuild": "^0.24.2",

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { DEFAULT_CAPS } from '@wdf/import';
+import { CAPTURE_MARK, DEFAULT_CAPS } from '@wdf/import';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -40,6 +40,12 @@ describe('snapshotAndMeasure', () => {
     expect(navEntry?.display).toBe('none');
     expect(snapshot.html).toContain(`data-wdf-cap="${String(navEntry?.id ?? -1)}"`);
     expect(snapshot.title).toBe('Doc');
+  });
+
+  it('stamps the marker attribute @wdf/import expects (CAPTURE_MARK)', () => {
+    document.documentElement.innerHTML = '<head></head><body><p>x</p></body>';
+    const { snapshot } = snapshotAndMeasure(document, () => zeroGeometry);
+    expect(snapshot.html).toContain(`${CAPTURE_MARK}="0"`);
   });
 
   it('does not touch the live document', () => {

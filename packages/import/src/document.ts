@@ -46,6 +46,8 @@ export interface ImportDocumentOptions {
   withSource?: boolean;
   embedFonts?: boolean;
   fullPage?: boolean;
+  /** Geometric pre-filter for dom-snapshot inputs (T18.3, prefilter.ts). */
+  captureExclusions?: ReadonlySet<number>;
   /** Resolves an image src to bytes; absent → external images are dropped. */
   loadAsset?: AssetLoader;
   /** Word support-folder access for page headers/footers (T14.1). */
@@ -90,6 +92,7 @@ export async function importDocument(
     if (opts.withSource === true) options.keepAllAssets = true;
     if (opts.loadSibling !== undefined) options.loadSibling = opts.loadSibling;
     if (opts.fullPage === true) options.fullPage = true;
+    if (opts.captureExclusions !== undefined) options.captureExclusions = opts.captureExclusions;
     const result = await importHtml(input.text, options);
     blocks = result.blocks;
     sourceTitle = result.title;

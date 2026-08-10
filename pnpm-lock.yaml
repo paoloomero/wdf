@@ -61,6 +61,10 @@ importers:
         version: 7.3.0
 
   packages/extension:
+    dependencies:
+      '@wdf/import':
+        specifier: workspace:*
+        version: link:../import
     devDependencies:
       '@types/chrome':
         specifier: ^0.0.287

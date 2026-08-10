@@ -2,6 +2,7 @@
 // script collects from the live page. DOM access is kept at the edges
 // (injectable measure/fetch/encode callbacks), so the assembly logic is
 // unit-testable without a browser.
+import type { CaptureElementGeometry, CapturePageGeometry } from '@wdf/import';
 
 // ---------------------------------------------------------------------------
 // Caps. Mirrors @wdf/import DEFAULT_CAPS (asserted by a unit test) instead
@@ -25,26 +26,16 @@ export const CAPTURE_CAPS: CaptureCaps = {
 
 // ---------------------------------------------------------------------------
 // Geometry: what only the rendering knows, recorded per element for the
-// geometric pre-filter (T18.3). The capture records facts; the pure
-// geometries→exclusions function decides policy.
+// geometric pre-filter (T18.3). The capture records facts; the policy is
+// `geometryExclusions` in @wdf/import (prefilter.ts) — same package that
+// consumes this payload at conversion, so producer and consumer share the
+// types (type-only imports: nothing of the pipeline enters the bundle).
+// The marker attribute stamped below is @wdf/import's CAPTURE_MARK
+// ('data-wdf-cap'), kept literal here for the same reason and asserted in
+// sync by a unit test.
 
-export interface ElementGeometry {
-  /** Matches the data-wdf-cap marker stamped on the snapshot. */
-  id: number;
-  tag: string;
-  /** Document coordinates (viewport rect + scroll offsets). */
-  rect: { x: number; y: number; width: number; height: number };
-  display: string;
-  visibility: string;
-  position: string;
-}
-
-export interface CaptureGeometry {
-  viewport: { width: number; height: number; devicePixelRatio: number };
-  /** Scrollable size of the document root. */
-  document: { width: number; height: number };
-  elements: ElementGeometry[];
-}
+export type ElementGeometry = CaptureElementGeometry;
+export type CaptureGeometry = CapturePageGeometry;
 
 export type Measure = (el: Element) => Omit<ElementGeometry, 'id' | 'tag'>;
 
