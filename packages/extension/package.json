@@ -1,0 +1,17 @@
+{
+  "name": "@wdf/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser extension: save the page you are reading as a verifiable WDF document — fully client-side.",
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json && node build.mjs",
+    "test:e2e": "node build.mjs && node e2e/smoke.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.24.2",
+    "playwright": "^1.50.0"
+  },
+  "license": "Apache-2.0"
+}
