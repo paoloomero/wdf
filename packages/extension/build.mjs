@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 import { build } from 'esbuild';
 
+import { firefoxManifest } from './build-lib.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const out = join(here, 'dist/chrome');
 
@@ -45,4 +47,14 @@ const e2e = join(here, 'dist/chrome-e2e');
 cpSync(out, e2e, { recursive: true });
 writeFileSync(join(e2e, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
-console.log('extension built: dist/chrome (loadable), dist/chrome-e2e (smoke test)');
+// Firefox (T18.6): same files, event-page manifest. Load it from
+// about:debugging → "Load Temporary Add-on" → dist/firefox/manifest.json.
+const chromeManifest = JSON.parse(readFileSync(join(here, 'src/manifest.json'), 'utf8'));
+const firefox = join(here, 'dist/firefox');
+cpSync(out, firefox, { recursive: true });
+writeFileSync(
+  join(firefox, 'manifest.json'),
+  JSON.stringify(firefoxManifest(chromeManifest), null, 2) + '\n',
+);
+
+console.log('extension built: dist/chrome + dist/firefox (loadable), dist/chrome-e2e (smoke test)');

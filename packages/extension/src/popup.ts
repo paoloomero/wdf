@@ -9,6 +9,7 @@ import {
   type StartRequest,
   type StatusMessage,
 } from './protocol.js';
+import { ext } from './compat.js';
 
 function $(id: string): HTMLElement {
   const node = document.getElementById(id);
@@ -17,7 +18,7 @@ function $(id: string): HTMLElement {
 }
 
 async function activeTabId(): Promise<number | undefined> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await ext.tabs.query({ active: true, currentWindow: true });
   return tab?.id;
 }
 
@@ -60,10 +61,10 @@ async function start(output: CaptureOptions['output']): Promise<void> {
     options: { mode: mode === 'full-page' ? 'full-page' : 'article', output },
   };
   setBusy(true);
-  await chrome.runtime.sendMessage(request);
+  await ext.runtime.sendMessage(request);
 }
 
-chrome.runtime.onMessage.addListener((message: unknown) => {
+ext.runtime.onMessage.addListener((message: unknown) => {
   const status = message as Partial<StatusMessage>;
   if (status.type !== 'wdf-status') return;
   setBusy(false);
@@ -71,13 +72,13 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
 });
 
 void (async () => {
-  const stored = await chrome.storage.local.get(PRIVACY_ACK_KEY);
+  const stored = await ext.storage.local.get(PRIVACY_ACK_KEY);
   const acknowledged = stored[PRIVACY_ACK_KEY] === true;
   $('privacy-notice').hidden = acknowledged;
   $('controls').hidden = !acknowledged;
 
   $('privacy-ack').addEventListener('click', () => {
-    void chrome.storage.local.set({ [PRIVACY_ACK_KEY]: true }).then(() => {
+    void ext.storage.local.set({ [PRIVACY_ACK_KEY]: true }).then(() => {
       $('privacy-notice').hidden = true;
       $('controls').hidden = false;
     });

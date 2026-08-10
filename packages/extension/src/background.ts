@@ -26,6 +26,7 @@ import {
   type StatusMessage,
 } from './protocol.js';
 import { fillStandalone } from './standalone.js';
+import { ext } from './compat.js';
 
 const enc = new TextEncoder();
 
@@ -40,7 +41,7 @@ async function startCapture(
 ): Promise<void> {
   if (tabId === undefined) return;
   pendingOptions.set(tabId, options);
-  await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+  await ext.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
 }
 
 // The toolbar action opens the popup (T18.5); automation cannot click
@@ -51,7 +52,7 @@ async function startCapture(
 /** Best-effort status broadcast to the popup (it may be closed). */
 function notify(tabId: number, ok: boolean, lines: string[]): void {
   const status: StatusMessage = { type: 'wdf-status', tabId, ok, lines };
-  chrome.runtime.sendMessage(status).catch(() => undefined);
+  ext.runtime.sendMessage(status).catch(() => undefined);
 }
 
 async function convertCapture(
@@ -149,7 +150,7 @@ async function convertCapture(
   };
 }
 
-chrome.runtime.onMessage.addListener(
+ext.runtime.onMessage.addListener(
   (message: unknown, sender, sendResponse: (reply: ConvertReply) => void) => {
     const typed = message as { type?: string; tabId?: number; options?: StartRequest['options'] };
     if (typed.type === 'wdf-start') {

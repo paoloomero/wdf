@@ -18,6 +18,7 @@ import {
   type CaptureRequest,
   type ConvertReply,
 } from './protocol.js';
+import { ext } from './compat.js';
 
 async function capturePage(): Promise<CaptureRequest> {
   const report: string[] = [];
@@ -96,7 +97,7 @@ async function capturePage(): Promise<CaptureRequest> {
 
 void (async () => {
   const request = await capturePage();
-  const reply: unknown = await chrome.runtime.sendMessage(request);
+  const reply: unknown = await ext.runtime.sendMessage(request);
   const r = reply as Partial<ConvertReply> & {
     message?: string;
     base64?: string;
