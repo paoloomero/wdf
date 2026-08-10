@@ -27,7 +27,7 @@ await build({
   ],
   bundle: true,
   format: 'iife',
-  minify: false,
+  minify: true,
   target: ['chrome110'],
   legalComments: 'none',
   // The viewer's standalone template ships inside the background bundle
@@ -39,6 +39,7 @@ await build({
 cpSync(join(here, 'src/manifest.json'), join(out, 'manifest.json'));
 cpSync(join(here, 'src/popup.html'), join(out, 'popup.html'));
 cpSync(join(here, 'src/options.html'), join(out, 'options.html'));
+cpSync(join(here, 'icons'), join(out, 'icons'), { recursive: true });
 
 const manifest = JSON.parse(readFileSync(join(here, 'src/manifest.json'), 'utf8'));
 manifest.name += ' (e2e)';

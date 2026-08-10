@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Save as WDF — Privacy Policy</title>
+    <meta
+      name="description"
+      content="Privacy policy of the Save as WDF browser extension: zero data collected, zero network requests of its own."
+    />
+    <link rel="icon" href="icons/wdf-favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="icons/wdf-favicon-32.png" sizes="32x32" />
+    <link rel="stylesheet" href="site.css" />
+    <style>
+      main.policy {
+        max-width: 44rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      main.policy h2 {
+        margin-top: 1.6rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="policy">
+      <h1>Save as WDF — Privacy Policy</h1>
+      <p><em>Effective date: 10 August 2026 · applies to extension version 0.1.x</em></p>
+
+      <h2>The short version</h2>
+      <p>
+        <strong>This extension collects no data and sends no data, to anyone, ever.</strong> It has
+        no servers, no analytics, no telemetry, and makes no network requests of its own.
+      </p>
+
+      <h2>What the extension does</h2>
+      <p>
+        Save as WDF has a single purpose: when <em>you</em> click it, it converts the page you are
+        reading into a verifiable document (a <code>.wdf</code> package, or a standalone
+        <code>.wdf.html</code> file with the offline viewer embedded) and saves it as a regular
+        download on your computer. The conversion runs entirely on your machine, from what the page
+        has already loaded in your browser.
+      </p>
+
+      <h2>Permissions, and why</h2>
+      <ul>
+        <li>
+          <strong>activeTab + scripting</strong> — read the page you are looking at, only after your
+          explicit click on the extension. There are no host permissions: the extension cannot read
+          any page on its own, and no content script runs before you ask.
+        </li>
+        <li>
+          <strong>storage</strong> — one local flag remembering that you acknowledged the one-time
+          privacy notice. Nothing else is stored, and this flag never leaves your browser.
+        </li>
+      </ul>
+
+      <h2>What ends up in the document you save</h2>
+      <p>
+        The captured document contains what the page showed <em>to you</em> — including, if you were
+        logged in, content personal to your session. That file is yours, on your disk; the extension
+        shows a notice about this before your first capture. The document also records capture
+        provenance (page URL, time, browser user agent, viewport size) inside the package, so
+        recipients can see where and when it was captured. Nothing is transmitted anywhere by the
+        extension.
+      </p>
+
+      <h2>Changes</h2>
+      <p>
+        If a future version ever changed any of the above, this page and the extension's store
+        listings would say so explicitly before the change ships.
+      </p>
+
+      <p>
+        <a href="index.html">← wdf.dev</a> · The extension is open source:
+        <a href="https://github.com/paoloomero/wdf">github.com/paoloomero/wdf</a>
+        (<code>packages/extension</code>).
+      </p>
+    </main>
+  </body>
+</html>
