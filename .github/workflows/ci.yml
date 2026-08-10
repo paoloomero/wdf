@@ -19,3 +19,14 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      # T18.7: the extension e2e runs the REAL extension in full Chromium
+      # (new headless; the headless shell cannot load extensions).
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Playwright Chromium
+        run: pnpm --filter @wdf/extension exec playwright install --with-deps chromium
+      - name: Extension e2e (real browser)
+        run: pnpm --filter @wdf/extension test:e2e
