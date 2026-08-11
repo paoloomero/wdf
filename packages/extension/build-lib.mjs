@@ -10,7 +10,13 @@ export function firefoxManifest(chromeManifest) {
   const manifest = structuredClone(chromeManifest);
   manifest.background = { scripts: ['background.js'] };
   manifest.browser_specific_settings = {
-    gecko: { id: 'save-as-wdf@wdf.dev', strict_min_version: '128.0' },
+    gecko: {
+      id: 'save-as-wdf@wdf.dev',
+      strict_min_version: '128.0',
+      // Mandatory for new AMO submissions (2025+): the data-collection
+      // consent declaration. Ours is the truth: none, ever.
+      data_collection_permissions: { required: ['none'] },
+    },
   };
   return manifest;
 }
