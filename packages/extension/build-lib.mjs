@@ -12,7 +12,10 @@ export function firefoxManifest(chromeManifest) {
   manifest.browser_specific_settings = {
     gecko: {
       id: 'save-as-wdf@wdf.dev',
-      strict_min_version: '128.0',
+      // 142 = first release where data_collection_permissions is
+      // supported on BOTH desktop (140) and Android (142); an older
+      // minimum makes AMO warn about the mismatch.
+      strict_min_version: '142.0',
       // Mandatory for new AMO submissions (2025+): the data-collection
       // consent declaration. Ours is the truth: none, ever.
       data_collection_permissions: { required: ['none'] },
