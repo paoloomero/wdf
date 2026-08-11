@@ -71,6 +71,9 @@ importers:
       '@wdf/viewer':
         specifier: workspace:*
         version: link:../viewer
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.3
     devDependencies:
       '@types/chrome':
         specifier: ^0.0.287

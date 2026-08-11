@@ -10,6 +10,7 @@ import {
   type StatusMessage,
 } from './protocol.js';
 import { ext } from './compat.js';
+import { isGoogleDocsUrl } from './gdocs.js';
 
 function $(id: string): HTMLElement {
   const node = document.getElementById(id);
@@ -17,9 +18,12 @@ function $(id: string): HTMLElement {
   return node;
 }
 
-async function activeTabId(): Promise<number | undefined> {
+async function activeTab(): Promise<{ id?: number; url?: string }> {
   const [tab] = await ext.tabs.query({ active: true, currentWindow: true });
-  return tab?.id;
+  return {
+    ...(tab?.id !== undefined && { id: tab.id }),
+    ...(tab?.url !== undefined && { url: tab.url }),
+  };
 }
 
 function showStatus(lines: string[], isError: boolean): void {
@@ -51,15 +55,18 @@ function setBusy(busy: boolean): void {
 }
 
 async function start(output: CaptureOptions['output']): Promise<void> {
-  const tabId = await activeTabId();
-  if (tabId === undefined) return;
+  const tab = await activeTab();
+  if (tab.id === undefined) return;
   const mode = (document.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)
     ?.value;
-  const request: StartRequest = {
-    type: 'wdf-start',
-    tabId,
-    options: { mode: mode === 'full-page' ? 'full-page' : 'article', output },
-  };
+  // Site-aware capture (T18.9): on a Google Doc the DOM is a canvas —
+  // the official export is the honest source, and it is always the
+  // whole document.
+  const gdocs = isGoogleDocsUrl(tab.url ?? '');
+  const options: CaptureOptions = gdocs
+    ? { mode: 'full-page', output, site: 'gdocs' }
+    : { mode: mode === 'full-page' ? 'full-page' : 'article', output };
+  const request: StartRequest = { type: 'wdf-start', tabId: tab.id, options };
   setBusy(true);
   await ext.runtime.sendMessage(request);
 }
@@ -76,6 +83,14 @@ void (async () => {
   const acknowledged = stored[PRIVACY_ACK_KEY] === true;
   $('privacy-notice').hidden = acknowledged;
   $('controls').hidden = !acknowledged;
+
+  // Google Doc open in the active tab → announce the export path and
+  // hide the article/full-page choice (the export is the whole document).
+  const tab = await activeTab();
+  if (isGoogleDocsUrl(tab.url ?? '')) {
+    $('gdocs-note').hidden = false;
+    $('mode-fieldset').hidden = true;
+  }
 
   $('privacy-ack').addEventListener('click', () => {
     void ext.storage.local.set({ [PRIVACY_ACK_KEY]: true }).then(() => {

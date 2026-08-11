@@ -6,13 +6,14 @@
   "description": "Browser extension: save the page you are reading as a verifiable WDF document — fully client-side.",
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json && node build.mjs",
-    "test:e2e": "node build.mjs && node e2e/capture.mjs && node e2e/dossier.mjs",
+    "test:e2e": "node build.mjs && node e2e/capture.mjs && node e2e/dossier.mjs && node e2e/gdocs.mjs",
     "package": "node scripts/package.mjs"
   },
   "dependencies": {
     "@wdf/core": "workspace:*",
     "@wdf/import": "workspace:*",
-    "@wdf/viewer": "workspace:*"
+    "@wdf/viewer": "workspace:*",
+    "fflate": "^0.8.2"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",

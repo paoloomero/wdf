@@ -22,11 +22,13 @@ import {
   type CaptureOptions,
   type CaptureRequest,
   type ConvertReply,
+  type GdocsCaptureRequest,
   type StartRequest,
   type StatusMessage,
 } from './protocol.js';
 import { fillStandalone } from './standalone.js';
 import { ext } from './compat.js';
+import { prepareGdocsExport } from './gdocs.js';
 
 const enc = new TextEncoder();
 
@@ -34,14 +36,16 @@ const enc = new TextEncoder();
 // when that tab's content script delivers its capture payload.
 const pendingOptions = new Map<number, CaptureOptions>();
 
-/** Injects the content script into the given tab (activeTab grant). */
+/** Injects the right content script into the given tab (activeTab grant):
+ *  the DOM capture, or the Google Docs export path (T18.9). */
 async function startCapture(
   tabId: number | undefined,
   options: CaptureOptions = DEFAULT_OPTIONS,
 ): Promise<void> {
   if (tabId === undefined) return;
   pendingOptions.set(tabId, options);
-  await ext.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+  const file = options.site === 'gdocs' ? 'content-gdocs.js' : 'content.js';
+  await ext.scripting.executeScript({ target: { tabId }, files: [file] });
 }
 
 // The toolbar action opens the popup (T18.5); automation cannot click
@@ -125,7 +129,16 @@ async function convertCapture(
   if (result === undefined) {
     return { type: 'wdf-error', message: 'no representable content found on this page' };
   }
+  return buildReply(result, options, report);
+}
 
+/** The download reply for a converted document: raw .wdf, or the
+ *  double-suffixed standalone (§10.38) as the sendable default. */
+function buildReply(
+  result: { wdfBytes: Uint8Array; title: string },
+  options: CaptureOptions,
+  report: string[],
+): ConvertReply {
   if (options.output === 'wdf') {
     return {
       type: 'wdf-download',
@@ -142,12 +155,63 @@ async function convertCapture(
   );
   return {
     type: 'wdf-download',
-    // Double suffix (§10.38): says what it is, opens anywhere.
     filename: downloadFilename(result.title, 'wdf.html'),
     mediaType: 'text/html',
     base64: bytesToBase64(enc.encode(standalone)),
     report: aggregateReport(report),
   };
+}
+
+/** T18.9: converts the official Google Docs export (plan §10.43). The
+ *  export is server-delivered bytes — the source stays `fetched-html`,
+ *  and the whole document is converted (no article landmark to find). */
+async function convertGdocs(
+  request: GdocsCaptureRequest,
+  options: CaptureOptions,
+): Promise<ConvertReply> {
+  const report: string[] = [
+    'Google Docs detected — converted from the official web-page export (session-authenticated)',
+  ];
+  const exported = prepareGdocsExport(base64ToBytes(request.zipBase64));
+  const capture: WdfCapture = {
+    capture: '0.1',
+    url: request.provenance.url,
+    capturedAt: request.provenance.capturedAt,
+    userAgent: request.provenance.userAgent,
+    viewport: {
+      width: request.provenance.viewport.width,
+      height: request.provenance.viewport.height,
+      devicePixelRatio: request.provenance.viewport.devicePixelRatio,
+    },
+    mode: 'full-page',
+  };
+  const result = await importDocument(
+    {
+      kind: 'html',
+      text: exported.html,
+      baseName: exported.htmlName.replace(/\.html$/i, ''),
+      sourceBytes: exported.htmlBytes,
+      sourceName: request.provenance.url,
+      sourceEncoding: 'utf-8',
+    },
+    {
+      capture,
+      withSource: true,
+      loadAsset: (src) => {
+        const bytes = exported.files.get(src) ?? exported.files.get(decodeURIComponent(src));
+        return Promise.resolve(
+          bytes === undefined ? { reason: 'not present in the export zip' } : { bytes },
+        );
+      },
+      fullPage: true,
+      date: request.provenance.capturedAt,
+    },
+    report,
+  );
+  if (result === undefined) {
+    return { type: 'wdf-error', message: 'the Google Docs export produced no content' };
+  }
+  return buildReply(result, options, report);
 }
 
 ext.runtime.onMessage.addListener(
@@ -157,11 +221,14 @@ ext.runtime.onMessage.addListener(
       void startCapture(typed.tabId, typed.options);
       return false;
     }
-    if (typed.type !== 'wdf-capture') return false;
+    if (typed.type !== 'wdf-capture' && typed.type !== 'wdf-capture-gdocs') return false;
     const tabId = sender.tab?.id ?? -1;
     const options = pendingOptions.get(tabId) ?? DEFAULT_OPTIONS;
     pendingOptions.delete(tabId);
-    convertCapture(message as CaptureRequest, options)
+    (typed.type === 'wdf-capture-gdocs'
+      ? convertGdocs(message as GdocsCaptureRequest, options)
+      : convertCapture(message as CaptureRequest, options)
+    )
       .then((reply) => {
         sendResponse(reply);
         if (reply.type === 'wdf-download') notify(tabId, true, reply.report);

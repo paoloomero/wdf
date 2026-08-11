@@ -23,6 +23,8 @@ export interface CaptureOptions {
   mode: 'article' | 'full-page';
   /** Standalone .wdf.html (the sendable default, §10.38) or raw .wdf. */
   output: 'standalone' | 'wdf';
+  /** Site-aware capture (T18.9): use the site's official export. */
+  site?: 'gdocs';
 }
 
 export const DEFAULT_OPTIONS: CaptureOptions = { mode: 'article', output: 'standalone' };
@@ -52,6 +54,15 @@ export interface CaptureRequest {
   images: CapturedImage[];
   geometry: CaptureGeometry;
   report: string[];
+}
+
+/** Sent by the Google Docs content script: the official export, fetched
+ *  with the user's session (T18.9, plan §10.43). */
+export interface GdocsCaptureRequest {
+  type: 'wdf-capture-gdocs';
+  /** The export?format=zip bytes (HTML + images). */
+  zipBase64: string;
+  provenance: CaptureProvenance;
 }
 
 /** Background's reply: the bytes the content script downloads in-page. */

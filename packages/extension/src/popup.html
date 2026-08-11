@@ -108,7 +108,11 @@
     </div>
 
     <div id="controls" hidden>
-      <fieldset>
+      <div id="gdocs-note" class="hint" hidden>
+        <strong>Google Doc detected.</strong> The document will be saved through Google's own export
+        (full document, higher fidelity than a page capture).
+      </div>
+      <fieldset id="mode-fieldset">
         <legend>Capture</legend>
         <label><input type="radio" name="mode" value="article" checked /> Extracted article</label>
         <label><input type="radio" name="mode" value="full-page" /> Full page</label>

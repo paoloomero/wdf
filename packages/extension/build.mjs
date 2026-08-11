@@ -22,6 +22,7 @@ await build({
   entryPoints: [
     join(here, 'src/background.ts'),
     join(here, 'src/content.ts'),
+    join(here, 'src/content-gdocs.ts'),
     join(here, 'src/popup.ts'),
     join(here, 'src/options.ts'),
   ],
