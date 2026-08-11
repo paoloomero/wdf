@@ -19,11 +19,18 @@ for (const target of ['chrome', 'firefox']) {
   const zipName = `wdf-save-as-wdf-${target}-${version}.zip`;
   const zipPath = join(pkgRoot, 'dist', zipName);
   rmSync(zipPath, { force: true });
-  // Zip the CONTENTS of the folder (stores want manifest.json at the root).
-  const zip = spawnSync('zip', ['-r', '-X', zipPath, '.'], {
-    cwd: join(pkgRoot, 'dist', target),
-    stdio: 'pipe',
-  });
+  // Zip the CONTENTS of the folder (stores want manifest.json at the
+  // root). -X plus the excludes keep macOS metadata (__MACOSX, ._*,
+  // .DS_Store) out — AMO flags every hidden file. Always submit THIS
+  // zip, never a Finder "Compress" of the folder.
+  const zip = spawnSync(
+    'zip',
+    ['-r', '-X', zipPath, '.', '-x', '.*', '-x', '*/.*', '-x', '__MACOSX/*'],
+    {
+      cwd: join(pkgRoot, 'dist', target),
+      stdio: 'pipe',
+    },
+  );
   if (zip.status !== 0) {
     console.error(`zip failed for ${target}:\n${String(zip.stderr)}`);
     process.exit(1);
