@@ -159,9 +159,9 @@ describe('convertDocx — structure, drops and reports', () => {
     expect(report.some((r) => r.includes('2 empty paragraphs'))).toBe(true);
   });
 
-  it('reports tables, images and hyperlinks as pending tasks — text preserved', () => {
+  it('reports images and hyperlinks as pending tasks — text preserved', () => {
     const { blocks, report } = convert(
-      '<w:tbl/>' +
+      '<w:tbl/>' + // rowless: dropped with a report (tables convert since T20.4)
         p(
           '<w:hyperlink r:id="rId9" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
             run('link testo') +
@@ -169,7 +169,7 @@ describe('convertDocx — structure, drops and reports', () => {
         ) +
         p('<w:r><w:drawing/></w:r>' + run('con immagine')),
     );
-    expect(report.some((r) => r.includes('T20.4'))).toBe(true);
+    expect(report.some((r) => r.includes('table with no rows'))).toBe(true);
     expect(report.some((r) => r.includes('T20.5') && r.includes('hyperlink'))).toBe(true);
     expect(textOf(blocks[0] as MEl)).toBe('link testo');
     expect(textOf(blocks[1] as MEl)).toBe('con immagine');

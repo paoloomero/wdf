@@ -1,4 +1,6 @@
-import { el, isEl, type MEl, type MNode } from '../ast.js';
+import { computeTableGrid } from '@wdf-dev/core';
+
+import { el, isEl, textOf, type MEl, type MNode } from '../ast.js';
 import { hoistStyles, sanitizeDeclarations, STYLE_TMP_ATTR, type Decls } from '../styles.js';
 import { openDocx, resolveTarget, type DocxContainer } from './container.js';
 import { parseXml, xmlAttr, xmlChild, xmlChildren, xmlText, type XmlElement } from './xml.js';
@@ -156,6 +158,63 @@ function mergePara(base: ParaProps, over: ParaProps): ParaProps {
 }
 
 // ---------------------------------------------------------------------------
+// Table properties (T20.4): borders and shading
+
+interface BorderSpec {
+  /** true = a visible line; false = explicitly none/nil. */
+  readonly visible: boolean;
+  /** Eighths of a point (w:sz). */
+  readonly size: number;
+  /** RRGGBB hex or undefined for "auto". */
+  readonly color: string | undefined;
+}
+
+interface TableBorders {
+  top?: BorderSpec;
+  bottom?: BorderSpec;
+  left?: BorderSpec;
+  right?: BorderSpec;
+  insideH?: BorderSpec;
+  insideV?: BorderSpec;
+}
+
+const BORDER_SIDES = ['top', 'bottom', 'left', 'right', 'insideH', 'insideV'] as const;
+
+function parseTblBorders(tblPr: XmlElement | undefined): TableBorders {
+  const out: TableBorders = {};
+  const borders = tblPr === undefined ? undefined : xmlChild(tblPr, W_NS, 'tblBorders');
+  if (borders === undefined) return out;
+  for (const side of BORDER_SIDES) {
+    const b = xmlChild(borders, W_NS, side);
+    if (b === undefined) continue;
+    const val = xmlAttr(b, W_NS, 'val') ?? 'single';
+    const color = xmlAttr(b, W_NS, 'color');
+    out[side] = {
+      visible: val !== 'none' && val !== 'nil',
+      size: twips(xmlAttr(b, W_NS, 'sz')) ?? 4,
+      color:
+        color !== undefined && /^[0-9A-Fa-f]{6}$/.test(color) ? color.toLowerCase() : undefined,
+    };
+  }
+  return out;
+}
+
+function mergeBorders(base: TableBorders, over: TableBorders): TableBorders {
+  const out: TableBorders = { ...base };
+  for (const side of BORDER_SIDES) {
+    const b = over[side];
+    if (b !== undefined) out[side] = b;
+  }
+  return out;
+}
+
+/** CSS border value: eighths-of-a-point width (min 0.5pt for visibility). */
+function borderCss(b: BorderSpec): string {
+  const width = Math.max(0.5, Math.round((b.size / 8) * 4) / 4);
+  return `${String(width)}pt solid #${b.color ?? '000000'}`;
+}
+
+// ---------------------------------------------------------------------------
 // styles.xml
 
 interface DocxStyle {
@@ -166,6 +225,8 @@ interface DocxStyle {
   readonly basedOn: string | undefined;
   readonly pPr: ParaProps;
   readonly rPr: RunProps;
+  /** Table borders of a w:type="table" style (T20.4). */
+  readonly tbl: TableBorders;
 }
 
 export class DocxStyles {
@@ -204,6 +265,7 @@ export class DocxStyles {
         basedOn: wVal(style, 'basedOn'),
         pPr: parsePPr(xmlChild(style, W_NS, 'pPr')),
         rPr: parseRPr(xmlChild(style, W_NS, 'rPr')),
+        tbl: parseTblBorders(xmlChild(style, W_NS, 'tblPr')),
       };
       this.byId.set(id, entry);
       if (type === 'paragraph' && xmlAttr(style, W_NS, 'default') === '1') {
@@ -247,6 +309,20 @@ export class DocxStyles {
       props = mergeRun(props, style.rPr);
     }
     return mergeRun(props, direct);
+  }
+
+  /** Effective table borders: style chain (w:tblStyle) then direct tblPr. */
+  effectiveTableBorders(styleId: string | undefined, direct: TableBorders): TableBorders {
+    let borders: TableBorders = {};
+    for (const style of this.chain(styleId)) {
+      borders = mergeBorders(borders, style.tbl);
+    }
+    return mergeBorders(borders, direct);
+  }
+
+  /** True when the paragraph uses the built-in "caption" style. */
+  isCaption(direct: ParaProps): boolean {
+    return this.chain(direct.styleId).some((s) => s.name === 'caption');
   }
 
   /**
@@ -767,6 +843,186 @@ function paragraphToBlock(
 }
 
 // ---------------------------------------------------------------------------
+// Tables (T20.4): gridSpan → colspan, vMerge → rowspan, on the WP11 model
+
+interface RawCell {
+  readonly tc: XmlElement;
+  readonly colspan: number;
+  readonly vMerge: 'restart' | 'continue' | undefined;
+  /** Leftmost grid column this cell occupies. */
+  readonly col: number;
+  /** RRGGBB shading fill, when declared and concrete. */
+  readonly shd: string | undefined;
+  rowspan: number;
+}
+
+/** Removes <br> from cell content at any depth (§6.2.8 forbids it there). */
+function stripBr(nodes: MNode[]): MNode[] {
+  return nodes.flatMap((n): MNode[] => {
+    if (!isEl(n)) return [n];
+    if (n.tag === 'br') return [];
+    n.children = stripBr(n.children);
+    return [n];
+  });
+}
+
+/** The w:p descendants of a cell, nested tables flattened with a report. */
+function cellParagraphs(tc: XmlElement, ctx: WmlContext): XmlElement[] {
+  const out: XmlElement[] = [];
+  const walk = (parent: XmlElement): void => {
+    for (const child of parent.children) {
+      if (child.kind !== 'element' || child.ns !== W_NS) continue;
+      if (child.local === 'p') {
+        out.push(child);
+      } else if (child.local === 'tbl') {
+        reportOnce(ctx, 'nested table flattened into its cell (§6.2.8: cells hold phrasing)');
+        walk(child);
+      } else if (['tr', 'tc', 'sdt', 'sdtContent'].includes(child.local)) {
+        walk(child);
+      }
+    }
+  };
+  walk(tc);
+  return out;
+}
+
+function tableToBlock(tbl: XmlElement, caption: string, ctx: WmlContext): MEl | undefined {
+  const trs = xmlChildren(tbl, W_NS, 'tr');
+  if (trs.length === 0) {
+    ctx.report.push('dropped a table with no rows');
+    return undefined;
+  }
+  const tblPr = xmlChild(tbl, W_NS, 'tblPr');
+  const styleId = tblPr === undefined ? undefined : wVal(tblPr, 'tblStyle');
+  const borders = ctx.styles.effectiveTableBorders(styleId, parseTblBorders(tblPr));
+
+  const rawRows: RawCell[][] = trs.map((tr) => {
+    let col = 0;
+    return xmlChildren(tr, W_NS, 'tc').map((tc) => {
+      const tcPr = xmlChild(tc, W_NS, 'tcPr');
+      const span = tcPr === undefined ? undefined : twips(wVal(tcPr, 'gridSpan'));
+      const vm = tcPr === undefined ? undefined : xmlChild(tcPr, W_NS, 'vMerge');
+      const fill =
+        tcPr === undefined
+          ? undefined
+          : (() => {
+              const shd = xmlChild(tcPr, W_NS, 'shd');
+              return shd === undefined ? undefined : xmlAttr(shd, W_NS, 'fill');
+            })();
+      const cell: RawCell = {
+        tc,
+        colspan: span !== undefined && span >= 2 ? span : 1,
+        vMerge:
+          vm === undefined
+            ? undefined
+            : xmlAttr(vm, W_NS, 'val') === 'restart'
+              ? 'restart'
+              : 'continue',
+        col,
+        shd: fill !== undefined && /^[0-9A-Fa-f]{6}$/.test(fill) ? fill.toLowerCase() : undefined,
+        rowspan: 1,
+      };
+      col += cell.colspan;
+      return cell;
+    });
+  });
+
+  // vMerge: the restart cell spans over the continue cells below it (same
+  // grid column); continue cells leave the output.
+  for (const [i, row] of rawRows.entries()) {
+    for (const cell of row) {
+      if (cell.vMerge !== 'restart') continue;
+      for (let j = i + 1; j < rawRows.length; j++) {
+        const cont = rawRows[j]?.find((c) => c.col === cell.col && c.vMerge === 'continue');
+        if (cont === undefined) break;
+        cell.rowspan += 1;
+      }
+    }
+  }
+  const outRows = rawRows.map((row) => row.filter((c) => c.vMerge !== 'continue'));
+
+  // Merged cells survive when the grid is exactly rectangular (§6.2.8);
+  // otherwise every span is stripped and rows are padded — same policy as
+  // the HTML importer (WP11).
+  const [firstRow, ...restRows] = outRows;
+  const spanGroups = [
+    [(firstRow ?? []).map((c) => ({ colspan: c.colspan, rowspan: c.rowspan }))],
+    restRows.map((r) => r.map((c) => ({ colspan: c.colspan, rowspan: c.rowspan }))),
+  ];
+  const spansPresent = outRows.flat().some((c) => c.colspan > 1 || c.rowspan > 1);
+  const keepSpans = spansPresent && computeTableGrid(spanGroups).problems.length === 0;
+  if (spansPresent) {
+    ctx.report.push(
+      keepSpans
+        ? 'kept merged cells (colspan/rowspan)'
+        : 'dropped colspan/rowspan (table grid could not be reconciled)',
+    );
+  }
+  const width = Math.max(...outRows.map((r) => r.length));
+
+  const inside = [borders.insideH, borders.insideV].find((b) => b?.visible === true);
+  const cellOf = (cell: RawCell, tag: 'th' | 'td'): MEl => {
+    const parts: MNode[] = [];
+    let align: string | undefined;
+    for (const p of cellParagraphs(cell.tc, ctx)) {
+      const direct = parsePPr(xmlChild(p, W_NS, 'pPr'));
+      const inline = stripBr(inlineContent(p, direct.styleId, ctx));
+      if (inline.length === 0) continue;
+      align ??= ctx.styles.effectivePara(direct).jc;
+      if (parts.length > 0) appendInline(parts, [' ']);
+      appendInline(parts, inline);
+    }
+    const hoisted = hoistUniformRunStyle(parts);
+    const decls: Decls = new Map();
+    if (inside !== undefined) decls.set('border', borderCss(inside));
+    if (cell.shd !== undefined) decls.set('background-color', `#${cell.shd}`);
+    if (align !== undefined) {
+      const mapped = { both: 'justify', start: 'left', end: 'right' }[align] ?? align;
+      if (/^(left|right|center|justify)$/.test(mapped)) decls.set('text-align', mapped);
+    }
+    const signature = mergeSignatures(signatureOf(decls), hoisted.signature);
+    const attrs: Record<string, string> = {};
+    if (signature !== undefined) attrs[STYLE_TMP_ATTR] = signature;
+    if (keepSpans) {
+      if (cell.colspan > 1) attrs['colspan'] = String(cell.colspan);
+      if (cell.rowspan > 1) attrs['rowspan'] = String(cell.rowspan);
+    }
+    return el(tag, attrs, hoisted.children);
+  };
+  const rowOf = (row: RawCell[], tag: 'th' | 'td'): MEl => {
+    const cells = row.map((c) => cellOf(c, tag));
+    if (!keepSpans) {
+      while (cells.length < width) cells.push(el(tag));
+    }
+    return el('tr', {}, cells);
+  };
+
+  const tableDecls: Decls = new Map();
+  for (const side of ['top', 'right', 'bottom', 'left'] as const) {
+    const b = borders[side];
+    if (b?.visible === true) tableDecls.set(`border-${side}`, borderCss(b));
+  }
+  const tableAttrs: Record<string, string> = {};
+  const tableSignature = signatureOf(tableDecls);
+  if (tableSignature !== undefined) tableAttrs[STYLE_TMP_ATTR] = tableSignature;
+
+  if (caption === '') ctx.report.push('synthesized empty <caption> for a table');
+  const bodyRows = restRows;
+  if (bodyRows.length === 0) {
+    ctx.report.push('table had a single row: kept as header with empty body');
+  }
+  return el('table', tableAttrs, [
+    el('caption', {}, caption === '' ? [] : [caption]),
+    el('thead', {}, [rowOf(firstRow ?? [], 'th')]),
+    el(
+      'tbody',
+      {},
+      bodyRows.map((r) => rowOf(r, 'td')),
+    ),
+  ]);
+}
+
+// ---------------------------------------------------------------------------
 // Document conversion
 
 export interface DocxConversion {
@@ -792,9 +1048,10 @@ function numberingXmlOf(container: DocxContainer, mainPart: string): string | un
 }
 
 /**
- * Converts the paragraphs of a .docx into importer blocks (T20.2 scope:
- * paragraphs/runs/styles/headings — tables, images, hyperlink targets,
- * notes and fields arrive with T20.4–T20.7 and are reported meanwhile).
+ * Converts the body of a .docx into importer blocks: paragraphs, runs and
+ * styles (T20.2), lists (T20.3), tables (T20.4) — images, hyperlink
+ * targets, notes and fields arrive with T20.5–T20.7 and are reported
+ * meanwhile.
  */
 export function convertDocx(input: Uint8Array | DocxContainer, report: string[]): DocxConversion {
   const container = input instanceof Uint8Array ? openDocx(input) : input;
@@ -810,9 +1067,17 @@ export function convertDocx(input: Uint8Array | DocxContainer, report: string[])
   const lists = new ListAssembler();
   let emptyParagraphs = 0;
 
+  // A paragraph in the built-in "caption" style adjacent to a table becomes
+  // its <caption> (the paragraph before wins over the one after).
+  let pendingCaption: MEl | undefined;
+
   const walkBody = (parent: XmlElement): void => {
-    for (const child of parent.children) {
-      if (child.kind !== 'element' || child.ns !== W_NS) continue;
+    const items = parent.children.filter(
+      (c): c is XmlElement => c.kind === 'element' && c.ns === W_NS,
+    );
+    for (let i = 0; i < items.length; i++) {
+      const child = items[i];
+      if (child === undefined) continue;
       switch (child.local) {
         case 'p': {
           const direct = parsePPr(xmlChild(child, W_NS, 'pPr'));
@@ -832,17 +1097,41 @@ export function convertDocx(input: Uint8Array | DocxContainer, report: string[])
             break;
           }
           if (listInfo !== undefined) {
+            pendingCaption = undefined;
             lists.add(listInfo, block, blocks, ctx);
           } else {
             lists.flush();
             blocks.push(block);
+            pendingCaption = tag === 'p' && ctx.styles.isCaption(direct) ? block : undefined;
           }
           break;
         }
-        case 'tbl':
+        case 'tbl': {
           lists.flush();
-          reportOnce(ctx, 'table skipped (arrives with T20.4)');
+          let caption = '';
+          if (pendingCaption !== undefined && blocks[blocks.length - 1] === pendingCaption) {
+            caption = textOf(pendingCaption).trim();
+            blocks.pop();
+            ctx.report.push('used the adjacent caption-style paragraph as the table caption');
+          } else {
+            const next = items[i + 1];
+            if (next !== undefined && next.local === 'p') {
+              const nextDirect = parsePPr(xmlChild(next, W_NS, 'pPr'));
+              if (ctx.styles.isCaption(nextDirect)) {
+                const capBlock = paragraphToBlock(next, nextDirect, 'p', ctx);
+                caption = capBlock === undefined ? '' : textOf(capBlock).trim();
+                if (caption !== '') {
+                  i += 1;
+                  ctx.report.push('used the adjacent caption-style paragraph as the table caption');
+                }
+              }
+            }
+          }
+          pendingCaption = undefined;
+          const table = tableToBlock(child, caption, ctx);
+          if (table !== undefined) blocks.push(table);
           break;
+        }
         case 'sdt': {
           const content = xmlChild(child, W_NS, 'sdtContent');
           if (content !== undefined) walkBody(content);
