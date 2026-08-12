@@ -1,4 +1,9 @@
-import type { WdfCapture, WdfOutline, WdfOutlineNode } from '@wdf-dev/core';
+import {
+  parsePaginationExt,
+  type WdfCapture,
+  type WdfOutline,
+  type WdfOutlineNode,
+} from '@wdf-dev/core';
 
 /** Pure helpers of the viewer — kept DOM-free so they are unit-testable. */
 
@@ -191,6 +196,22 @@ export const PAGINATE_JS = `
     return null;
   }
 
+  /* Authored page breaks (ext pagination, docs/ext-pagination.md §6): ids
+     injected by buildSrcdoc; a unit breaks when it carries or contains one. */
+  var WDF_BREAKS = typeof WDF_AUTHORED_BREAKS !== 'undefined' ? WDF_AUTHORED_BREAKS : [];
+  function wdfOwnBreak(node) {
+    return WDF_BREAKS.length > 0 && node.id !== '' && WDF_BREAKS.indexOf(node.id) !== -1;
+  }
+  function wdfHasBreak(node) {
+    if (WDF_BREAKS.length === 0) return false;
+    if (wdfOwnBreak(node)) return true;
+    if (typeof node.querySelector !== 'function') return false;
+    for (var i = 0; i < WDF_BREAKS.length; i++) {
+      if (node.querySelector('[id="' + WDF_BREAKS[i] + '"]') !== null) return true;
+    }
+    return false;
+  }
+
   function wdfCollectUnits(article, bodyH) {
     var units = [];
     function pushUnit(node, wrappers, breakBefore) {
@@ -198,22 +219,23 @@ export const PAGINATE_JS = `
         node: node,
         wrappers: wrappers,
         h: wdfMeasureH(node),
-        breakBefore: breakBefore === true,
+        breakBefore: breakBefore === true || wdfHasBreak(node),
         keepWithNext: /^H[1-6]$/.test(node.tagName),
       });
     }
     function walk(el, wrappers, breakBefore) {
+      var owns = breakBefore || wdfOwnBreak(el);
       if (el.tagName === 'SECTION') {
         var kids = Array.prototype.slice.call(el.children);
         for (var i = 0; i < kids.length; i++) {
-          walk(kids[i], wrappers.concat([el]), breakBefore && i === 0);
+          walk(kids[i], wrappers.concat([el]), owns && i === 0);
         }
         return;
       }
       var parts = wdfMeasureH(el) > bodyH ? wdfSplitChildren(el) : null;
       if (parts !== null) {
         for (var j = 0; j < parts.length; j++) {
-          pushUnit(parts[j], wrappers.concat([el]), breakBefore && j === 0);
+          pushUnit(parts[j], wrappers.concat([el]), owns && j === 0);
         }
         return;
       }
@@ -441,7 +463,10 @@ export function buildSrcdoc(
     /<head([^>]*)>/,
     (match) => `${match}${csp}<style>${BASE_CSS}</style><style>${PAGED_CSS}</style>${fontStyle}`,
   );
-  const controller = `<script nonce="${nonce}">${PAGINATE_JS}${CONTROLLER_JS}</script>`;
+  // Authored page breaks (ext pagination): the Paper paginator honors them.
+  const breaks = parsePaginationExt(files)?.breakBefore ?? [];
+  const breaksVar = `var WDF_AUTHORED_BREAKS = ${JSON.stringify(breaks)};`;
+  const controller = `<script nonce="${nonce}">${breaksVar}${PAGINATE_JS}${CONTROLLER_JS}</script>`;
   out = out.includes('</body>') ? out.replace('</body>', `${controller}</body>`) : out + controller;
   return out;
 }
@@ -489,6 +514,17 @@ export function wrapPrintShell(html: string): string {
  * and a CSP with no script-src at all. Rendered in a dedicated frame
  * without allow-scripts; the browser's print engine does the pagination.
  */
+/**
+ * Authored page breaks (extension `pagination` 0.1, docs/ext-pagination.md
+ * §6): CSS rules forcing a page before each referenced element. Unknown ids
+ * simply match nothing — consumers skip them (§10.3).
+ */
+export function authoredBreakCss(files: ReadonlyMap<string, Uint8Array>): string {
+  const pagination = parsePaginationExt(files);
+  if (pagination === undefined || pagination.breakBefore.length === 0) return '';
+  return pagination.breakBefore.map((id) => `[id="${id}"] { break-before: page; }`).join('\n');
+}
+
 export function buildPrintSrcdoc(
   entryHtml: string,
   files: ReadonlyMap<string, Uint8Array>,
@@ -497,9 +533,12 @@ export function buildPrintSrcdoc(
   const out = wrapPrintShell(inlineResources(entryHtml, files));
   const fonts = fontsCss(files);
   const fontStyle = fonts === undefined ? '' : `<style>${fonts}</style>`;
+  const breaks = authoredBreakCss(files);
+  const breakStyle = breaks === '' ? '' : `<style>${breaks}</style>`;
   return out.replace(
     /<head([^>]*)>/,
-    (match) => `${match}${csp}<style>${BASE_CSS}</style>${fontStyle}<style>${PRINT_CSS}</style>`,
+    (match) =>
+      `${match}${csp}<style>${BASE_CSS}</style>${fontStyle}<style>${PRINT_CSS}</style>${breakStyle}`,
   );
 }
 

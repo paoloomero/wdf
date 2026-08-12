@@ -631,7 +631,17 @@ interface WmlContext {
   readonly media: Map<string, { bytes: Uint8Array; ext: string; mediaType: string }>;
   /** Bookmark name → generated element id, for names a hyperlink references. */
   readonly bookmarkIds: ReadonlyMap<string, string>;
-  mediaBytes: number;
+  /** Shared across part contexts (header/footer, T20.6): global caps. */
+  readonly mediaTotal: { bytes: number };
+}
+
+/** A context for another part (header/footer): same document, its own rels. */
+function partContext(ctx: WmlContext, partName: string): WmlContext {
+  return {
+    ...ctx,
+    mainPart: partName,
+    rels: new Map(ctx.container.relationshipsOf(partName).map((r) => [r.id, r])),
+  };
 }
 
 /** Reports once per distinct message — real documents repeat everything. */
@@ -703,12 +713,12 @@ function emitImage(
       ctx.report.push(`dropped image ${part} (exceeds per-file size limit)`);
       return undefined;
     }
-    if (ctx.mediaBytes + bytes.length > ctx.caps.totalBytes) {
+    if (ctx.mediaTotal.bytes + bytes.length > ctx.caps.totalBytes) {
       ctx.report.push(`dropped image ${part} (total asset size limit reached)`);
       return undefined;
     }
     ctx.media.set(part, { bytes, ext: kind.ext, mediaType: kind.mediaType });
-    ctx.mediaBytes += bytes.length;
+    ctx.mediaTotal.bytes += bytes.length;
   }
   const attrs: Record<string, string> = { src: part, alt };
   if (width > 0) attrs['width'] = String(width);
@@ -781,8 +791,8 @@ function runToNodes(run: XmlElement, paraStyleId: string | undefined, ctx: WmlCo
       case 'br': {
         const type = xmlAttr(child, W_NS, 'type');
         if (type === 'page') {
-          // Authored page break: becomes ext `pagination` data with T20.6.
-          reportOnce(ctx, 'authored page break not yet recorded (arrives with T20.6)');
+          // Authored page break: collected per paragraph (T20.6) — the br
+          // itself renders nothing.
         } else if (type !== 'column') {
           content.push(el('br'));
         }
@@ -1232,6 +1242,12 @@ export interface DocxConversion {
   stylesheet: string | undefined;
   /** Packaged images (content-hashed under content/assets/, T20.5). */
   assets: LoadedAsset[];
+  /**
+   * Blocks an AUTHORED page break lands before (T20.6) — references into
+   * `blocks`. Ids exist only after ensureIds: the caller derives the
+   * ext-pagination breakBefore list from these elements' ids.
+   */
+  pageBreakBlocks: MEl[];
 }
 
 /** Locates and reads styles.xml via the main part's relationships. */
@@ -1304,98 +1320,55 @@ export async function convertDocx(
     caps,
     media: new Map(),
     bookmarkIds,
-    mediaBytes: 0,
+    mediaTotal: { bytes: 0 },
   };
 
   const body = xmlChild(root, W_NS, 'body');
-  const blocks: MEl[] = [];
-  const lists = new ListAssembler();
-  let emptyParagraphs = 0;
+  const bodyResult =
+    body === undefined ? { blocks: [], empty: 0, pageBreaks: [] } : convertBlocks(body, ctx, true);
+  const blocks = bodyResult.blocks;
+  const pageBreakBlocks = bodyResult.pageBreaks;
+  let emptyParagraphs = bodyResult.empty;
 
-  // A paragraph in the built-in "caption" style adjacent to a table becomes
-  // its <caption> (the paragraph before wins over the one after).
-  let pendingCaption: MEl | undefined;
-
-  const walkBody = (parent: XmlElement): void => {
-    const items = parent.children.filter(
-      (c): c is XmlElement => c.kind === 'element' && c.ns === W_NS,
-    );
-    for (let i = 0; i < items.length; i++) {
-      const child = items[i];
-      if (child === undefined) continue;
-      switch (child.local) {
-        case 'p': {
-          const direct = parsePPr(xmlChild(child, W_NS, 'pPr'));
-          const level = ctx.styles.headingLevel(direct);
-          const listInfo = level === undefined ? listInfoOf(direct, ctx) : undefined;
-          if (level !== undefined && listInfoOf(direct, ctx) !== undefined) {
-            reportOnce(
-              ctx,
-              'numbered heading: the list number is dropped (headings are not list items)',
-            );
-          }
-          const tag =
-            level !== undefined ? `h${String(level)}` : listInfo !== undefined ? 'li' : 'p';
-          const block = paragraphToBlock(child, direct, tag, ctx);
-          if (block === undefined) {
-            emptyParagraphs += 1;
-            break;
-          }
-          if (listInfo !== undefined) {
-            pendingCaption = undefined;
-            lists.add(listInfo, block, blocks, ctx);
-          } else {
-            lists.flush();
-            blocks.push(block);
-            pendingCaption = tag === 'p' && ctx.styles.isCaption(direct) ? block : undefined;
-          }
-          break;
-        }
-        case 'tbl': {
-          lists.flush();
-          let caption = '';
-          if (pendingCaption !== undefined && blocks[blocks.length - 1] === pendingCaption) {
-            caption = textOf(pendingCaption).trim();
-            blocks.pop();
-            ctx.report.push('used the adjacent caption-style paragraph as the table caption');
-          } else {
-            const next = items[i + 1];
-            if (next !== undefined && next.local === 'p') {
-              const nextDirect = parsePPr(xmlChild(next, W_NS, 'pPr'));
-              if (ctx.styles.isCaption(nextDirect)) {
-                const capBlock = paragraphToBlock(next, nextDirect, 'p', ctx);
-                caption = capBlock === undefined ? '' : textOf(capBlock).trim();
-                if (caption !== '') {
-                  i += 1;
-                  ctx.report.push('used the adjacent caption-style paragraph as the table caption');
-                }
-              }
-            }
-          }
-          pendingCaption = undefined;
-          const table = tableToBlock(child, caption, ctx);
-          if (table !== undefined) blocks.push(table);
-          break;
-        }
-        case 'sdt': {
-          const content = xmlChild(child, W_NS, 'sdtContent');
-          if (content !== undefined) walkBody(content);
-          break;
-        }
-        case 'sectPr': // section properties: headers/footers/page breaks, T20.6
-        case 'bookmarkStart': // markers, not content (ids arrive with T20.5)
-        case 'bookmarkEnd':
-          break;
-        default:
-          reportOnce(ctx, `unsupported body element <w:${child.local}> skipped`);
+  // Page header/footer (T20.6, T14.1 policy): the body's trailing sectPr
+  // names the parts; the first-page variant wins only when w:titlePg
+  // activates it, the even-page variant is never used. Header/footer parts
+  // carry their OWN relationships (images resolve against them).
+  const sectPr = body === undefined ? undefined : xmlChild(body, W_NS, 'sectPr');
+  if (sectPr !== undefined) {
+    const titlePg = onOff(xmlChild(sectPr, W_NS, 'titlePg')) === true;
+    for (const kind of ['header', 'footer'] as const) {
+      const refs = xmlChildren(sectPr, W_NS, `${kind}Reference`);
+      const byType = (t: string): XmlElement | undefined =>
+        refs.find((r) => (xmlAttr(r, W_NS, 'type') ?? 'default') === t);
+      const ref = (titlePg ? byType('first') : undefined) ?? byType('default');
+      if (ref === undefined) continue;
+      const relId = xmlAttr(ref, R_OFFICE, 'id');
+      const rel = relId === undefined ? undefined : ctx.rels.get(relId);
+      if (rel === undefined || rel.targetMode === 'External') continue;
+      const part = resolveTarget(mainPart, rel.target);
+      const partXml = container.partText(part);
+      if (partXml === undefined) continue;
+      const partResult = convertBlocks(parseXml(partXml), partContext(ctx, part), false);
+      emptyParagraphs += partResult.empty;
+      if (partResult.blocks.length === 0) continue; // empty containers are pruned (T14.1)
+      if (kind === 'header') {
+        blocks.unshift(el('header', {}, partResult.blocks));
+      } else {
+        blocks.push(el('footer', {}, partResult.blocks));
       }
+      report.push(`imported page ${kind} (${part})`);
     }
-  };
-  if (body !== undefined) walkBody(body);
+  }
 
   if (emptyParagraphs > 0) {
     report.push(
       `dropped ${String(emptyParagraphs)} empty paragraph${emptyParagraphs === 1 ? '' : 's'} (spacing is translated style, not content)`,
+    );
+  }
+  if (pageBreakBlocks.length > 0) {
+    report.push(
+      `recorded ${String(pageBreakBlocks.length)} authored page break${pageBreakBlocks.length === 1 ? '' : 's'} (extension pagination, docs/ext-pagination.md)`,
     );
   }
 
@@ -1430,5 +1403,184 @@ export async function convertDocx(
     language: styles.language,
     stylesheet: hoistStyles(blocks),
     assets: [...assets.values()],
+    pageBreakBlocks,
+  };
+}
+
+interface BlockContainerResult {
+  blocks: MEl[];
+  empty: number;
+  /** Blocks an authored page break lands BEFORE, document order (T20.6). */
+  pageBreaks: MEl[];
+}
+
+/**
+ * Position of the first authored page break of a paragraph relative to its
+ * content, or undefined. A paragraph-level section break (w:pPr>w:sectPr,
+ * type other than "continuous") breaks after the paragraph.
+ */
+function pageBreakPosition(p: XmlElement): 'before' | 'after' | undefined {
+  let seenContent = false;
+  let found: 'before' | 'after' | undefined;
+  const walk = (node: XmlElement): boolean => {
+    for (const child of node.children) {
+      if (child.kind !== 'element') continue;
+      if (child.ns === W_NS && child.local === 'pPr') continue; // properties, not content
+      if (child.ns === W_NS && child.local === 'br' && xmlAttr(child, W_NS, 'type') === 'page') {
+        found = seenContent ? 'after' : 'before';
+        return true;
+      }
+      if (child.ns === W_NS && child.local === 't' && xmlText(child).trim() !== '') {
+        seenContent = true;
+      }
+      if (child.ns === W_NS && (child.local === 'drawing' || child.local === 'pict')) {
+        seenContent = true;
+      }
+      if (walk(child)) return true;
+    }
+    return false;
+  };
+  walk(p);
+  if (found !== undefined) return found;
+  const pPr = xmlChild(p, W_NS, 'pPr');
+  const sect = pPr === undefined ? undefined : xmlChild(pPr, W_NS, 'sectPr');
+  if (sect !== undefined && wVal(sect, 'type') !== 'continuous') return 'after';
+  return undefined;
+}
+
+/**
+ * Converts a block container (w:body, w:hdr, w:ftr) into importer blocks:
+ * paragraphs/lists/tables plus, for the body, the authored page breaks
+ * anchored to the block they land before (ext-pagination §5 — implicit
+ * overflow breaks are never recorded, only explicit intent).
+ */
+function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): BlockContainerResult {
+  const blocks: MEl[] = [];
+  const pageBreaks: MEl[] = [];
+  const lists = new ListAssembler();
+  let empty = 0;
+  let pendingBreak = false;
+
+  // A paragraph in the built-in "caption" style adjacent to a table becomes
+  // its <caption> (the paragraph before wins over the one after).
+  let pendingCaption: MEl | undefined;
+
+  const walkBody = (container: XmlElement): void => {
+    const items = container.children.filter(
+      (c): c is XmlElement => c.kind === 'element' && c.ns === W_NS,
+    );
+    for (let i = 0; i < items.length; i++) {
+      const child = items[i];
+      if (child === undefined) continue;
+      switch (child.local) {
+        case 'p': {
+          const direct = parsePPr(xmlChild(child, W_NS, 'pPr'));
+          const level = ctx.styles.headingLevel(direct);
+          const listInfo = level === undefined ? listInfoOf(direct, ctx) : undefined;
+          if (level !== undefined && listInfoOf(direct, ctx) !== undefined) {
+            reportOnce(
+              ctx,
+              'numbered heading: the list number is dropped (headings are not list items)',
+            );
+          }
+          const breakPos = isBody ? pageBreakPosition(child) : undefined;
+          if (
+            isBody &&
+            xmlChild(child, W_NS, 'pPr') !== undefined &&
+            xmlChild(xmlChild(child, W_NS, 'pPr') as XmlElement, W_NS, 'sectPr') !== undefined
+          ) {
+            reportOnce(
+              ctx,
+              "multiple sections: only the last section's page header/footer is used",
+            );
+          }
+          const tag =
+            level !== undefined ? `h${String(level)}` : listInfo !== undefined ? 'li' : 'p';
+          const block = paragraphToBlock(child, direct, tag, ctx);
+          if (block === undefined) {
+            empty += 1;
+            if (breakPos !== undefined) pendingBreak = true;
+            break;
+          }
+          if (pendingBreak || breakPos === 'before') {
+            pageBreaks.push(block);
+            pendingBreak = false;
+          }
+          if (listInfo !== undefined) {
+            pendingCaption = undefined;
+            lists.add(listInfo, block, blocks, ctx);
+          } else {
+            lists.flush();
+            blocks.push(block);
+            pendingCaption = tag === 'p' && ctx.styles.isCaption(direct) ? block : undefined;
+          }
+          if (breakPos === 'after') pendingBreak = true;
+          break;
+        }
+        case 'tbl': {
+          lists.flush();
+          let caption = '';
+          let consumed: MEl | undefined;
+          if (pendingCaption !== undefined && blocks[blocks.length - 1] === pendingCaption) {
+            caption = textOf(pendingCaption).trim();
+            consumed = pendingCaption;
+            blocks.pop();
+            ctx.report.push('used the adjacent caption-style paragraph as the table caption');
+          } else {
+            const next = items[i + 1];
+            if (next !== undefined && next.local === 'p') {
+              const nextDirect = parsePPr(xmlChild(next, W_NS, 'pPr'));
+              if (ctx.styles.isCaption(nextDirect)) {
+                const capBlock = paragraphToBlock(next, nextDirect, 'p', ctx);
+                caption = capBlock === undefined ? '' : textOf(capBlock).trim();
+                if (caption !== '') {
+                  i += 1;
+                  ctx.report.push('used the adjacent caption-style paragraph as the table caption');
+                }
+              }
+            }
+          }
+          pendingCaption = undefined;
+          const table = tableToBlock(child, caption, ctx);
+          if (table !== undefined) {
+            if (pendingBreak) {
+              pageBreaks.push(table);
+              pendingBreak = false;
+            }
+            // A consumed caption paragraph that carried the break mark hands
+            // it to the table it captions.
+            const at = consumed === undefined ? -1 : pageBreaks.indexOf(consumed);
+            if (at !== -1) pageBreaks[at] = table;
+            blocks.push(table);
+          }
+          break;
+        }
+        case 'sdt': {
+          const content = xmlChild(child, W_NS, 'sdtContent');
+          if (content !== undefined) walkBody(content);
+          break;
+        }
+        case 'sectPr': // trailing section properties: consumed by convertDocx
+        case 'bookmarkStart': // markers, not content
+        case 'bookmarkEnd':
+          break;
+        default:
+          reportOnce(ctx, `unsupported body element <w:${child.local}> skipped`);
+      }
+    }
+  };
+  walkBody(parent);
+
+  // A break before the container's first rendered element is meaningless
+  // (ext-pagination §4): every rendering starts a page there.
+  const first = blocks[0];
+  const firstContent =
+    first !== undefined && (first.tag === 'ul' || first.tag === 'ol')
+      ? first.children.find(isEl)
+      : first;
+  return {
+    blocks,
+    empty,
+    pageBreaks: pageBreaks.filter((b) => b !== first && b !== firstContent),
   };
 }
