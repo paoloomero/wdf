@@ -180,7 +180,25 @@ Resolves to:
 Spending commitments by chapter and year {#tbl-commitments}</pre>
         <p class="hint">
           Full recorded session: <a href="mcp-demo.md">MCP demo transcript</a>. Register it in
-          Claude Code with <code>claude mcp add wdf -- node packages/mcp/dist/index.js</code>.
+          Claude Code with <code>claude mcp add wdf -- npx -y @wdf/mcp</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Install the tools</h2>
+        <p>
+          Everything is on npm (Node ≥ 20). Validate any <code>.wdf</code> in ten seconds, or
+          convert an HTML export from Word or Google Docs — every violation cites the spec section
+          it enforces, and the same input produces a byte-identical package on any platform:
+        </p>
+        <pre class="transcript">
+npx @wdf/cli validate document.wdf
+npx @wdf/cli import mydoc.html -o mydoc.wdf</pre>
+        <p class="hint">
+          Same one-liner validates published documents in CI. Libraries:
+          <code>@wdf/core</code> (validation, extraction, integrity — runs in Node and browsers) and
+          <code>@wdf/import</code> (HTML/Markdown → <code>.wdf</code>). Source on
+          <a href="https://github.com/paoloomero/wdf">GitHub</a>, Apache-2.0.
         </p>
       </section>
 
@@ -199,9 +217,8 @@ Spending commitments by chapter and year {#tbl-commitments}</pre>
     <footer>
       <p>
         WDF is an open format under development by
-        <a href="https://www.infofactory.it/">infoFACTORY</a>. Spec: CC-BY 4.0 · Code: open source
-        license to be finalized. Built in the context of the European <em>Open Internet Stack</em> /
-        NLnet ecosystem.
+        <a href="https://www.infofactory.it/">infoFACTORY</a>. Spec: CC-BY 4.0 · Code: Apache-2.0.
+        Built in the context of the European <em>Open Internet Stack</em> / NLnet ecosystem.
       </p>
     </footer>
   </body>

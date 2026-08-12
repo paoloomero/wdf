@@ -1,9 +1,35 @@
 {
   "name": "@wdf/viewer",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Single-file HTML viewer for .wdf packages — zero installation, works offline.",
+  "keywords": [
+    "wdf",
+    "document",
+    "viewer",
+    "reader",
+    "offline",
+    "single-file"
+  ],
+  "homepage": "https://wdf.dev",
+  "bugs": "https://github.com/paoloomero/wdf/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paoloomero/wdf.git",
+    "directory": "packages/viewer"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/viewer.html",
+    "dist/standalone.html",
+    "LICENSE",
+    "NOTICE"
+  ],
   "exports": {
     "./viewer.html": "./dist/viewer.html",
     "./standalone.html": "./dist/standalone.html"

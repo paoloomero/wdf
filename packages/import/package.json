@@ -1,9 +1,34 @@
 {
   "name": "@wdf/import",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "WDF import pipeline — isomorphic (Node + browser): HTML/Markdown to canonical package, with injected loaders for assets, siblings, stylesheets and fonts.",
+  "keywords": [
+    "wdf",
+    "document",
+    "import",
+    "html",
+    "markdown",
+    "converter"
+  ],
+  "homepage": "https://wdf.dev",
+  "bugs": "https://github.com/paoloomero/wdf/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paoloomero/wdf.git",
+    "directory": "packages/import"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

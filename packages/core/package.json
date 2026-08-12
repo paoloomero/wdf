@@ -1,9 +1,35 @@
 {
   "name": "@wdf/core",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "WDF core library — isomorphic (Node + browser): manifest, profile validation, canonical extraction, integrity, packaging.",
+  "keywords": [
+    "wdf",
+    "document",
+    "format",
+    "validation",
+    "extraction",
+    "provenance",
+    "markdown"
+  ],
+  "homepage": "https://wdf.dev",
+  "bugs": "https://github.com/paoloomero/wdf/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paoloomero/wdf.git",
+    "directory": "packages/core"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

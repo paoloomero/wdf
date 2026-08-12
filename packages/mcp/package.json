@@ -1,9 +1,34 @@
 {
   "name": "@wdf/mcp",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "MCP server exposing WDF packages to AI agents: open, outline, read, cite — with verifiable citations and no parsing heuristics.",
+  "keywords": [
+    "wdf",
+    "document",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "citations"
+  ],
+  "homepage": "https://wdf.dev",
+  "bugs": "https://github.com/paoloomero/wdf/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paoloomero/wdf.git",
+    "directory": "packages/mcp"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
   "bin": {
     "wdf-mcp": "./dist/index.js"
   },

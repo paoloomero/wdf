@@ -1,9 +1,36 @@
 {
   "name": "@wdf/cli",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "The wdf command: validate, pack, unpack, extract, import, new.",
+  "keywords": [
+    "wdf",
+    "document",
+    "cli",
+    "validate",
+    "import",
+    "converter",
+    "provenance"
+  ],
+  "homepage": "https://wdf.dev",
+  "bugs": "https://github.com/paoloomero/wdf/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paoloomero/wdf.git",
+    "directory": "packages/cli"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "fonts",
+    "LICENSE",
+    "NOTICE"
+  ],
   "bin": {
     "wdf": "./dist/index.js"
   },

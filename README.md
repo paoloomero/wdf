@@ -50,7 +50,33 @@ change.
 - `site/` — demo site (assembled into `_site/` by `pnpm demo`)
 - `docs/` — LLM-extraction comparison, MCP demo, Reader install guide
 
-## Quick start
+## Install
+
+The tools are published on npm (Node ≥ 20):
+
+```sh
+# validate a document, nothing to install
+npx @wdf/cli validate document.wdf
+
+# convert an HTML export (Word, Google Docs, saved web page) or Markdown
+npx @wdf/cli import mydoc.html -o mydoc.wdf
+
+# or install the `wdf` command globally
+npm install -g @wdf/cli
+```
+
+Give AI agents verifiable access to `.wdf` documents via MCP:
+
+```sh
+claude mcp add wdf -- npx -y @wdf/mcp
+```
+
+Libraries: [`@wdf/core`](packages/core) (validation, extraction, integrity — isomorphic) and
+[`@wdf/import`](packages/import) (HTML/Markdown → `.wdf` pipeline); [`@wdf/viewer`](packages/viewer)
+ships the prebuilt single-file Reader. Validate documents in CI with the same
+one-liner: `npx @wdf/cli validate docs/report.wdf`.
+
+## Working on the repo
 
 Requirements: Node ≥ 20, pnpm ≥ 9.
 
