@@ -41,9 +41,11 @@ function run(text: string, rPr = ''): string {
   return `<w:r>${rPr === '' ? '' : `<w:rPr>${rPr}</w:rPr>`}<w:t xml:space="preserve">${text}</w:t></w:r>`;
 }
 
-function convert(body: string): { blocks: MEl[]; stylesheet?: string; report: string[] } {
+async function convert(
+  body: string,
+): Promise<{ blocks: MEl[]; stylesheet?: string; report: string[] }> {
   const report: string[] = [];
-  const result = convertDocx(docWith(body), report);
+  const result = await convertDocx(docWith(body), report);
   return {
     blocks: result.blocks,
     ...(result.stylesheet !== undefined && { stylesheet: result.stylesheet }),
@@ -52,8 +54,8 @@ function convert(body: string): { blocks: MEl[]; stylesheet?: string; report: st
 }
 
 describe('convertDocx — headings and style chain', () => {
-  it('maps outlineLvl and built-in names to h1..h6; Title to h1', () => {
-    const { blocks } = convert(
+  it('maps outlineLvl and built-in names to h1..h6; Title to h1', async () => {
+    const { blocks } = await convert(
       p(run('Il titolo'), '<w:pStyle w:val="Titolo"/>') +
         p(run('Capitolo'), '<w:pStyle w:val="Heading1"/>') +
         p(run('Paragrafo per nome'), '<w:pStyle w:val="Sottotitolo2"/>') +
@@ -62,8 +64,8 @@ describe('convertDocx — headings and style chain', () => {
     expect(blocks.map((b) => b.tag)).toEqual(['h1', 'h1', 'h2', 'p']);
   });
 
-  it('resolves the chain: docDefaults → basedOn → style → direct', () => {
-    const { blocks, stylesheet } = convert(p(run('Capo'), '<w:pStyle w:val="Heading1"/>'));
+  it('resolves the chain: docDefaults → basedOn → style → direct', async () => {
+    const { blocks, stylesheet } = await convert(p(run('Capo'), '<w:pStyle w:val="Heading1"/>'));
     const h1 = blocks[0];
     expect(h1?.tag).toBe('h1');
     // Base contributes italic (em); Heading1's bold is native on headings.
@@ -78,8 +80,8 @@ describe('convertDocx — headings and style chain', () => {
     expect(stylesheet).toContain('margin-top: 12pt'); // spacing before 240tw
   });
 
-  it('direct run properties override the chain (toggle off)', () => {
-    const { blocks } = convert(
+  it('direct run properties override the chain (toggle off)', async () => {
+    const { blocks } = await convert(
       p(run('grassetto') + run(' normale', '<w:b w:val="0"/>'), '<w:pStyle w:val="BoldPara"/>'),
     );
     const children = blocks[0]?.children ?? [];
@@ -92,8 +94,8 @@ describe('convertDocx — headings and style chain', () => {
 });
 
 describe('convertDocx — inline semantics and typography', () => {
-  it('maps bold/italic/vertAlign to strong/em/sup-sub', () => {
-    const { blocks } = convert(
+  it('maps bold/italic/vertAlign to strong/em/sup-sub', async () => {
+    const { blocks } = await convert(
       p(
         run('piano ') +
           run('forte', '<w:b/>') +
@@ -105,8 +107,8 @@ describe('convertDocx — inline semantics and typography', () => {
     expect(kids.map((c) => (c as MEl).tag)).toEqual(['strong', 'em', 'sup']);
   });
 
-  it('translates underline/strike/highlight/caps into a generated class', () => {
-    const { blocks, stylesheet } = convert(
+  it('translates underline/strike/highlight/caps into a generated class', async () => {
+    const { blocks, stylesheet } = await convert(
       p(run('evidente', '<w:u w:val="single"/><w:strike/><w:highlight w:val="yellow"/><w:caps/>')),
     );
     expect(stylesheet).toContain('text-decoration: underline line-through');
@@ -115,8 +117,8 @@ describe('convertDocx — inline semantics and typography', () => {
     expect(textOf(blocks[0] as MEl)).toBe('evidente');
   });
 
-  it('hoists a uniform run style onto the paragraph (docDefaults case)', () => {
-    const { blocks, stylesheet } = convert(p(run('solo testo')));
+  it('hoists a uniform run style onto the paragraph (docDefaults case)', async () => {
+    const { blocks, stylesheet } = await convert(p(run('solo testo')));
     const para = blocks[0];
     // No span survives; the paragraph carries the class.
     expect(para?.children).toEqual(['solo testo']);
@@ -125,8 +127,8 @@ describe('convertDocx — inline semantics and typography', () => {
     expect(stylesheet).toContain('font-size: 11pt');
   });
 
-  it('keeps per-run spans when runs differ', () => {
-    const { blocks } = convert(
+  it('keeps per-run spans when runs differ', async () => {
+    const { blocks } = await convert(
       p(run('rosso', '<w:color w:val="FF0000"/>') + run(' e blu', '<w:color w:val="0000FF"/>')),
     );
     const kids = (blocks[0]?.children ?? []).filter((c) => typeof c !== 'string') as MEl[];
@@ -134,15 +136,15 @@ describe('convertDocx — inline semantics and typography', () => {
     expect(kids.every((k) => k.tag === 'span')).toBe(true);
   });
 
-  it('merges adjacent runs with identical formatting', () => {
-    const { blocks } = convert(p(run('uno ', '<w:b/>') + run('due', '<w:b/>')));
+  it('merges adjacent runs with identical formatting', async () => {
+    const { blocks } = await convert(p(run('uno ', '<w:b/>') + run('due', '<w:b/>')));
     const kids = (blocks[0]?.children ?? []).filter((c) => typeof c !== 'string') as MEl[];
     expect(kids).toHaveLength(1);
     expect(textOf(kids[0] as MEl)).toBe('uno due');
   });
 
-  it('maps alignment, breaks and tabs', () => {
-    const { blocks, stylesheet } = convert(
+  it('maps alignment, breaks and tabs', async () => {
+    const { blocks, stylesheet } = await convert(
       p(`<w:r><w:t>a</w:t><w:br/><w:t>b</w:t><w:tab/><w:t>c</w:t></w:r>`, '<w:jc w:val="both"/>'),
     );
     expect(stylesheet).toContain('text-align: justify');
@@ -153,14 +155,14 @@ describe('convertDocx — inline semantics and typography', () => {
 });
 
 describe('convertDocx — structure, drops and reports', () => {
-  it('drops empty paragraphs with one aggregate report line', () => {
-    const { blocks, report } = convert(p(run('pieno')) + '<w:p/><w:p/>');
+  it('drops empty paragraphs with one aggregate report line', async () => {
+    const { blocks, report } = await convert(p(run('pieno')) + '<w:p/><w:p/>');
     expect(blocks).toHaveLength(1);
     expect(report.some((r) => r.includes('2 empty paragraphs'))).toBe(true);
   });
 
-  it('reports images and hyperlinks as pending tasks — text preserved', () => {
-    const { blocks, report } = convert(
+  it('degrades gracefully: rowless table, dangling link, empty drawing — text preserved', async () => {
+    const { blocks, report } = await convert(
       '<w:tbl/>' + // rowless: dropped with a report (tables convert since T20.4)
         p(
           '<w:hyperlink r:id="rId9" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
@@ -170,13 +172,14 @@ describe('convertDocx — structure, drops and reports', () => {
         p('<w:r><w:drawing/></w:r>' + run('con immagine')),
     );
     expect(report.some((r) => r.includes('table with no rows'))).toBe(true);
-    expect(report.some((r) => r.includes('T20.5') && r.includes('hyperlink'))).toBe(true);
+    expect(report.some((r) => r.includes('without a resolvable external target'))).toBe(true);
+    expect(report.some((r) => r.includes('drawing without an embedded picture'))).toBe(true);
     expect(textOf(blocks[0] as MEl)).toBe('link testo');
     expect(textOf(blocks[1] as MEl)).toBe('con immagine');
   });
 
-  it('accepts tracked insertions and drops deletions (final view)', () => {
-    const { blocks, report } = convert(
+  it('accepts tracked insertions and drops deletions (final view)', async () => {
+    const { blocks, report } = await convert(
       p(
         '<w:ins w:id="1">' +
           run('nuovo') +
@@ -187,15 +190,15 @@ describe('convertDocx — structure, drops and reports', () => {
     expect(report.some((r) => r.includes('deletion dropped'))).toBe(true);
   });
 
-  it('reads the document language from docDefaults', () => {
+  it('reads the document language from docDefaults', async () => {
     const report: string[] = [];
-    expect(convertDocx(docWith(p(run('x'))), report).language).toBe('it-IT');
+    expect((await convertDocx(docWith(p(run('x'))), report)).language).toBe('it-IT');
   });
 });
 
 describe('convertDocx — profile-valid end to end', () => {
-  it('blocks serialize to a conforming WDF-HTML document', () => {
-    const { blocks, stylesheet } = convert(
+  it('blocks serialize to a conforming WDF-HTML document', async () => {
+    const { blocks, stylesheet } = await convert(
       p(run('Il titolo'), '<w:pStyle w:val="Titolo"/>') +
         p(
           run('Testo con ') +

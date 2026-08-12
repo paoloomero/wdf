@@ -46,13 +46,13 @@ function para(text: string, pPr = ''): string {
   return `<w:p>${pPr === '' ? '' : `<w:pPr>${pPr}</w:pPr>`}<w:r><w:t>${text}</w:t></w:r></w:p>`;
 }
 
-function convert(body: string): {
+async function convert(body: string): Promise<{
   blocks: MEl[];
   stylesheet?: string;
   report: string[];
-} {
+}> {
   const report: string[] = [];
-  const result = convertDocx(docWith(body), report);
+  const result = await convertDocx(docWith(body), report);
   return {
     blocks: result.blocks,
     ...(result.stylesheet !== undefined && { stylesheet: result.stylesheet }),
@@ -80,8 +80,8 @@ function rowsOf(section: MEl | undefined): MEl[][] {
 }
 
 describe('convertDocx — tables', () => {
-  it('builds caption + thead(th) + tbody(td) from rows', () => {
-    const { blocks, report } = convert(
+  it('builds caption + thead(th) + tbody(td) from rows', async () => {
+    const { blocks, report } = await convert(
       tbl(tr(tc('Colonna A'), tc('Colonna B')) + tr(tc('1'), tc('2'))),
     );
     const table = blocks[0];
@@ -93,8 +93,8 @@ describe('convertDocx — tables', () => {
     expect(report.some((r) => r.includes('synthesized empty <caption>'))).toBe(true);
   });
 
-  it('keeps gridSpan as colspan when the grid is rectangular', () => {
-    const { blocks, report } = convert(
+  it('keeps gridSpan as colspan when the grid is rectangular', async () => {
+    const { blocks, report } = await convert(
       tbl(tr(tc('span due', '<w:gridSpan w:val="2"/>')) + tr(tc('a'), tc('b'))),
     );
     const { thead } = partsOf(blocks[0]);
@@ -102,8 +102,8 @@ describe('convertDocx — tables', () => {
     expect(report.some((r) => r.includes('kept merged cells'))).toBe(true);
   });
 
-  it('turns vMerge into rowspan and drops continue cells', () => {
-    const { blocks } = convert(
+  it('turns vMerge into rowspan and drops continue cells', async () => {
+    const { blocks } = await convert(
       tbl(
         tr(tc('h1'), tc('h2')) +
           tr(tc('fusa', '<w:vMerge w:val="restart"/>'), tc('r1')) +
@@ -117,8 +117,8 @@ describe('convertDocx — tables', () => {
     expect(rows[1]).toHaveLength(1); // the continue cell left the row
   });
 
-  it('strips spans and pads when the grid cannot be reconciled', () => {
-    const { blocks, report } = convert(
+  it('strips spans and pads when the grid cannot be reconciled', async () => {
+    const { blocks, report } = await convert(
       tbl(tr(tc('a', '<w:gridSpan w:val="3"/>')) + tr(tc('x'), tc('y'))),
     );
     const { thead, tbody } = partsOf(blocks[0]);
@@ -127,8 +127,8 @@ describe('convertDocx — tables', () => {
     expect(report.some((r) => r.includes('could not be reconciled'))).toBe(true);
   });
 
-  it('uses the caption-style paragraph before the table', () => {
-    const { blocks, report } = convert(
+  it('uses the caption-style paragraph before the table', async () => {
+    const { blocks, report } = await convert(
       para('Tabella 1 — Spese', '<w:pStyle w:val="Didascalia"/>') + tbl(tr(tc('a')) + tr(tc('b'))),
     );
     expect(blocks).toHaveLength(1);
@@ -137,23 +137,23 @@ describe('convertDocx — tables', () => {
     expect(report.some((r) => r.includes('adjacent caption-style paragraph'))).toBe(true);
   });
 
-  it('uses the caption-style paragraph after the table', () => {
-    const { blocks } = convert(
+  it('uses the caption-style paragraph after the table', async () => {
+    const { blocks } = await convert(
       tbl(tr(tc('a')) + tr(tc('b'))) + para('Tabella 2', '<w:pStyle w:val="Didascalia"/>'),
     );
     expect(blocks).toHaveLength(1);
     expect(textOf(partsOf(blocks[0]).caption as MEl)).toBe('Tabella 2');
   });
 
-  it('a caption-style paragraph NOT adjacent to a table stays a paragraph', () => {
-    const { blocks } = convert(
+  it('a caption-style paragraph NOT adjacent to a table stays a paragraph', async () => {
+    const { blocks } = await convert(
       para('Solo testo', '<w:pStyle w:val="Didascalia"/>') + para('altro') + tbl(tr(tc('a'))),
     );
     expect(blocks.map((b) => b.tag)).toEqual(['p', 'p', 'table']);
   });
 
-  it('translates style-chain borders and shading into generated classes', () => {
-    const { blocks, stylesheet } = convert(
+  it('translates style-chain borders and shading into generated classes', async () => {
+    const { blocks, stylesheet } = await convert(
       tbl(
         tr(tc('intestazione', '<w:shd w:val="clear" w:fill="D9E2F3"/>')) + tr(tc('corpo')),
         '<w:tblStyle w:val="GrigliaBase"/>',
@@ -165,11 +165,11 @@ describe('convertDocx — tables', () => {
     expect(stylesheet).toContain('background-color: #d9e2f3');
   });
 
-  it('cells hold phrasing: multi-paragraph joined, br stripped, nested table flattened', () => {
+  it('cells hold phrasing: multi-paragraph joined, br stripped, nested table flattened', async () => {
     const cell =
       '<w:tc><w:p><w:r><w:t>riga uno</w:t><w:br/></w:r></w:p><w:p><w:r><w:t>riga due</w:t></w:r></w:p>' +
       '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>annidata</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc>';
-    const { blocks, report } = convert(tbl(`<w:tr>${cell}</w:tr>` + tr(tc('x'))));
+    const { blocks, report } = await convert(tbl(`<w:tr>${cell}</w:tr>` + tr(tc('x'))));
     const { thead } = partsOf(blocks[0]);
     const th = rowsOf(thead)[0]?.[0];
     expect(textOf(th as MEl)).toBe('riga uno riga due annidata');
@@ -177,22 +177,22 @@ describe('convertDocx — tables', () => {
     expect(report.some((r) => r.includes('nested table flattened'))).toBe(true);
   });
 
-  it('a single-row table keeps the header with an empty body, reported', () => {
-    const { blocks, report } = convert(tbl(tr(tc('sola'))));
+  it('a single-row table keeps the header with an empty body, reported', async () => {
+    const { blocks, report } = await convert(tbl(tr(tc('sola'))));
     const { tbody } = partsOf(blocks[0]);
     expect(rowsOf(tbody)).toHaveLength(0);
     expect(report.some((r) => r.includes('single row'))).toBe(true);
   });
 
-  it('tables between list items split the list', () => {
+  it('tables between list items split the list', async () => {
     const li = (t: string): string =>
       `<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>${t}</w:t></w:r></w:p>`;
-    const { blocks } = convert(li('a') + tbl(tr(tc('x')) + tr(tc('y'))) + li('b'));
+    const { blocks } = await convert(li('a') + tbl(tr(tc('x')) + tr(tc('y'))) + li('b'));
     expect(blocks.map((b) => b.tag)).toEqual(['ul', 'table', 'ul']);
   });
 
-  it('serializes to a conforming document (spans included)', () => {
-    const { blocks, stylesheet } = convert(
+  it('serializes to a conforming document (spans included)', async () => {
+    const { blocks, stylesheet } = await convert(
       para('Tabella 3', '<w:pStyle w:val="Didascalia"/>') +
         tbl(
           tr(tc('A', '<w:gridSpan w:val="2"/>')) +

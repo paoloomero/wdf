@@ -1,8 +1,9 @@
-import { computeTableGrid } from '@wdf-dev/core';
+import { computeTableGrid, sha256Hex } from '@wdf-dev/core';
 
-import { el, isEl, textOf, type MEl, type MNode } from '../ast.js';
+import { el, isEl, slugify, textOf, type MEl, type MNode } from '../ast.js';
+import { DEFAULT_CAPS, identifyImage, type AssetCaps, type LoadedAsset } from '../assets.js';
 import { hoistStyles, sanitizeDeclarations, STYLE_TMP_ATTR, type Decls } from '../styles.js';
-import { openDocx, resolveTarget, type DocxContainer } from './container.js';
+import { openDocx, resolveTarget, type DocxContainer, type Relationship } from './container.js';
 import { parseXml, xmlAttr, xmlChild, xmlChildren, xmlText, type XmlElement } from './xml.js';
 
 // WordprocessingML → importer blocks (WP20 T20.2, plan §10.47): paragraphs
@@ -15,6 +16,11 @@ import { parseXml, xmlAttr, xmlChild, xmlChildren, xmlText, type XmlElement } fr
 
 export const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const STYLES_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles';
+/** DrawingML namespaces (T20.5): images travel as a:blip r:embed → rels. */
+const A_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const WP_NS = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+/** Namespace of r:id / r:embed attributes. */
+const R_OFFICE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
 // ---------------------------------------------------------------------------
 // Property model
@@ -615,6 +621,17 @@ interface WmlContext {
   readonly numbering: DocxNumbering;
   readonly report: string[];
   readonly reported: Set<string>;
+  /** Container access for media parts (T20.5). */
+  readonly container: DocxContainer;
+  readonly mainPart: string;
+  /** Main-part relationships by id (images, hyperlinks). */
+  readonly rels: ReadonlyMap<string, Relationship>;
+  readonly caps: AssetCaps;
+  /** Media parts referenced by emitted <img> (src = part name until resolution). */
+  readonly media: Map<string, { bytes: Uint8Array; ext: string; mediaType: string }>;
+  /** Bookmark name → generated element id, for names a hyperlink references. */
+  readonly bookmarkIds: ReadonlyMap<string, string>;
+  mediaBytes: number;
 }
 
 /** Reports once per distinct message — real documents repeat everything. */
@@ -622,6 +639,134 @@ function reportOnce(ctx: WmlContext, message: string): void {
   if (ctx.reported.has(message)) return;
   ctx.reported.add(message);
   ctx.report.push(message);
+}
+
+/** First descendant with the given (namespace, local name), depth first. */
+function findDescendant(root: XmlElement, ns: string, local: string): XmlElement | undefined {
+  for (const child of root.children) {
+    if (child.kind !== 'element') continue;
+    if (child.ns === ns && child.local === local) return child;
+    const found = findDescendant(child, ns, local);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Emits an <img> for a media relationship (T20.5). The src carries the PART
+ * NAME until the asset-resolution phase hashes the bytes and rewrites it to
+ * content/assets/<hash>.<ext> — the same naming the HTML importer uses.
+ */
+function emitImage(
+  relId: string | undefined,
+  alt: string,
+  width: number,
+  height: number,
+  ctx: WmlContext,
+): MEl | undefined {
+  if (relId === undefined) {
+    reportOnce(ctx, 'image without a relationship reference dropped');
+    return undefined;
+  }
+  const rel = ctx.rels.get(relId);
+  if (rel === undefined) {
+    ctx.report.push(`dropped image (missing relationship ${relId})`);
+    return undefined;
+  }
+  if (rel.targetMode === 'External') {
+    ctx.report.push(
+      `dropped external image reference "${rel.target}" (images come from the package, never the network)`,
+    );
+    return undefined;
+  }
+  const part = resolveTarget(ctx.mainPart, rel.target);
+  const known = ctx.media.get(part);
+  if (known === undefined) {
+    const bytes = ctx.container.part(part);
+    if (bytes === undefined) {
+      ctx.report.push(`dropped image (media part ${part} is missing)`);
+      return undefined;
+    }
+    const kind = identifyImage(bytes);
+    if (kind === undefined) {
+      const ext = part.slice(part.lastIndexOf('.') + 1).toLowerCase();
+      ctx.report.push(
+        `dropped image ${part} (format "${ext}" is not web-renderable — legacy formats need conversion)`,
+      );
+      return undefined;
+    }
+    if (ctx.media.size >= ctx.caps.maxCount) {
+      ctx.report.push(`dropped image ${part} (max ${String(ctx.caps.maxCount)} images reached)`);
+      return undefined;
+    }
+    if (bytes.length > ctx.caps.perFile) {
+      ctx.report.push(`dropped image ${part} (exceeds per-file size limit)`);
+      return undefined;
+    }
+    if (ctx.mediaBytes + bytes.length > ctx.caps.totalBytes) {
+      ctx.report.push(`dropped image ${part} (total asset size limit reached)`);
+      return undefined;
+    }
+    ctx.media.set(part, { bytes, ext: kind.ext, mediaType: kind.mediaType });
+    ctx.mediaBytes += bytes.length;
+  }
+  const attrs: Record<string, string> = { src: part, alt };
+  if (width > 0) attrs['width'] = String(width);
+  if (height > 0) attrs['height'] = String(height);
+  return el('img', attrs);
+}
+
+/** <img> from a w:drawing (DrawingML): blip r:embed, extent, docPr alt. */
+function imageFromDrawing(drawing: XmlElement, ctx: WmlContext): MEl | undefined {
+  if (findDescendant(drawing, WP_NS, 'anchor') !== undefined) {
+    reportOnce(
+      ctx,
+      'floating image anchored inline at its paragraph (fixed layout is not preserved)',
+    );
+  }
+  const blip = findDescendant(drawing, A_NS, 'blip');
+  if (blip === undefined) {
+    reportOnce(
+      ctx,
+      'drawing without an embedded picture skipped (shapes/charts arrive as placeholders with T20.7)',
+    );
+    return undefined;
+  }
+  const docPr = findDescendant(drawing, WP_NS, 'docPr');
+  const alt = docPr === undefined ? '' : (xmlAttr(docPr, '', 'descr') ?? '');
+  const extent = findDescendant(drawing, WP_NS, 'extent');
+  // EMU → CSS px at 96dpi: 9525 EMU per pixel.
+  const px = (v: string | undefined): number => Math.round((twips(v) ?? 0) / 9525);
+  return emitImage(
+    xmlAttr(blip, R_OFFICE, 'embed'),
+    alt,
+    px(extent === undefined ? undefined : xmlAttr(extent, '', 'cx')),
+    px(extent === undefined ? undefined : xmlAttr(extent, '', 'cy')),
+    ctx,
+  );
+}
+
+/** <img> from legacy VML (w:pict / w:object): v:imagedata r:id. */
+function imageFromVml(pict: XmlElement, ctx: WmlContext): MEl | undefined {
+  let imagedata: XmlElement | undefined;
+  const walk = (node: XmlElement): void => {
+    for (const child of node.children) {
+      if (child.kind !== 'element') continue;
+      if (child.local === 'imagedata') {
+        imagedata ??= child;
+        return;
+      }
+      walk(child);
+    }
+  };
+  walk(pict);
+  if (imagedata === undefined) {
+    reportOnce(ctx, 'legacy shape (VML) without an image skipped');
+    return undefined;
+  }
+  const relId = xmlAttr(imagedata, R_OFFICE, 'id') ?? xmlAttr(imagedata, '', 'id');
+  const alt = xmlAttr(imagedata, '', 'title') ?? '';
+  return emitImage(relId, alt, 0, 0, ctx);
 }
 
 function runToNodes(run: XmlElement, paraStyleId: string | undefined, ctx: WmlContext): MNode[] {
@@ -654,11 +799,17 @@ function runToNodes(run: XmlElement, paraStyleId: string | undefined, ctx: WmlCo
         break;
       case 'softHyphen':
         break;
-      case 'drawing':
-      case 'pict':
-      case 'object':
-        reportOnce(ctx, `image/drawing skipped (arrives with T20.5)`);
+      case 'drawing': {
+        const img = imageFromDrawing(child, ctx);
+        if (img !== undefined) content.push(img);
         break;
+      }
+      case 'pict':
+      case 'object': {
+        const img = imageFromVml(child, ctx);
+        if (img !== undefined) content.push(img);
+        break;
+      }
       case 'sym':
         reportOnce(ctx, 'symbol run (w:sym) dropped — private-use glyph');
         break;
@@ -726,12 +877,34 @@ function inlineContent(
       case 'r':
         appendInline(out, runToNodes(child, paraStyleId, ctx));
         break;
-      case 'hyperlink':
-        // Link targets resolve through relationships at T20.5; the text
-        // must not be lost meanwhile.
-        reportOnce(ctx, 'hyperlink flattened to its text (targets arrive with T20.5)');
-        appendInline(out, inlineContent(child, paraStyleId, ctx));
+      case 'hyperlink': {
+        const inner = inlineContent(child, paraStyleId, ctx);
+        if (inner.length === 0) break;
+        const relId = xmlAttr(child, R_OFFICE, 'id');
+        const anchor = xmlAttr(child, W_NS, 'anchor') ?? xmlAttr(child, '', 'anchor');
+        let href: string | undefined;
+        if (relId !== undefined) {
+          const rel = ctx.rels.get(relId);
+          if (rel !== undefined && rel.targetMode === 'External') {
+            if (/^(https?:|mailto:)/i.test(rel.target)) {
+              href = rel.target;
+            } else {
+              ctx.report.push(`unwrapped link to "${rel.target}" (scheme not allowed)`);
+            }
+          } else {
+            reportOnce(ctx, 'unwrapped hyperlink without a resolvable external target');
+          }
+        } else if (anchor !== undefined) {
+          const id = ctx.bookmarkIds.get(anchor);
+          if (id !== undefined) {
+            href = `#${id}`;
+          } else {
+            reportOnce(ctx, 'unwrapped link to a bookmark that does not exist in the document');
+          }
+        }
+        appendInline(out, href === undefined ? inner : [el('a', { href }, inner)]);
         break;
+      }
       case 'ins': // tracked insertion, accepted (final view, T20.7 policy)
       case 'smartTag':
       case 'sdt': {
@@ -839,7 +1012,33 @@ function paragraphToBlock(
   const signature = mergeSignatures(signatureOf(paraDecls(effective)), hoisted.signature);
   const attrs: Record<string, string> = {};
   if (signature !== undefined) attrs[STYLE_TMP_ATTR] = signature;
+  // A referenced bookmark starting in this paragraph anchors here (T20.5):
+  // the block carries the generated id, internal links resolve to it.
+  for (const name of bookmarkNames(p)) {
+    const id = ctx.bookmarkIds.get(name);
+    if (id !== undefined) {
+      attrs['id'] = id;
+      break;
+    }
+  }
   return el(tag, attrs, hoisted.children);
+}
+
+/** Names of every w:bookmarkStart in the subtree, document order. */
+function bookmarkNames(root: XmlElement): string[] {
+  const out: string[] = [];
+  const walk = (node: XmlElement): void => {
+    for (const child of node.children) {
+      if (child.kind !== 'element') continue;
+      if (child.ns === W_NS && child.local === 'bookmarkStart') {
+        const name = xmlAttr(child, W_NS, 'name');
+        if (name !== undefined) out.push(name);
+      }
+      walk(child);
+    }
+  };
+  walk(root);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -1031,6 +1230,8 @@ export interface DocxConversion {
   language: string | undefined;
   /** Generated stylesheet (hoisted classes), or undefined when unstyled. */
   stylesheet: string | undefined;
+  /** Packaged images (content-hashed under content/assets/, T20.5). */
+  assets: LoadedAsset[];
 }
 
 /** Locates and reads styles.xml via the main part's relationships. */
@@ -1053,16 +1254,60 @@ function numberingXmlOf(container: DocxContainer, mainPart: string): string | un
  * targets, notes and fields arrive with T20.5–T20.7 and are reported
  * meanwhile.
  */
-export function convertDocx(input: Uint8Array | DocxContainer, report: string[]): DocxConversion {
+export async function convertDocx(
+  input: Uint8Array | DocxContainer,
+  report: string[],
+  caps: AssetCaps = DEFAULT_CAPS,
+): Promise<DocxConversion> {
   const container = input instanceof Uint8Array ? openDocx(input) : input;
   const mainPart = container.mainDocumentPart();
   const mainXml = container.partText(mainPart);
   if (mainXml === undefined) throw new Error(`main part ${mainPart} is unreadable`);
   const styles = new DocxStyles(stylesXmlOf(container, mainPart));
   const numbering = new DocxNumbering(numberingXmlOf(container, mainPart));
-  const ctx: WmlContext = { styles, numbering, report, reported: new Set() };
+  const root = parseXml(mainXml);
 
-  const body = xmlChild(parseXml(mainXml), W_NS, 'body');
+  // Bookmark prepass (T20.5): only names some hyperlink actually references
+  // become element ids — no id litter from Word's internal bookmarks.
+  const referenced = new Set<string>();
+  const collectAnchors = (node: XmlElement): void => {
+    for (const child of node.children) {
+      if (child.kind !== 'element') continue;
+      if (child.ns === W_NS && child.local === 'hyperlink') {
+        const anchor = xmlAttr(child, W_NS, 'anchor') ?? xmlAttr(child, '', 'anchor');
+        if (anchor !== undefined) referenced.add(anchor);
+      }
+      collectAnchors(child);
+    }
+  };
+  collectAnchors(root);
+  const bookmarkIds = new Map<string, string>();
+  const usedIds = new Set<string>();
+  for (const name of bookmarkNames(root)) {
+    if (!referenced.has(name) || bookmarkIds.has(name)) continue;
+    const slug = slugify(name);
+    let id = `bm-${slug === '' ? String(bookmarkIds.size + 1) : slug}`;
+    let n = 2;
+    while (usedIds.has(id)) id = `bm-${slug}-${String(n++)}`;
+    usedIds.add(id);
+    bookmarkIds.set(name, id);
+  }
+
+  const ctx: WmlContext = {
+    styles,
+    numbering,
+    report,
+    reported: new Set(),
+    container,
+    mainPart,
+    rels: new Map(container.relationshipsOf(mainPart).map((r) => [r.id, r])),
+    caps,
+    media: new Map(),
+    bookmarkIds,
+    mediaBytes: 0,
+  };
+
+  const body = xmlChild(root, W_NS, 'body');
   const blocks: MEl[] = [];
   const lists = new ListAssembler();
   let emptyParagraphs = 0;
@@ -1154,5 +1399,36 @@ export function convertDocx(input: Uint8Array | DocxContainer, report: string[])
     );
   }
 
-  return { blocks, language: styles.language, stylesheet: hoistStyles(blocks) };
+  // Asset resolution (T20.5): hash the referenced media parts, rewrite the
+  // interim src (part name) to content/assets/<hash>.<ext> — identical
+  // naming and dedup to the HTML importer's pipeline.
+  const assets = new Map<string, LoadedAsset>();
+  const partToPath = new Map<string, string>();
+  for (const [part, media] of [...ctx.media.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const path = `content/assets/${(await sha256Hex(media.bytes)).slice(0, 16)}.${media.ext}`;
+    partToPath.set(part, path);
+    if (!assets.has(path)) {
+      assets.set(path, { path, mediaType: media.mediaType, bytes: media.bytes });
+    }
+    report.push(`imported image "${part}" → ${path}`);
+  }
+  if (partToPath.size > 0) {
+    const rewrite = (node: MEl): void => {
+      if (node.tag === 'img') {
+        const mapped = partToPath.get(node.attrs['src'] ?? '');
+        if (mapped !== undefined) node.attrs['src'] = mapped;
+      }
+      for (const child of node.children) {
+        if (isEl(child)) rewrite(child);
+      }
+    };
+    for (const block of blocks) rewrite(block);
+  }
+
+  return {
+    blocks,
+    language: styles.language,
+    stylesheet: hoistStyles(blocks),
+    assets: [...assets.values()],
+  };
 }
