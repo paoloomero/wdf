@@ -39,6 +39,7 @@ export {
   resolveTarget,
   type Relationship,
 } from './docx/container.js';
+export { convertDocx, DocxStyles, W_NS, type DocxConversion } from './docx/wml.js';
 export {
   parseXml,
   XmlError,
