@@ -5,6 +5,7 @@ import {
   readPackage,
   validateCaptureExt,
   validateDatasets,
+  validatePaginationExt,
   validateProfile,
   validateStylesheet,
   verifyPackage,
@@ -80,6 +81,7 @@ export async function cmdValidate(
     if (styles !== undefined) violations.push(...validateStylesheet(dec.decode(styles)));
     violations.push(...validateDatasets(pkg));
     violations.push(...validateCaptureExt(pkg));
+    violations.push(...validatePaginationExt(pkg));
     const verify = await verifyPackage(pkg);
     integrity = verify.integrity;
     determinism = verify.determinism;

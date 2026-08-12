@@ -72,6 +72,13 @@ export interface WdfCaptureViewport {
   devicePixelRatio?: number;
 }
 
+/** ext/pagination/pagination.json — authored page breaks (docs/ext-pagination.md §4). */
+export interface WdfPagination {
+  pagination: '0.1';
+  /** Element ids a page begins before — unique, existing, in document order. */
+  breakBefore: string[];
+}
+
 /** ext/capture/capture.json — provenance of a live-page capture (docs/ext-capture.md §4). */
 export interface WdfCapture {
   capture: '0.1';

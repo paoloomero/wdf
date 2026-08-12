@@ -1,0 +1,5 @@
+{
+  "pagination": "0.1",
+  "breakBefore": ["h-details"],
+  "breakAfter": ["p-0001"]
+}

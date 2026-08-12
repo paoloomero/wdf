@@ -2,6 +2,7 @@ import {
   parseCaptureExt,
   readPackage,
   validateCaptureExt,
+  validatePaginationExt,
   validateDatasets,
   validateProfile,
   validateStylesheet,
@@ -18,6 +19,7 @@ import { aggregateReport } from '@wdf-dev/import';
 import { convertFiles } from './convert.js';
 import {
   agentBlocks,
+  binarySourceDetails,
   buildOriginalSrcdoc,
   buildPrintSrcdoc,
   buildSrcdoc,
@@ -227,16 +229,46 @@ function setPaged(on: boolean): void {
 }
 
 // "Original" view (WP13): the embedded source, shown untouched. The toggle
-// only appears when the package carries the `source` extension.
+// only appears when the package carries the `source` extension. A binary
+// original (ext-source 0.4) has nothing to render: the view shows its
+// metadata and offers the embedded bytes for download instead.
+let originalIsBinary = false;
+let binaryUrl: string | undefined;
+
 function renderOriginal(doc: Loaded): void {
   const frame = $('original') as HTMLIFrameElement;
   const button = $('view-original');
+  originalIsBinary = doc.sourceExt?.kind === 'binary';
+  if (binaryUrl !== undefined) {
+    URL.revokeObjectURL(binaryUrl);
+    binaryUrl = undefined;
+  }
   if (doc.sourceExt === undefined) {
     button.hidden = true;
     frame.srcdoc = '';
     return;
   }
   button.hidden = false;
+  if (originalIsBinary) {
+    frame.srcdoc = '';
+    const details = binarySourceDetails(doc.pkg.files, doc.sourceExt);
+    const bytes = doc.pkg.files.get(doc.sourceExt.main);
+    if (details === undefined || bytes === undefined) {
+      button.hidden = true;
+      return;
+    }
+    $('original-binary-name').textContent = details.fileName;
+    $('original-binary-meta').textContent = `${details.mediaType} · ${details.sizeLabel}`;
+    const link = $('original-binary-download') as HTMLAnchorElement;
+    binaryUrl = URL.createObjectURL(
+      new Blob([bytes as BlobPart], {
+        type: doc.sourceExt.mediaType ?? 'application/octet-stream',
+      }),
+    );
+    link.href = binaryUrl;
+    link.download = details.fileName;
+    return;
+  }
   frame.srcdoc = buildOriginalSrcdoc(doc.pkg.files, doc.sourceExt);
 }
 
@@ -362,6 +394,7 @@ async function verify(doc: Loaded): Promise<void> {
       ...validateProfile(entry),
       ...validateDatasets(doc.pkg),
       ...validateCaptureExt(doc.pkg),
+      ...validatePaginationExt(doc.pkg),
     ];
     const styles = doc.pkg.files.get('content/styles.css');
     if (styles !== undefined) violations.push(...validateStylesheet(dec.decode(styles)));
@@ -438,7 +471,8 @@ async function copyCitation(id: string, button?: HTMLElement): Promise<void> {
 function setView(view: 'human' | 'agent' | 'original'): void {
   $('human').hidden = view !== 'human';
   $('agent').hidden = view !== 'agent';
-  $('original').hidden = view !== 'original';
+  $('original').hidden = view !== 'original' || originalIsBinary;
+  $('original-binary').hidden = view !== 'original' || !originalIsBinary;
   $('view-human').classList.toggle('active', view === 'human');
   $('view-agent').classList.toggle('active', view === 'agent');
   $('view-original').classList.toggle('active', view === 'original');

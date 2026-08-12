@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  binarySourceDetails,
   buildOriginalSrcdoc,
   buildSrcdoc,
   fontsCss,
@@ -174,5 +175,80 @@ describe('buildOriginalSrcdoc', () => {
     files.set('ext/source/latin.html', new Uint8Array([60, 112, 62, 232, 60, 47, 112, 62])); // <p>è</p> in cp1252
     const ext = parseSourceExt(files) as SourceExt;
     expect(buildOriginalSrcdoc(files, ext)).toContain('<p>è</p>');
+  });
+});
+
+// ext-source 0.4: a binary original (e.g. .docx) is never rendered — the
+// Original view presents metadata and offers the embedded bytes instead.
+describe('binary source kind (ext-source 0.4)', () => {
+  function binaryFiles(mediaType?: string): Map<string, Uint8Array> {
+    const meta: Record<string, unknown> = {
+      source: '0.4',
+      kind: 'binary',
+      main: 'ext/source/cafebabe12345678.docx',
+      mainName: 'delibera 42.docx',
+      resources: {},
+    };
+    if (mediaType !== undefined) meta['mediaType'] = mediaType;
+    return new Map([
+      ['ext/source/source.json', enc.encode(JSON.stringify(meta))],
+      ['ext/source/cafebabe12345678.docx', new Uint8Array(2048)],
+    ]);
+  }
+
+  it('parseSourceExt reads kind and mediaType', () => {
+    const ext = parseSourceExt(
+      binaryFiles('application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+    );
+    expect(ext?.kind).toBe('binary');
+    expect(ext?.mediaType).toContain('wordprocessingml');
+    expect(ext?.mainName).toBe('delibera 42.docx');
+  });
+
+  it('unknown kinds still normalize to fetched-html', () => {
+    const files = packageFiles();
+    const meta = JSON.parse(new TextDecoder().decode(files.get('ext/source/source.json'))) as {
+      kind?: string;
+    };
+    meta.kind = 'quantum-entangled';
+    files.set('ext/source/source.json', enc.encode(JSON.stringify(meta)));
+    expect(parseSourceExt(files)?.kind).toBe('fetched-html');
+  });
+
+  it('binarySourceDetails reports name, type and size', () => {
+    const files = binaryFiles('application/msword');
+    const ext = parseSourceExt(files);
+    expect(ext).toBeDefined();
+    const details = binarySourceDetails(files, ext as SourceExt);
+    expect(details).toEqual({
+      fileName: 'delibera 42.docx',
+      mediaType: 'application/msword',
+      sizeLabel: '2.0 KB',
+    });
+  });
+
+  it('binarySourceDetails falls back to the package name and unknown type', () => {
+    const files = binaryFiles();
+    const ext = parseSourceExt(files);
+    expect(ext).toBeDefined();
+    const noName = { ...(ext as SourceExt), mainName: '' };
+    const details = binarySourceDetails(files, noName);
+    expect(details?.fileName).toBe('cafebabe12345678.docx');
+    expect(details?.mediaType).toBe('unknown type');
+  });
+
+  it('binarySourceDetails is undefined when the bytes are missing', () => {
+    const files = binaryFiles();
+    files.delete('ext/source/cafebabe12345678.docx');
+    // parseSourceExt already refuses a dangling main; call the helper directly.
+    const ext: SourceExt = {
+      kind: 'binary',
+      main: 'ext/source/cafebabe12345678.docx',
+      mainName: 'delibera 42.docx',
+      encoding: 'utf-8',
+      resources: {},
+      stylesheets: {},
+    };
+    expect(binarySourceDetails(files, ext)).toBeUndefined();
   });
 });

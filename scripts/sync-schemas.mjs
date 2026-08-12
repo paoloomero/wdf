@@ -19,6 +19,8 @@ export const outlineSchema: object = ${load('outline.schema.json')};
 export const hashesSchema: object = ${load('hashes.schema.json')};
 
 export const captureSchema: object = ${load('capture.schema.json')};
+
+export const paginationSchema: object = ${load('pagination.schema.json')};
 `;
 
 writeFileSync(join(root, 'packages/core/src/schemas.data.ts'), out);

@@ -31,6 +31,7 @@ const ajv = new Ajv2020({
     outline: load('outline.schema.json'),
     hashes: load('hashes.schema.json'),
     capture: load('capture.schema.json'),
+    pagination: load('pagination.schema.json'),
   },
 });
 addFormats.default(ajv);
@@ -40,6 +41,7 @@ const code = standaloneCode(ajv, {
   validateOutline: 'outline',
   validateHashes: 'hashes',
   validateCapture: 'capture',
+  validatePagination: 'pagination',
 });
 
 // ajv standalone still emits require() for its runtime helpers even in

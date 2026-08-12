@@ -2583,3 +2583,228 @@ function validate23(
   return errors === 0;
 }
 validate23.evaluated = { props: true, dynamicProps: false, dynamicItems: false };
+export const validatePagination = validate24;
+const schema35 = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  $id: 'https://wdf.dev/schemas/ext/pagination/0.1/pagination.schema.json',
+  title: 'WDF extension `pagination` 0.1 — pagination.json',
+  description:
+    'Authored page breaks anchored to stable element ids (docs/ext-pagination.md §4). An extension schema, not part of WDF Core.',
+  type: 'object',
+  additionalProperties: false,
+  required: ['pagination', 'breakBefore'],
+  properties: {
+    pagination: {
+      description: 'Version of the pagination extension the file conforms to.',
+      const: '0.1',
+    },
+    breakBefore: {
+      description: 'Element ids (§6.4.2 syntax) a page begins before, unique, in document order.',
+      type: 'array',
+      minItems: 1,
+      uniqueItems: true,
+      items: { type: 'string', pattern: '^[a-z]+-[a-z0-9][a-z0-9-]*$' },
+    },
+  },
+};
+function validate24(
+  data,
+  { instancePath = '', parentData, parentDataProperty, rootData = data, dynamicAnchors = {} } = {},
+) {
+  /*# sourceURL="https://wdf.dev/schemas/ext/pagination/0.1/pagination.schema.json" */ let vErrors =
+    null;
+  let errors = 0;
+  const evaluated0 = validate24.evaluated;
+  if (evaluated0.dynamicProps) {
+    evaluated0.props = undefined;
+  }
+  if (evaluated0.dynamicItems) {
+    evaluated0.items = undefined;
+  }
+  if (data && typeof data == 'object' && !Array.isArray(data)) {
+    if (data.pagination === undefined) {
+      const err0 = {
+        instancePath,
+        schemaPath: '#/required',
+        keyword: 'required',
+        params: { missingProperty: 'pagination' },
+        message: "must have required property '" + 'pagination' + "'",
+      };
+      if (vErrors === null) {
+        vErrors = [err0];
+      } else {
+        vErrors.push(err0);
+      }
+      errors++;
+    }
+    if (data.breakBefore === undefined) {
+      const err1 = {
+        instancePath,
+        schemaPath: '#/required',
+        keyword: 'required',
+        params: { missingProperty: 'breakBefore' },
+        message: "must have required property '" + 'breakBefore' + "'",
+      };
+      if (vErrors === null) {
+        vErrors = [err1];
+      } else {
+        vErrors.push(err1);
+      }
+      errors++;
+    }
+    for (const key0 in data) {
+      if (!(key0 === 'pagination' || key0 === 'breakBefore')) {
+        const err2 = {
+          instancePath,
+          schemaPath: '#/additionalProperties',
+          keyword: 'additionalProperties',
+          params: { additionalProperty: key0 },
+          message: 'must NOT have additional properties',
+        };
+        if (vErrors === null) {
+          vErrors = [err2];
+        } else {
+          vErrors.push(err2);
+        }
+        errors++;
+      }
+    }
+    if (data.pagination !== undefined) {
+      if ('0.1' !== data.pagination) {
+        const err3 = {
+          instancePath: instancePath + '/pagination',
+          schemaPath: '#/properties/pagination/const',
+          keyword: 'const',
+          params: { allowedValue: '0.1' },
+          message: 'must be equal to constant',
+        };
+        if (vErrors === null) {
+          vErrors = [err3];
+        } else {
+          vErrors.push(err3);
+        }
+        errors++;
+      }
+    }
+    if (data.breakBefore !== undefined) {
+      let data1 = data.breakBefore;
+      if (Array.isArray(data1)) {
+        if (data1.length < 1) {
+          const err4 = {
+            instancePath: instancePath + '/breakBefore',
+            schemaPath: '#/properties/breakBefore/minItems',
+            keyword: 'minItems',
+            params: { limit: 1 },
+            message: 'must NOT have fewer than 1 items',
+          };
+          if (vErrors === null) {
+            vErrors = [err4];
+          } else {
+            vErrors.push(err4);
+          }
+          errors++;
+        }
+        const len0 = data1.length;
+        for (let i0 = 0; i0 < len0; i0++) {
+          let data2 = data1[i0];
+          if (typeof data2 === 'string') {
+            if (!pattern9.test(data2)) {
+              const err5 = {
+                instancePath: instancePath + '/breakBefore/' + i0,
+                schemaPath: '#/properties/breakBefore/items/pattern',
+                keyword: 'pattern',
+                params: { pattern: '^[a-z]+-[a-z0-9][a-z0-9-]*$' },
+                message: 'must match pattern "' + '^[a-z]+-[a-z0-9][a-z0-9-]*$' + '"',
+              };
+              if (vErrors === null) {
+                vErrors = [err5];
+              } else {
+                vErrors.push(err5);
+              }
+              errors++;
+            }
+          } else {
+            const err6 = {
+              instancePath: instancePath + '/breakBefore/' + i0,
+              schemaPath: '#/properties/breakBefore/items/type',
+              keyword: 'type',
+              params: { type: 'string' },
+              message: 'must be string',
+            };
+            if (vErrors === null) {
+              vErrors = [err6];
+            } else {
+              vErrors.push(err6);
+            }
+            errors++;
+          }
+        }
+        let i1 = data1.length;
+        let j0;
+        if (i1 > 1) {
+          const indices0 = {};
+          for (; i1--;) {
+            let item0 = data1[i1];
+            if (typeof item0 !== 'string') {
+              continue;
+            }
+            if (typeof indices0[item0] == 'number') {
+              j0 = indices0[item0];
+              const err7 = {
+                instancePath: instancePath + '/breakBefore',
+                schemaPath: '#/properties/breakBefore/uniqueItems',
+                keyword: 'uniqueItems',
+                params: { i: i1, j: j0 },
+                message:
+                  'must NOT have duplicate items (items ## ' +
+                  j0 +
+                  ' and ' +
+                  i1 +
+                  ' are identical)',
+              };
+              if (vErrors === null) {
+                vErrors = [err7];
+              } else {
+                vErrors.push(err7);
+              }
+              errors++;
+              break;
+            }
+            indices0[item0] = i1;
+          }
+        }
+      } else {
+        const err8 = {
+          instancePath: instancePath + '/breakBefore',
+          schemaPath: '#/properties/breakBefore/type',
+          keyword: 'type',
+          params: { type: 'array' },
+          message: 'must be array',
+        };
+        if (vErrors === null) {
+          vErrors = [err8];
+        } else {
+          vErrors.push(err8);
+        }
+        errors++;
+      }
+    }
+  } else {
+    const err9 = {
+      instancePath,
+      schemaPath: '#/type',
+      keyword: 'type',
+      params: { type: 'object' },
+      message: 'must be object',
+    };
+    if (vErrors === null) {
+      vErrors = [err9];
+    } else {
+      vErrors.push(err9);
+    }
+    errors++;
+  }
+  validate24.errors = vErrors;
+  return errors === 0;
+}
+validate24.evaluated = { props: true, dynamicProps: false, dynamicItems: false };

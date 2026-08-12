@@ -756,7 +756,8 @@ The _standalone distribution profile_ addresses this for dissemination:
   distribution ships extension specifications alongside this document,
   as `docs/ext-*.md` — currently `source` (byte-for-byte embedding of
   the conversion input), `fonts` (embedded metric-compatible font
-  clones) and `capture` (provenance of a live-page capture).
+  clones), `capture` (provenance of a live-page capture) and
+  `pagination` (authored page breaks anchored to stable element ids).
 
 ## 11. Security considerations
 

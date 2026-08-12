@@ -507,11 +507,13 @@ export function buildPrintSrcdoc(
 // `source` extension (WP13, docs/ext-source.md)
 
 export interface SourceExt {
-  /** How the original was obtained (v0.3): absent means "fetched-html". */
-  kind: 'fetched-html' | 'dom-snapshot';
+  /** How the original was obtained (v0.3/0.4): absent means "fetched-html". */
+  kind: 'fetched-html' | 'dom-snapshot' | 'binary';
   main: string;
   mainName: string;
   encoding: string;
+  /** IANA media type of a binary original, when declared (v0.4). */
+  mediaType?: string;
   resources: Record<string, string>;
   /** Original stylesheet href → embedded ext/source/*.css (WP15, v0.2). */
   stylesheets: Record<string, string>;
@@ -527,6 +529,7 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
       main?: unknown;
       mainName?: unknown;
       encoding?: unknown;
+      mediaType?: unknown;
       resources?: unknown;
       stylesheets?: unknown;
     };
@@ -540,14 +543,17 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
       }
       return out;
     };
-    return {
-      kind: parsed.kind === 'dom-snapshot' ? 'dom-snapshot' : 'fetched-html',
+    const ext: SourceExt = {
+      kind:
+        parsed.kind === 'dom-snapshot' || parsed.kind === 'binary' ? parsed.kind : 'fetched-html',
       main: parsed.main,
       mainName: typeof parsed.mainName === 'string' ? parsed.mainName : '',
       encoding: typeof parsed.encoding === 'string' ? parsed.encoding : 'utf-8',
       resources: stringMap(parsed.resources),
       stylesheets: stringMap(parsed.stylesheets),
     };
+    if (typeof parsed.mediaType === 'string') ext.mediaType = parsed.mediaType;
+    return ext;
   } catch {
     return undefined;
   }
@@ -573,6 +579,31 @@ export function captureDetails(c: WdfCapture): string[] {
     `User agent: ${c.userAgent}`,
     `Viewport: ${String(c.viewport.width)}×${String(c.viewport.height)}${dpr === undefined ? '' : ` @${String(dpr)}x`}`,
   ];
+}
+
+/**
+ * Details of a binary original (ext-source 0.4) for the download-only
+ * Original view: there is nothing to render, the viewer presents metadata
+ * and offers the embedded bytes (docs/ext-source.md, consumer guidance).
+ */
+export function binarySourceDetails(
+  files: ReadonlyMap<string, Uint8Array>,
+  ext: SourceExt,
+): { fileName: string; mediaType: string; sizeLabel: string } | undefined {
+  const bytes = files.get(ext.main);
+  if (bytes === undefined) return undefined;
+  const units = ['bytes', 'KB', 'MB'];
+  let size = bytes.length;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit += 1;
+  }
+  return {
+    fileName: ext.mainName !== '' ? ext.mainName : (ext.main.split('/').pop() ?? 'original'),
+    mediaType: ext.mediaType ?? 'unknown type',
+    sizeLabel: `${unit === 0 ? String(size) : size.toFixed(1)} ${units[unit] ?? ''}`.trim(),
+  };
 }
 
 /**

@@ -100,6 +100,17 @@
           <iframe id="human" sandbox="allow-scripts" title="Document"></iframe>
           <div id="agent" hidden></div>
           <iframe id="original" sandbox="" title="Original source" hidden></iframe>
+          <div id="original-binary" hidden>
+            <div class="binary-card">
+              <p id="original-binary-name"></p>
+              <p id="original-binary-meta"></p>
+              <p>
+                The embedded original is a binary file — nothing to render. Download it to open it
+                in its native application (the bytes come from the package; no network involved).
+              </p>
+              <a id="original-binary-download" class="button">Download original</a>
+            </div>
+          </div>
           <iframe id="print-frame" sandbox="allow-same-origin allow-modals" title="Print"></iframe>
         </main>
       </div>

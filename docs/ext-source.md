@@ -1,4 +1,4 @@
-# WDF extension: `source` (version 0.3)
+# WDF extension: `source` (version 0.4)
 
 Status: extension specification (outside WDF Core, per core spec §10).
 Producers MAY use it; conforming consumers MAY ignore it entirely (§10.3).
@@ -15,17 +15,24 @@ the package integrity hashes like any other file (§10.2).
 ## Manifest declaration
 
 ```json
-"extensions": [{ "name": "source", "version": "0.3" }]
+"extensions": [{ "name": "source", "version": "0.4" }]
 ```
+
+Each version is a strict superset of the previous one: a producer using
+only the features of an earlier version MAY declare that earlier
+version, and packages declaring earlier versions stay valid unchanged.
 
 ## Files
 
 - `ext/source/source.json` — REQUIRED. Metadata and resource map (below).
 - `ext/source/<hash>.<ext>` — REQUIRED. The original main file, stored
-  unmodified in its **original encoding** (never re-encoded). `<hash>` is
-  the first 16 hex digits of the SHA-256 of the bytes; `<ext>` is `html`
-  or `md`. Original file names (which may contain characters §3.2 forbids
-  in package paths) survive only as _values_ inside `source.json`.
+  unmodified in its **original encoding** (never re-encoded; for a
+  binary original, the exact bytes). `<hash>` is the first 16 hex digits
+  of the SHA-256 of the bytes; `<ext>` is `html` or `md` — or, for
+  `"kind": "binary"` (0.4), the original file extension lowercased
+  (e.g. `docx`), subject to the package path rules (§3.2). Original file
+  names (which may contain characters §3.2 forbids in package paths)
+  survive only as _values_ inside `source.json`.
 
 Referenced images are **not duplicated**: the import pipeline already
 copies them unmodified into `content/assets/` under content-hashed names;
@@ -48,6 +55,14 @@ consumers never present a DOM snapshot as the server's bytes. Absent
 `kind` means `"fetched-html"` (the pre-0.3 behavior — older packages
 stay valid unchanged, older consumers ignore the field).
 
+**Binary originals** (version 0.4): not every original is text. A
+package converted from a word-processor file (e.g. `wdf import` of a
+`.docx`) embeds the original **as-is**: `"kind": "binary"` declares that
+the main file is an opaque byte stream, `encoding` is omitted (there is
+nothing to decode), and the OPTIONAL `mediaType` field records the IANA
+media type when known. A consumer cannot render a binary original; see
+the consumer guidance below.
+
 ## `source.json`
 
 ```json
@@ -69,14 +84,19 @@ stay valid unchanged, older consumers ignore the field).
 - `source` — extension version.
 - `kind` — OPTIONAL (0.3). How the embedded original was obtained:
   `"fetched-html"` (a file obtained as bytes — downloaded, exported or
-  provided; the default when absent) or `"dom-snapshot"` (a
+  provided; the default when absent), `"dom-snapshot"` (a
   serialization of the rendered DOM captured from a live page, e.g. by
-  the browser extension; see docs/ext-capture.md). Any other value is
+  the browser extension; see docs/ext-capture.md) or `"binary"` (0.4 —
+  an opaque, non-text original such as a `.docx`). Any other value is
   reserved.
 - `main` — package path of the embedded original main file.
 - `mainName` — the original file name (or URL, for `wdf import <url>`).
 - `encoding` — the encoding detected at import time (WHATWG label);
-  consumers use it to decode `main` for display.
+  consumers use it to decode `main` for display. REQUIRED for text
+  kinds; OMITTED for `"kind": "binary"`.
+- `mediaType` — OPTIONAL (0.4, `"binary"` only). IANA media type of the
+  original when known (e.g.
+  `application/vnd.openxmlformats-officedocument.wordprocessingml.document`).
 - `resources` — original `src` value (verbatim, URL-encoding included) →
   package path. Keys are sorted; serialization is canonical JSON with
   two-space indent and a trailing newline, so identical input produces
@@ -90,3 +110,10 @@ A viewer offering an "original" view MUST render the decoded main file in
 the same sandbox it uses for canonical content (no scripts, no external
 requests), resolving `resources` references from the package. It MUST NOT
 inject its own styling: the point of the view is the untouched original.
+
+For `"kind": "binary"` (0.4) there is nothing to render: the view SHOULD
+instead present the original's metadata (`mainName`, `mediaType`, size)
+and offer the embedded bytes for download, so the user can open the
+original in its native application. The no-network rule is unaffected —
+the bytes come from the package. A consumer MUST NOT attempt to render a
+binary original as text.

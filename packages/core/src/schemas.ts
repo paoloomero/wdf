@@ -7,23 +7,31 @@ import {
   validateHashes,
   validateManifest,
   validateOutline,
+  validatePagination,
 } from './schemas.compiled.js';
-import { captureSchema, hashesSchema, manifestSchema, outlineSchema } from './schemas.data.js';
-import type { WdfCapture, WdfHashes, WdfManifest, WdfOutline } from './types.js';
+import {
+  captureSchema,
+  hashesSchema,
+  manifestSchema,
+  outlineSchema,
+  paginationSchema,
+} from './schemas.data.js';
+import type { WdfCapture, WdfHashes, WdfManifest, WdfOutline, WdfPagination } from './types.js';
 
 /**
- * The three JSON Schemas of WDF Core 0.1, plus the schema of the `capture`
- * extension (an extension spec, docs/ext-capture.md — shipped here so the
- * reference validator can check declared capture metadata). The source of
- * truth is `spec/schemas/*.schema.json`; callers load them (fs in Node,
- * fetch or bundling in the browser) and pass them in, keeping this module
- * isomorphic.
+ * The three JSON Schemas of WDF Core 0.1, plus the schemas of the
+ * `capture` and `pagination` extensions (extension specs, docs/ext-*.md —
+ * shipped here so the reference validator can check declared extension
+ * payloads). The source of truth is `spec/schemas/*.schema.json`; callers
+ * load them (fs in Node, fetch or bundling in the browser) and pass them
+ * in, keeping this module isomorphic.
  */
 export interface SchemaSet {
   manifest: object;
   outline: object;
   hashes: object;
   capture: object;
+  pagination: object;
 }
 
 export interface SchemaValidators {
@@ -31,6 +39,7 @@ export interface SchemaValidators {
   outline: ValidateFunction<WdfOutline>;
   hashes: ValidateFunction<WdfHashes>;
   capture: ValidateFunction<WdfCapture>;
+  pagination: ValidateFunction<WdfPagination>;
 }
 
 export function createSchemaValidators(schemas: SchemaSet): SchemaValidators {
@@ -45,6 +54,7 @@ export function createSchemaValidators(schemas: SchemaSet): SchemaValidators {
     outline: ajv.compile<WdfOutline>(schemas.outline),
     hashes: ajv.compile<WdfHashes>(schemas.hashes),
     capture: ajv.compile<WdfCapture>(schemas.capture),
+    pagination: ajv.compile<WdfPagination>(schemas.pagination),
   };
 }
 
@@ -54,6 +64,7 @@ export const wdfSchemas: SchemaSet = {
   outline: outlineSchema,
   hashes: hashesSchema,
   capture: captureSchema,
+  pagination: paginationSchema,
 };
 
 /**
@@ -72,4 +83,5 @@ const compiledValidators: SchemaValidators = {
   outline: validateOutline as unknown as ValidateFunction<WdfOutline>,
   hashes: validateHashes as unknown as ValidateFunction<WdfHashes>,
   capture: validateCapture as unknown as ValidateFunction<WdfCapture>,
+  pagination: validatePagination as unknown as ValidateFunction<WdfPagination>,
 };

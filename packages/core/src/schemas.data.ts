@@ -292,3 +292,30 @@ export const captureSchema: object = {
     },
   },
 };
+
+export const paginationSchema: object = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  $id: 'https://wdf.dev/schemas/ext/pagination/0.1/pagination.schema.json',
+  title: 'WDF extension `pagination` 0.1 — pagination.json',
+  description:
+    'Authored page breaks anchored to stable element ids (docs/ext-pagination.md §4). An extension schema, not part of WDF Core.',
+  type: 'object',
+  additionalProperties: false,
+  required: ['pagination', 'breakBefore'],
+  properties: {
+    pagination: {
+      description: 'Version of the pagination extension the file conforms to.',
+      const: '0.1',
+    },
+    breakBefore: {
+      description: 'Element ids (§6.4.2 syntax) a page begins before, unique, in document order.',
+      type: 'array',
+      minItems: 1,
+      uniqueItems: true,
+      items: {
+        type: 'string',
+        pattern: '^[a-z]+-[a-z0-9][a-z0-9-]*$',
+      },
+    },
+  },
+};
