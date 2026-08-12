@@ -15,13 +15,13 @@ wdf validate document.wdf
 
 ## Commands
 
-| Command                    | What it does                                                                                                                                                                                                                                      |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `wdf validate <file>`      | Full validation: structure, WDF-HTML profile, canonical extraction, integrity, datasets. Every violation cites the spec section it enforces.                                                                                                      |
-| `wdf import <file-or-url>` | Convert HTML (Word / Google Docs exports, saved or live web pages) or Markdown into a valid `.wdf`. Options: `--standalone` (self-contained `.wdf.html`), `--with-source` (embed the original), `--embed-fonts`, `--full-page`, `--fetch-remote`. |
-| `wdf extract <file>`       | Emit the canonical Markdown (AI layer) of a package.                                                                                                                                                                                              |
-| `wdf pack` / `wdf unpack`  | Build a package from a directory / explode one.                                                                                                                                                                                                   |
-| `wdf new`                  | Scaffold a minimal valid document.                                                                                                                                                                                                                |
+| Command                    | What it does                                                                                                                                                                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `wdf validate <file>`      | Full validation: structure, WDF-HTML profile, canonical extraction, integrity, datasets. Every violation cites the spec section it enforces.                                                                                                                             |
+| `wdf import <file-or-url>` | Convert a native Word `.docx`, HTML (Word / Google Docs exports, saved or live web pages) or Markdown into a valid `.wdf`. Options: `--standalone` (self-contained `.wdf.html`), `--with-source` (embed the original), `--embed-fonts`, `--full-page`, `--fetch-remote`. |
+| `wdf extract <file>`       | Emit the canonical Markdown (AI layer) of a package.                                                                                                                                                                                                                     |
+| `wdf pack` / `wdf unpack`  | Build a package from a directory / explode one.                                                                                                                                                                                                                          |
+| `wdf new`                  | Scaffold a minimal valid document.                                                                                                                                                                                                                                       |
 
 Determinism is the contract: the same input produces a byte-identical package on any platform.
 

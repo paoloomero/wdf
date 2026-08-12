@@ -24,9 +24,10 @@ engine.
 
 The full chain runs end to end:
 
-1. **Author** in Word / Google Docs / Pages → export to HTML.
-2. **Convert** — `wdf import file.html` produces a valid `.wdf` (encoding,
-   style translation, local + remote images, Word VML images).
+1. **Author** in Word / Google Docs / Pages → save as `.docx` or export to HTML.
+2. **Convert** — `wdf import file.docx` (native: styles, lists, tables,
+   images, headers/footers, footnotes, authored page breaks) or
+   `wdf import file.html` produces a valid `.wdf`.
 3. **Read** — an installable **WDF Reader** (PWA) opens `.wdf` files on a double
    click, offline, like any document reader: verified badge, Human/Agent view
    toggle, outline navigation, copyable citations (`wdf:<doc-id>#<element-id>`).
@@ -58,8 +59,8 @@ The tools are published on npm (Node ≥ 20):
 # validate a document, nothing to install
 npx @wdf-dev/cli validate document.wdf
 
-# convert an HTML export (Word, Google Docs, saved web page) or Markdown
-npx @wdf-dev/cli import mydoc.html -o mydoc.wdf
+# convert a Word .docx, an HTML export (Word, Google Docs, saved web page) or Markdown
+npx @wdf-dev/cli import mydoc.docx -o mydoc.wdf
 
 # or install the `wdf` command globally
 npm install -g @wdf-dev/cli

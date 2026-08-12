@@ -31,6 +31,7 @@ export {
   CT_NS,
   DocxContainer,
   DocxError,
+  DOCX_MEDIA_TYPE,
   looksLikeDocx,
   MAIN_DOCUMENT_CT,
   OFFICE_DOCUMENT_REL,

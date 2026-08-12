@@ -19,6 +19,7 @@ import {
   buildPackage,
   decodeHtml,
   DEFAULT_CAPS,
+  looksLikeDocx,
   fetchPage,
   importDocument,
   urlAssetLoader,
@@ -240,19 +241,26 @@ export async function cmdImport(
   let sourceBytes: Uint8Array | undefined;
   let sourceName = '';
   let sourceEncoding = 'utf-8';
+  let docxBytes: Uint8Array | undefined;
   if (isUrl) {
     try {
       const page = await fetchPage(input, DEFAULT_CAPS);
-      const decoded = decodeHtml(page.bytes);
-      text = decoded.text;
-      if (decoded.encoding !== 'utf-8') report.push(`decoded page as ${decoded.encoding}`);
-      loader = urlAssetLoader(page.baseUrl, DEFAULT_CAPS);
       baseName = urlBaseName(input);
       sourceBytes = page.bytes;
       sourceName = input;
-      sourceEncoding = decoded.encoding;
-      const cssLoader = urlAssetLoader(page.baseUrl, DEFAULT_CAPS);
-      fetchCss = (href) => asBytes(cssLoader(href));
+      if (looksLikeDocx(page.bytes)) {
+        // WP20 T20.8: a served .docx routes to the native importer.
+        docxBytes = page.bytes;
+        text = '';
+      } else {
+        const decoded = decodeHtml(page.bytes);
+        text = decoded.text;
+        if (decoded.encoding !== 'utf-8') report.push(`decoded page as ${decoded.encoding}`);
+        loader = urlAssetLoader(page.baseUrl, DEFAULT_CAPS);
+        sourceEncoding = decoded.encoding;
+        const cssLoader = urlAssetLoader(page.baseUrl, DEFAULT_CAPS);
+        fetchCss = (href) => asBytes(cssLoader(href));
+      }
     } catch (e) {
       ctx.err(`error: cannot fetch ${input} (${String(e)})`);
       return 2;
@@ -267,7 +275,12 @@ export async function cmdImport(
     }
     sourceBytes = bytes;
     sourceName = basename(input);
-    if (isMarkdown) {
+    if (looksLikeDocx(bytes)) {
+      // WP20 T20.8: format detection is by CONTENT, not extension — a
+      // mis-named .docx still routes to the native importer.
+      docxBytes = bytes;
+      text = '';
+    } else if (isMarkdown) {
       text = dec.decode(bytes);
     } else {
       const decoded = decodeHtml(bytes);
@@ -311,12 +324,13 @@ export async function cmdImport(
   // The pipeline itself is the shared isomorphic path (T7.5): the CLI only
   // resolves the input and supplies the filesystem/network loaders.
   const docInput: ImportInput = {
-    kind: isMarkdown ? 'markdown' : 'html',
+    kind: docxBytes !== undefined ? 'docx' : isMarkdown ? 'markdown' : 'html',
     text,
     baseName,
     sourceName,
     sourceEncoding,
   };
+  if (docxBytes !== undefined) docInput.bytes = docxBytes;
   if (sourceBytes !== undefined) docInput.sourceBytes = sourceBytes;
 
   const importOpts: Parameters<typeof importDocument>[1] = { readFont: fsFontReader };

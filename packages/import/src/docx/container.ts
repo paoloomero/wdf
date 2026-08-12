@@ -15,6 +15,10 @@ export const REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationsh
 export const OFFICE_DOCUMENT_REL =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument';
 
+/** IANA media type of a .docx file (ext-source 0.4 binary originals). */
+export const DOCX_MEDIA_TYPE =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
 /** Content type of the WordprocessingML main document part. */
 export const MAIN_DOCUMENT_CT =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml';

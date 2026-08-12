@@ -2,6 +2,7 @@ import { computeTableGrid, sha256Hex } from '@wdf-dev/core';
 
 import { el, isEl, slugify, textOf, type MEl, type MNode } from '../ast.js';
 import { DEFAULT_CAPS, identifyImage, type AssetCaps, type LoadedAsset } from '../assets.js';
+import { promoteHeadings } from '../headings.js';
 import { hoistStyles, sanitizeDeclarations, STYLE_TMP_ATTR, type Decls } from '../styles.js';
 import { openDocx, resolveTarget, type DocxContainer, type Relationship } from './container.js';
 import { parseXml, xmlAttr, xmlChild, xmlChildren, xmlText, type XmlElement } from './xml.js';
@@ -1100,6 +1101,21 @@ function listInfoOf(direct: ParaProps, ctx: WmlContext): ListInfo | undefined {
   return { level, ordered: fmt !== 'bullet', numId };
 }
 
+/** Unwraps redundant <strong> in heading content, keeping its signature. */
+function stripHeadingStrong(children: MNode[]): MNode[] {
+  return children.flatMap((c): MNode[] => {
+    if (!isEl(c) || c.tag !== 'strong') return [c];
+    const sig = c.attrs[STYLE_TMP_ATTR];
+    if (sig === undefined) return c.children;
+    const only = c.children.length === 1 ? c.children[0] : undefined;
+    if (only !== undefined && isEl(only)) {
+      only.attrs[STYLE_TMP_ATTR] = mergeSignatures(only.attrs[STYLE_TMP_ATTR], sig) ?? sig;
+      return [only];
+    }
+    return [el('span', { [STYLE_TMP_ATTR]: sig }, c.children)];
+  });
+}
+
 function paragraphToBlock(
   p: XmlElement,
   direct: ParaProps,
@@ -1115,17 +1131,7 @@ function paragraphToBlock(
   // Headings render bold natively: a strong wrapper is redundant semantics —
   // but its typographic signature must survive the unwrap.
   if (/^h[1-6]$/.test(tag)) {
-    children = children.flatMap((c) => {
-      if (!isEl(c) || c.tag !== 'strong') return [c];
-      const sig = c.attrs[STYLE_TMP_ATTR];
-      if (sig === undefined) return c.children;
-      const only = c.children.length === 1 ? c.children[0] : undefined;
-      if (only !== undefined && isEl(only)) {
-        only.attrs[STYLE_TMP_ATTR] = mergeSignatures(only.attrs[STYLE_TMP_ATTR], sig) ?? sig;
-        return [only];
-      }
-      return [el('span', { [STYLE_TMP_ATTR]: sig }, c.children)];
-    });
+    children = stripHeadingStrong(children);
   }
 
   const hoisted = hoistUniformRunStyle(children);
@@ -1366,6 +1372,38 @@ export interface DocxConversion {
    * ext-pagination breakBefore list from these elements' ids.
    */
   pageBreakBlocks: MEl[];
+  /** Document title from docProps/core.xml (dc:title), when declared. */
+  title: string | undefined;
+  /**
+   * Modification instant from docProps/core.xml (dcterms:modified, falling
+   * back to created) — the deterministic manifest date (T20.8): the same
+   * file yields the same package with no --date needed.
+   */
+  date: string | undefined;
+}
+
+const DC_NS = 'http://purl.org/dc/elements/1.1/';
+const DCTERMS_NS = 'http://purl.org/dc/terms/';
+
+/** Title and dates from docProps/core.xml (OPC core properties). */
+function coreProperties(container: DocxContainer): { title?: string; date?: string } {
+  const xml = container.partText('docProps/core.xml');
+  if (xml === undefined) return {};
+  let root: XmlElement;
+  try {
+    root = parseXml(xml);
+  } catch {
+    return {};
+  }
+  const out: { title?: string; date?: string } = {};
+  const title = xmlChild(root, DC_NS, 'title');
+  if (title !== undefined && xmlText(title).trim() !== '') out.title = xmlText(title).trim();
+  const instant = xmlChild(root, DCTERMS_NS, 'modified') ?? xmlChild(root, DCTERMS_NS, 'created');
+  const value = instant === undefined ? '' : xmlText(instant).trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(value)) {
+    out.date = value.replace(/\.\d+Z$/, 'Z');
+  }
+  return out;
 }
 
 /** Locates and reads styles.xml via the main part's relationships. */
@@ -1573,12 +1611,24 @@ export async function convertDocx(
     for (const block of blocks) rewrite(block);
   }
 
+  // Styled-paragraph heading heuristic (T7.7/T7.8, plan §10.15/§10.17):
+  // runs BEFORE hoisting, while the style signatures still carry font sizes.
+  // Word documents fake titles with direct formatting exactly like their
+  // HTML exports do (field fact, §10.50).
+  promoteHeadings(blocks, report);
+  for (const block of blocks) {
+    if (/^h[1-6]$/.test(block.tag)) block.children = stripHeadingStrong(block.children);
+  }
+
+  const core = coreProperties(container);
   return {
     blocks,
     language: styles.language,
     stylesheet: hoistStyles(blocks),
     assets: [...assets.values()],
     pageBreakBlocks,
+    title: core.title,
+    date: core.date,
   };
 }
 

@@ -2,6 +2,7 @@ import {
   decodeHtml,
   DEFAULT_CAPS,
   importDocument,
+  looksLikeDocx,
   type AssetLoader,
   type CssFetcher,
   type ImportedDocument,
@@ -26,10 +27,21 @@ const SUPPORT_DIR = /\.(fld|files)\//i;
  * alphabetically, so the choice is deterministic.
  */
 export function pickMainFile(files: FileMap): string | undefined {
+  const shallowestFirst = (a: string, b: string): number =>
+    a.split('/').length - b.split('/').length || (a < b ? -1 : a > b ? 1 : 0);
   const candidates = [...files.keys()]
     .filter((p) => /\.(html?|md|markdown)$/i.test(p) && !SUPPORT_DIR.test(p))
-    .sort((a, b) => a.split('/').length - b.split('/').length || (a < b ? -1 : a > b ? 1 : 0));
-  return candidates[0];
+    .sort(shallowestFirst);
+  if (candidates.length > 0) return candidates[0];
+  // WP20 T20.8: no web document dropped — a .docx converts natively (the
+  // check is by content, so a mis-named file still routes correctly).
+  const docx = [...files.keys()]
+    .filter((p) => {
+      const bytes = files.get(p);
+      return bytes !== undefined && looksLikeDocx(bytes);
+    })
+    .sort(shallowestFirst);
+  return docx[0];
 }
 
 /** Resolves `rel` against the directory of `from`, staying inside the set. */
@@ -123,10 +135,13 @@ export async function convertFiles(
   const report: string[] = [];
   const baseName = (mainPath.split('/').pop() ?? mainPath).replace(/\.[^.]+$/, '');
   const isMarkdown = /\.(md|markdown)$/i.test(mainPath);
+  const isDocx = looksLikeDocx(bytes);
 
-  let text: string;
+  let text = '';
   let sourceEncoding = 'utf-8';
-  if (isMarkdown) {
+  if (isDocx) {
+    // WP20 T20.8: the native importer takes the bytes as they are.
+  } else if (isMarkdown) {
     text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } else {
     const decoded = decodeHtml(bytes);
@@ -138,13 +153,14 @@ export async function convertFiles(
   }
 
   const input: ImportInput = {
-    kind: isMarkdown ? 'markdown' : 'html',
+    kind: isDocx ? 'docx' : isMarkdown ? 'markdown' : 'html',
     text,
     baseName,
     sourceBytes: bytes,
     sourceName: mainPath.split('/').pop() ?? mainPath,
     sourceEncoding,
   };
+  if (isDocx) input.bytes = bytes;
   const result = await importDocument(
     input,
     {

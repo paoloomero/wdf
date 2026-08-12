@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -117,5 +117,37 @@ describe('browser converter ↔ CLI parity', () => {
     expect(new Uint8Array(result?.wdfBytes ?? [])).toEqual(
       new Uint8Array(await cliBytes('word-headings-it.html', false)),
     );
+  });
+});
+
+describe('browser converter ↔ CLI parity — docx (T20.8)', () => {
+  it('a dropped .docx converts byte-identically to the CLI, source included', async () => {
+    const { makeDocx, W_NS } = await import('../../import/test/docx-fixtures.js');
+    const document =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      `<w:document xmlns:w="${W_NS}"><w:body>` +
+      '<w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>Documento docx</w:t></w:r></w:p>' +
+      '<w:p><w:r><w:t>Contenuto di prova del convertitore.</w:t><w:br w:type="page"/></w:r></w:p>' +
+      '<w:p><w:r><w:t>Seconda pagina del documento.</w:t></w:r></w:p>' +
+      '<w:sectPr/></w:body></w:document>';
+    const bytes = makeDocx({ document });
+
+    const files = new Map([['delibera.docx', bytes]]);
+    expect(pickMainFile(files)).toBe('delibera.docx');
+    const result = await convertFiles(files, { withSource: true, date: DATE });
+    expect(result).toBeDefined();
+
+    const dir = mkdtempSync(join(tmpdir(), 'wdf-docx-par-'));
+    const inputPath = join(dir, 'delibera.docx');
+    writeFileSync(inputPath, bytes);
+    const out = join(dir, 'out.wdf');
+    expect(
+      await cmdImport(inputPath, { output: out, date: DATE, withSource: true }, silent()),
+    ).toBe(0);
+    expect(new Uint8Array(result?.wdfBytes ?? [])).toEqual(new Uint8Array(readFileSync(out)));
+
+    // The package carries the pagination extension and the binary original.
+    const pkg = readPackage(result?.wdfBytes ?? new Uint8Array());
+    expect(pkg.manifest.extensions?.map((e) => e.name)).toEqual(['pagination', 'source']);
   });
 });

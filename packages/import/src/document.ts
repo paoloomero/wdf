@@ -5,6 +5,8 @@ import { DEFAULT_CAPS, type AssetCaps, type AssetLoader, type LoadedAsset } from
 import { buildPackage } from './build.js';
 import { type EmbedPlaceholderOptions } from './embeds.js';
 import { embedFonts, type FontReader } from './fonts.js';
+import { DOCX_MEDIA_TYPE } from './docx/container.js';
+import { convertDocx } from './docx/wml.js';
 import { importHtml, type HtmlImportOptions } from './html.js';
 import { importMarkdown } from './markdown.js';
 import { collectSourceStylesheets, type CssFetcher } from './sourcecss.js';
@@ -20,9 +22,11 @@ const enc = new TextEncoder();
  */
 
 export interface ImportInput {
-  kind: 'html' | 'markdown';
-  /** Input decoded to text (see decodeHtml for HTML sources). */
+  kind: 'html' | 'markdown' | 'docx';
+  /** Input decoded to text (see decodeHtml for HTML sources; '' for docx). */
   text: string;
+  /** Raw input bytes — required for kind 'docx' (WP20 T20.8). */
+  bytes?: Uint8Array;
   /** Fallback title when the document declares none (no extension). */
   baseName: string;
   /** Original input bytes, embedded verbatim by `withSource` (WP13). */
@@ -83,6 +87,7 @@ export async function importDocument(
   report: string[] = [],
 ): Promise<ImportedDocument | undefined> {
   const isMarkdown = input.kind === 'markdown';
+  const isDocx = input.kind === 'docx';
   const caps = opts.caps ?? DEFAULT_CAPS;
 
   let blocks: MEl[];
@@ -91,7 +96,20 @@ export async function importDocument(
   let stylesheet: string | undefined;
   let assets: LoadedAsset[] = [];
   let sourceMap: Record<string, string> = {};
-  if (isMarkdown) {
+  // WP20 T20.8: authored page breaks and the document's own timestamp.
+  let pageBreakBlocks: MEl[] = [];
+  let docxDate: string | undefined;
+  if (isDocx) {
+    if (input.bytes === undefined) throw new Error('docx input requires bytes');
+    const result = await convertDocx(input.bytes, report, caps);
+    blocks = result.blocks;
+    sourceTitle = result.title;
+    sourceLang = result.language;
+    stylesheet = result.stylesheet;
+    assets = result.assets;
+    pageBreakBlocks = result.pageBreakBlocks;
+    docxDate = result.date;
+  } else if (isMarkdown) {
     const result = importMarkdown(input.text);
     blocks = result.blocks;
     report.push(...result.report);
@@ -126,7 +144,7 @@ export async function importDocument(
   const html = serializeDocument(lang, title, blocks, stylesheet !== undefined);
   const htmlBytes = enc.encode(html);
 
-  const date = opts.date ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const date = opts.date ?? docxDate ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
   const manifest: WdfManifest = {
     wdf: '0.1',
     id: deterministicUuid(await sha256Hex(htmlBytes)),
@@ -146,6 +164,23 @@ export async function importDocument(
   const extFiles = new Map<string, Uint8Array>();
   const extensions: { name: string; version: string }[] = [];
 
+  // WP20 T20.6/T20.8: authored page breaks travel as the `pagination`
+  // extension (docs/ext-pagination.md §4): unique ids in document order.
+  if (pageBreakBlocks.length > 0) {
+    const breakBefore = [
+      ...new Set(
+        pageBreakBlocks.map((b) => b.attrs['id']).filter((id): id is string => id !== undefined),
+      ),
+    ];
+    if (breakBefore.length > 0) {
+      extFiles.set(
+        'ext/pagination/pagination.json',
+        enc.encode(`${JSON.stringify({ pagination: '0.1', breakBefore }, null, 2)}\n`),
+      );
+      extensions.push({ name: 'pagination', version: '0.1' });
+    }
+  }
+
   // WP9 (plan §10.19): embed metric-compatible open clones for well-known
   // families and prepend them to the generated stacks.
   if (opts.embedFonts === true && stylesheet !== undefined) {
@@ -164,25 +199,37 @@ export async function importDocument(
   }
 
   if (opts.withSource === true && input.sourceBytes !== undefined) {
-    const mainPath = `ext/source/${(await sha256Hex(input.sourceBytes)).slice(0, 16)}.${isMarkdown ? 'md' : 'html'}`;
+    const ext = isDocx ? 'docx' : isMarkdown ? 'md' : 'html';
+    const mainPath = `ext/source/${(await sha256Hex(input.sourceBytes)).slice(0, 16)}.${ext}`;
     // WP15: a web page's look lives in its external stylesheets — embed
     // them so the Original view is not an unstyled skeleton.
     let stylesheets: Record<string, string> = {};
-    if (!isMarkdown && opts.fetchCss !== undefined) {
+    if (!isMarkdown && !isDocx && opts.fetchCss !== undefined) {
       const collected = await collectSourceStylesheets(input.text, opts.fetchCss, caps, report);
       for (const [path, bytes] of collected.files) extFiles.set(path, bytes);
       stylesheets = collected.stylesheets;
     }
-    const sourceJson: Record<string, unknown> = {
-      source: '0.3',
-      kind: input.sourceKind ?? 'fetched-html',
-      main: mainPath,
-      mainName: input.sourceName ?? '',
-      encoding: input.sourceEncoding ?? 'utf-8',
-      resources: sourceMap,
-    };
+    // ext-source 0.4: a binary original (docx) declares kind "binary" with
+    // its media type and no encoding — the Original view offers a download.
+    const sourceJson: Record<string, unknown> = isDocx
+      ? {
+          source: '0.4',
+          kind: 'binary',
+          main: mainPath,
+          mainName: input.sourceName ?? '',
+          mediaType: DOCX_MEDIA_TYPE,
+          resources: {},
+        }
+      : {
+          source: '0.3',
+          kind: input.sourceKind ?? 'fetched-html',
+          main: mainPath,
+          mainName: input.sourceName ?? '',
+          encoding: input.sourceEncoding ?? 'utf-8',
+          resources: sourceMap,
+        };
     if (Object.keys(stylesheets).length > 0) sourceJson['stylesheets'] = stylesheets;
-    extensions.push({ name: 'source', version: '0.3' });
+    extensions.push({ name: 'source', version: isDocx ? '0.4' : '0.3' });
     extFiles.set(mainPath, input.sourceBytes);
     extFiles.set('ext/source/source.json', enc.encode(`${JSON.stringify(sourceJson, null, 2)}\n`));
     report.push(
