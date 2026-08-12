@@ -2,11 +2,11 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { readPackage, validateStylesheet } from '@wdf/core';
+import { readPackage, validateStylesheet } from '@wdf-dev/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { parseStylesheet, sanitizeDeclarations, parseDeclarations } from '@wdf/import';
+import { parseStylesheet, sanitizeDeclarations, parseDeclarations } from '@wdf-dev/import';
 
 // T7.2 acceptance (plan §10.7): the imported document keeps its typographic
 // identity via a generated stylesheet; hostile constructs never survive;

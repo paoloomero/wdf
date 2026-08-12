@@ -1,8 +1,8 @@
-# @wdf/mcp
+# @wdf-dev/mcp
 
 MCP (Model Context Protocol) server for [WDF — Web Document Format](https://wdf.dev) packages. Lets AI agents open, navigate and quote `.wdf` documents through the canonical AI layer — verifiable citations with stable anchors, no parsing heuristics, no hallucinated page numbers.
 
-Zero runtime dependencies beyond `@wdf/core`; speaks MCP over stdio.
+Zero runtime dependencies beyond `@wdf-dev/core`; speaks MCP over stdio.
 
 ## Tools
 
@@ -16,9 +16,9 @@ Zero runtime dependencies beyond `@wdf/core`; speaks MCP over stdio.
 Claude Code:
 
 ```bash
-claude mcp add wdf -- npx -y @wdf/mcp
+claude mcp add wdf -- npx -y @wdf-dev/mcp
 ```
 
-Any MCP client: run `npx @wdf/mcp` as a stdio server.
+Any MCP client: run `npx @wdf-dev/mcp` as a stdio server.
 
 Spec: [`spec/wdf-core-0.1.md`](https://github.com/paoloomero/wdf/blob/main/spec/wdf-core-0.1.md) (CC-BY 4.0). Code is Apache-2.0.

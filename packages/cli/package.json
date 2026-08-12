@@ -1,5 +1,5 @@
 {
-  "name": "@wdf/cli",
+  "name": "@wdf-dev/cli",
   "version": "0.1.0",
   "type": "module",
   "description": "The wdf command: validate, pack, unpack, extract, import, new.",
@@ -38,9 +38,9 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@wdf/core": "workspace:*",
-    "@wdf/import": "workspace:*",
-    "@wdf/viewer": "workspace:*",
+    "@wdf-dev/core": "workspace:*",
+    "@wdf-dev/import": "workspace:*",
+    "@wdf-dev/viewer": "workspace:*",
     "commander": "^13.0.0"
   },
   "license": "Apache-2.0"

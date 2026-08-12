@@ -1,7 +1,7 @@
 # Store listing — Save as WDF (v0.1.0)
 
 Submission material for Chrome Web Store and addons.mozilla.org (T18.8,
-plan §10.32). The zips come from `pnpm --filter @wdf/extension package`:
+plan §10.32). The zips come from `pnpm --filter @wdf-dev/extension package`:
 `dist/wdf-save-as-wdf-chrome-0.1.0.zip` / `…-firefox-0.1.0.zip`.
 
 ## Shared
@@ -71,8 +71,8 @@ plan §10.32). The zips come from `pnpm --filter @wdf/extension package`:
   `pnpm install --frozen-lockfile && pnpm build` — the reviewable output
   is `packages/extension/dist/firefox/`. The build is reproducible:
   esbuild bundles `packages/extension/src/*` with the workspace packages
-  `@wdf/core` and `@wdf/import`; the large string in `background.js` is
-  the embedded offline viewer template (`@wdf/viewer`).
+  `@wdf-dev/core` and `@wdf-dev/import`; the large string in `background.js` is
+  the embedded offline viewer template (`@wdf-dev/viewer`).
 
 ## Screenshots
 

@@ -1,4 +1,4 @@
-# @wdf/viewer
+# @wdf-dev/viewer
 
 The single-file viewer of [WDF — Web Document Format](https://wdf.dev). This package ships two prebuilt, self-contained HTML files — no external requests at runtime, ever:
 
@@ -8,13 +8,13 @@ The single-file viewer of [WDF — Web Document Format](https://wdf.dev). This p
 ## Install
 
 ```bash
-npm install @wdf/viewer
+npm install @wdf-dev/viewer
 ```
 
 ```js
 import { readFileSync } from 'node:fs';
 
-const url = new URL(import.meta.resolve('@wdf/viewer/standalone.html'));
+const url = new URL(import.meta.resolve('@wdf-dev/viewer/standalone.html'));
 const template = readFileSync(url, 'utf8');
 ```
 

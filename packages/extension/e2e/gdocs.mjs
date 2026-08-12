@@ -5,7 +5,7 @@
 // does. The capture must come from the export, with `source.kind`
 // "fetched-html" (server-delivered bytes, not a snapshot).
 //
-// Run with: pnpm --filter @wdf/extension test:e2e
+// Run with: pnpm --filter @wdf-dev/extension test:e2e
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

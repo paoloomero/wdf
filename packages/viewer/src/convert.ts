@@ -6,7 +6,7 @@ import {
   type CssFetcher,
   type ImportedDocument,
   type ImportInput,
-} from '@wdf/import';
+} from '@wdf-dev/import';
 
 /**
  * In-browser converter (T7.6, plan §10.24): the dropped files become an

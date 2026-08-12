@@ -1,5 +1,5 @@
 {
-  "name": "@wdf/import",
+  "name": "@wdf-dev/import",
   "version": "0.1.0",
   "type": "module",
   "description": "WDF import pipeline — isomorphic (Node + browser): HTML/Markdown to canonical package, with injected loaders for assets, siblings, stylesheets and fonts.",
@@ -39,7 +39,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@wdf/core": "workspace:*"
+    "@wdf-dev/core": "workspace:*"
   },
   "license": "Apache-2.0"
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@wdf/mcp",
+  "name": "@wdf-dev/mcp",
   "version": "0.1.0",
   "type": "module",
   "description": "MCP server exposing WDF packages to AI agents: open, outline, read, cite — with verifiable citations and no parsing heuristics.",
@@ -36,7 +36,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@wdf/core": "workspace:*"
+    "@wdf-dev/core": "workspace:*"
   },
   "license": "Apache-2.0"
 }

@@ -7,7 +7,7 @@ import {
   type VerifyResult,
   type WdfOutline,
   type WdfPackage,
-} from '@wdf/core';
+} from '@wdf-dev/core';
 
 /**
  * The WDF tool surface for AI agents (plan T6.1). Everything an agent reads

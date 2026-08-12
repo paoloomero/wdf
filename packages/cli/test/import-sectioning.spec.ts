@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { importHtml } from '@wdf/import';
+import { importHtml } from '@wdf-dev/import';
 
 // Robustness-matrix finding (plan §10.22): real-world pages nest sectioning
 // inside transparent containers (Wikipedia: nav in header; MDN: nav in

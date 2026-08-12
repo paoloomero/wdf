@@ -10,7 +10,7 @@
     "build": "pnpm -r build",
     "test": "vitest run",
     "sync:schemas": "node scripts/sync-schemas.mjs && node packages/core/scripts/compile-schemas.mjs",
-    "golden:update": "pnpm --filter @wdf/core build && node scripts/update-golden.mjs",
+    "golden:update": "pnpm --filter @wdf-dev/core build && node scripts/update-golden.mjs",
     "demo": "pnpm build && node scripts/build-demo.mjs",
     "test:watch": "vitest",
     "lint": "eslint . && prettier --check .",

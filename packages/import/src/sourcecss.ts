@@ -1,4 +1,4 @@
-import { elementChildren, findChild, getAttr, parseHtml, sha256Hex } from '@wdf/core';
+import { elementChildren, findChild, getAttr, parseHtml, sha256Hex } from '@wdf-dev/core';
 
 import type { AssetCaps } from './assets.js';
 

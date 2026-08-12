@@ -1,6 +1,6 @@
 import type { WdfDocument, WdfElement, WdfNode } from './ast.js';
 
-// Minimal structural DOM types: @wdf/core compiles without lib.dom (it must
+// Minimal structural DOM types: @wdf-dev/core compiles without lib.dom (it must
 // stay isomorphic), so we describe just what we read from a real DOM.
 interface DomNode {
   nodeType: number;

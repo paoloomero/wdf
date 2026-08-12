@@ -27,6 +27,6 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright Chromium
-        run: pnpm --filter @wdf/extension exec playwright install --with-deps chromium
+        run: pnpm --filter @wdf-dev/extension exec playwright install --with-deps chromium
       - name: Extension e2e (real browser)
-        run: pnpm --filter @wdf/extension test:e2e
+        run: pnpm --filter @wdf-dev/extension test:e2e

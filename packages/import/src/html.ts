@@ -10,7 +10,7 @@ import {
   type SpanCell,
   type WdfElement,
   type WdfNode,
-} from '@wdf/core';
+} from '@wdf-dev/core';
 
 import { el, isEl, textOf, type MEl, type MNode } from './ast.js';
 import { replaceEmbeds, type EmbedPlaceholderOptions } from './embeds.js';

@@ -1,4 +1,4 @@
-import { getAttr, isElement, sha256Hex, type WdfElement } from '@wdf/core';
+import { getAttr, isElement, sha256Hex, type WdfElement } from '@wdf-dev/core';
 
 /**
  * Asset import (plan §10.7, T7.3): pull the images a document references into

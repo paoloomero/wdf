@@ -39,12 +39,12 @@ change.
 ## Repository layout
 
 - `spec/` — the WDF Core 0.1 specification and JSON Schemas (the source of truth)
-- `packages/core` — `@wdf/core`: isomorphic library (Node + browser): packaging,
+- `packages/core` — `@wdf-dev/core`: isomorphic library (Node + browser): packaging,
   profile validation, canonical extraction, integrity, datasets
-- `packages/cli` — `@wdf/cli`: the `wdf` command (validate, pack, unpack,
+- `packages/cli` — `@wdf-dev/cli`: the `wdf` command (validate, pack, unpack,
   extract, import, new)
 - `packages/viewer` — single-file HTML viewer + installable Reader (PWA)
-- `packages/mcp` — `@wdf/mcp`: MCP server exposing packages to AI agents
+- `packages/mcp` — `@wdf-dev/mcp`: MCP server exposing packages to AI agents
 - `examples/` — three example documents (source + built `.wdf` + comparison PDF)
 - `fixtures/` — golden files and valid/invalid documents for testing
 - `site/` — demo site (assembled into `_site/` by `pnpm demo`)
@@ -56,25 +56,25 @@ The tools are published on npm (Node ≥ 20):
 
 ```sh
 # validate a document, nothing to install
-npx @wdf/cli validate document.wdf
+npx @wdf-dev/cli validate document.wdf
 
 # convert an HTML export (Word, Google Docs, saved web page) or Markdown
-npx @wdf/cli import mydoc.html -o mydoc.wdf
+npx @wdf-dev/cli import mydoc.html -o mydoc.wdf
 
 # or install the `wdf` command globally
-npm install -g @wdf/cli
+npm install -g @wdf-dev/cli
 ```
 
 Give AI agents verifiable access to `.wdf` documents via MCP:
 
 ```sh
-claude mcp add wdf -- npx -y @wdf/mcp
+claude mcp add wdf -- npx -y @wdf-dev/mcp
 ```
 
-Libraries: [`@wdf/core`](packages/core) (validation, extraction, integrity — isomorphic) and
-[`@wdf/import`](packages/import) (HTML/Markdown → `.wdf` pipeline); [`@wdf/viewer`](packages/viewer)
+Libraries: [`@wdf-dev/core`](packages/core) (validation, extraction, integrity — isomorphic) and
+[`@wdf-dev/import`](packages/import) (HTML/Markdown → `.wdf` pipeline); [`@wdf-dev/viewer`](packages/viewer)
 ships the prebuilt single-file Reader. Validate documents in CI with the same
-one-liner: `npx @wdf/cli validate docs/report.wdf`.
+one-liner: `npx @wdf-dev/cli validate docs/report.wdf`.
 
 ## Working on the repo
 

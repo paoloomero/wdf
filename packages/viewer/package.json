@@ -1,5 +1,5 @@
 {
-  "name": "@wdf/viewer",
+  "name": "@wdf-dev/viewer",
   "version": "0.1.0",
   "type": "module",
   "description": "Single-file HTML viewer for .wdf packages — zero installation, works offline.",
@@ -38,8 +38,8 @@
     "build": "tsc --noEmit -p tsconfig.json && node build.mjs"
   },
   "dependencies": {
-    "@wdf/core": "workspace:*",
-    "@wdf/import": "workspace:*"
+    "@wdf-dev/core": "workspace:*",
+    "@wdf-dev/import": "workspace:*"
   },
   "devDependencies": {
     "esbuild": "^0.24.2"

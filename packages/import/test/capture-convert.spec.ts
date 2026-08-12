@@ -1,4 +1,4 @@
-import { readPackage, validateCaptureExt, verifyPackage, type WdfCapture } from '@wdf/core';
+import { readPackage, validateCaptureExt, verifyPackage, type WdfCapture } from '@wdf-dev/core';
 import { describe, expect, it } from 'vitest';
 
 import { importDocument } from '../src/document.js';

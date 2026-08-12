@@ -8,7 +8,7 @@ import type { WdfHashes } from './types.js';
 const HASHES_PATH = 'integrity/hashes.json';
 
 // WebCrypto is the one crypto API present in both browsers and Node ≥ 20
-// (spec table: no dependency needed). Typed structurally so @wdf/core keeps
+// (spec table: no dependency needed). Typed structurally so @wdf-dev/core keeps
 // compiling without lib.dom or Node type definitions.
 interface SubtleLike {
   digest(algorithm: string, data: Uint8Array): Promise<ArrayBuffer>;

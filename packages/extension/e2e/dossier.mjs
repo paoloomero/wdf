@@ -8,7 +8,7 @@
 //    cookie — `wdf import <url>` could never reach them; the extension
 //    runs with the page's session and captures what the user sees.
 //
-// Run with: pnpm --filter @wdf/extension test:e2e
+// Run with: pnpm --filter @wdf-dev/extension test:e2e
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 

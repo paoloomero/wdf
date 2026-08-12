@@ -1,4 +1,4 @@
-import { getAttr, isElement, type WdfElement, type WdfNode } from '@wdf/core';
+import { getAttr, isElement, type WdfElement, type WdfNode } from '@wdf-dev/core';
 
 import { isEl, type MEl } from './ast.js';
 

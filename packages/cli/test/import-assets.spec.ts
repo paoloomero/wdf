@@ -4,11 +4,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AddressInfo } from 'node:net';
 
-import { parseHtml, readPackage } from '@wdf/core';
+import { parseHtml, readPackage } from '@wdf-dev/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { DEFAULT_CAPS, identifyImage, resolveDocumentAssets, type AssetLoad } from '@wdf/import';
+import {
+  DEFAULT_CAPS,
+  identifyImage,
+  resolveDocumentAssets,
+  type AssetLoad,
+} from '@wdf-dev/import';
 
 const dec = new TextDecoder();
 

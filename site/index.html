@@ -166,7 +166,7 @@
       <section>
         <h2>Agent-native by design (MCP)</h2>
         <p>
-          The <code>@wdf/mcp</code> server gives any MCP-capable agent four tools —
+          The <code>@wdf-dev/mcp</code> server gives any MCP-capable agent four tools —
           <code>wdf_open</code>, <code>wdf_outline</code>, <code>wdf_read</code>,
           <code>wdf_cite</code> — so an assistant answers questions about a document by navigating
           stable ids, never by parsing heuristics, and cites verifiably:
@@ -180,7 +180,7 @@ Resolves to:
 Spending commitments by chapter and year {#tbl-commitments}</pre>
         <p class="hint">
           Full recorded session: <a href="mcp-demo.md">MCP demo transcript</a>. Register it in
-          Claude Code with <code>claude mcp add wdf -- npx -y @wdf/mcp</code>.
+          Claude Code with <code>claude mcp add wdf -- npx -y @wdf-dev/mcp</code>.
         </p>
       </section>
 
@@ -192,12 +192,12 @@ Spending commitments by chapter and year {#tbl-commitments}</pre>
           it enforces, and the same input produces a byte-identical package on any platform:
         </p>
         <pre class="transcript">
-npx @wdf/cli validate document.wdf
-npx @wdf/cli import mydoc.html -o mydoc.wdf</pre>
+npx @wdf-dev/cli validate document.wdf
+npx @wdf-dev/cli import mydoc.html -o mydoc.wdf</pre>
         <p class="hint">
           Same one-liner validates published documents in CI. Libraries:
-          <code>@wdf/core</code> (validation, extraction, integrity — runs in Node and browsers) and
-          <code>@wdf/import</code> (HTML/Markdown → <code>.wdf</code>). Source on
+          <code>@wdf-dev/core</code> (validation, extraction, integrity — runs in Node and browsers)
+          and <code>@wdf-dev/import</code> (HTML/Markdown → <code>.wdf</code>). Source on
           <a href="https://github.com/paoloomero/wdf">GitHub</a>, Apache-2.0.
         </p>
       </section>

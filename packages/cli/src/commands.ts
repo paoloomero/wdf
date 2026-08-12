@@ -11,7 +11,7 @@ import {
   WdfError,
   type Violation,
   type WdfManifest,
-} from '@wdf/core';
+} from '@wdf-dev/core';
 
 import {
   aggregateReport,
@@ -24,7 +24,7 @@ import {
   type AssetLoader,
   type CssFetcher,
   type ImportInput,
-} from '@wdf/import';
+} from '@wdf-dev/import';
 
 import { hasViewerTemplate, makeStandalone } from './lib/build.js';
 import { readDirFiles, writeDirFiles } from './lib/fsutil.js';
@@ -127,7 +127,7 @@ export async function cmdPack(
       writeFileSync(output, makeStandalone(bytes, manifest.title));
       ctx.log(`wrote ${output} (standalone, ${String(bytes.length)} bytes embedded)`);
       if (!hasViewerTemplate()) {
-        ctx.log('note: @wdf/viewer is not built — used the minimal fallback shell');
+        ctx.log('note: @wdf-dev/viewer is not built — used the minimal fallback shell');
       }
     } else {
       const output = opts.output ?? `${base}.wdf`;

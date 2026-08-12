@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, normalize } from 'node:path';
 
-import type { AssetCaps, AssetLoader, FontReader } from '@wdf/import';
+import type { AssetCaps, AssetLoader, FontReader } from '@wdf-dev/import';
 
 /**
  * The Node side of the injected import loaders (T7.5): filesystem access for
- * local inputs. The isomorphic pipeline in @wdf/import never touches the
+ * local inputs. The isomorphic pipeline in @wdf-dev/import never touches the
  * filesystem itself.
  */
 

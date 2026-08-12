@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 
-import { WDF_VERSION } from '@wdf/core';
+import { WDF_VERSION } from '@wdf-dev/core';
 
 import { cmdExtract, cmdImport, cmdNew, cmdPack, cmdUnpack, cmdValidate } from './commands.js';
 

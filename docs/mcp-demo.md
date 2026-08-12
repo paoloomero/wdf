@@ -1,6 +1,6 @@
 # MCP demo: an agent reading a WDF package (T6.1)
 
-A recorded, reproducible session with the `@wdf/mcp` server (stdio, JSON-RPC/MCP) reading
+A recorded, reproducible session with the `@wdf-dev/mcp` server (stdio, JSON-RPC/MCP) reading
 the example decree. Regenerate with `pnpm build && node scripts/mcp-demo.mjs`.
 Register the server in an MCP client, e.g. Claude Code:
 

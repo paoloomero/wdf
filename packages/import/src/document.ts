@@ -1,4 +1,4 @@
-import { sha256Hex, type WdfCapture, type WdfManifest } from '@wdf/core';
+import { sha256Hex, type WdfCapture, type WdfManifest } from '@wdf-dev/core';
 
 import { ensureIds, fixDanglingFragments, serializeDocument, textOf, type MEl } from './ast.js';
 import { DEFAULT_CAPS, type AssetCaps, type AssetLoader, type LoadedAsset } from './assets.js';

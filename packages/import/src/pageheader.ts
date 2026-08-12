@@ -6,7 +6,7 @@ import {
   normalizedText,
   type WdfElement,
   type WdfNode,
-} from '@wdf/core';
+} from '@wdf-dev/core';
 
 /**
  * Word page headers/footers (T14.1, plan §10.21): the full "Web Page"

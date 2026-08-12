@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { readPackage } from '@wdf/core';
+import { readPackage } from '@wdf-dev/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdExtract, cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
@@ -12,7 +12,7 @@ import {
   isPageResidue,
   preprocessHeaderHtml,
   STYLE_TMP_ATTR,
-} from '@wdf/import';
+} from '@wdf-dev/import';
 
 // T14.1 acceptance (plan §10.21): Word page headers/footers from the
 // support folder's header.html enter the document once, as <header> and

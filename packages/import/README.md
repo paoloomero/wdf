@@ -1,4 +1,4 @@
-# @wdf/import
+# @wdf-dev/import
 
 Import pipeline of [WDF — Web Document Format](https://wdf.dev): converts HTML (word-processor exports, saved web pages, live-page captures) and Markdown into valid, verifiable `.wdf` packages.
 
@@ -7,7 +7,7 @@ Isomorphic (Node ≥ 20 and browsers): all I/O goes through injected loaders (as
 ## Install
 
 ```bash
-npm install @wdf/import
+npm install @wdf-dev/import
 ```
 
 ## What it does
@@ -21,13 +21,13 @@ npm install @wdf/import
 ## Example
 
 ```js
-import { importDocument } from '@wdf/import';
+import { importDocument } from '@wdf-dev/import';
 
 const report = [];
 const result = await importDocument({ kind: 'html', text: html, baseName: 'document' }, {}, report);
 // result.wdfBytes is a complete .wdf package; result.report explains every transformation
 ```
 
-Most users want the [`@wdf/cli`](https://www.npmjs.com/package/@wdf/cli) `wdf import` command instead of calling this library directly.
+Most users want the [`@wdf-dev/cli`](https://www.npmjs.com/package/@wdf-dev/cli) `wdf import` command instead of calling this library directly.
 
 Spec: [`spec/wdf-core-0.1.md`](https://github.com/paoloomero/wdf/blob/main/spec/wdf-core-0.1.md) (CC-BY 4.0). Code is Apache-2.0.

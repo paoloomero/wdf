@@ -28,7 +28,7 @@ describe('npm publish contract (plan §10.46)', () => {
 
   it.each(PUBLISHED)('%s carries the required publish metadata', (dir) => {
     const pkg = readPkg(dir);
-    expect(pkg.name).toBe(`@wdf/${dir}`);
+    expect(pkg.name).toBe(`@wdf-dev/${dir}`);
     expect(pkg.version).toBe('0.1.0');
     expect(pkg.license).toBe('Apache-2.0');
     expect(pkg.homepage).toBe('https://wdf.dev');

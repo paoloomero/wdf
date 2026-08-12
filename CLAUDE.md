@@ -5,7 +5,7 @@ Open, web-native, AI-ready document format. Monorepo: pnpm workspaces, TypeScrip
 ## Ground rules
 
 - The spec (`spec/wdf-core-0.1.md`) is the source of truth. Code follows spec, never the reverse. If a change requires a spec change, update the spec in the same PR and flag it in the PR description.
-- `@wdf/core` must stay isomorphic (Node + browser). No Node-only APIs outside `platform/` adapters.
+- `@wdf-dev/core` must stay isomorphic (Node + browser). No Node-only APIs outside `platform/` adapters.
 - Determinism is the product. `extract()` must be byte-deterministic: same input → identical output, on any platform. Never introduce locale-, time- or order-dependent behavior in core.
 - Golden files under `fixtures/golden/` are contracts. If your change modifies them, regenerate explicitly (`pnpm golden:update`) and explain why in the PR.
 - Whitelist thinking: WDF-HTML profile is a closed whitelist. When in doubt, reject. Adding an element/attribute to the profile is a spec decision, not a code decision.

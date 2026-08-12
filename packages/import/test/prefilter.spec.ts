@@ -1,4 +1,4 @@
-import { parseHtml, readPackage } from '@wdf/core';
+import { parseHtml, readPackage } from '@wdf-dev/core';
 import { describe, expect, it } from 'vitest';
 
 import { importDocument } from '../src/document.js';

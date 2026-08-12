@@ -1,4 +1,4 @@
-import { getAttr, isElement, type WdfDocument, type WdfElement, type WdfNode } from '@wdf/core';
+import { getAttr, isElement, type WdfDocument, type WdfElement, type WdfNode } from '@wdf-dev/core';
 
 /**
  * Embed placeholders for dom-snapshot conversions (T18.4, ext-capture §5):

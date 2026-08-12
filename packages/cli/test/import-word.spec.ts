@@ -2,11 +2,11 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { readPackage } from '@wdf/core';
+import { readPackage } from '@wdf-dev/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdExtract, cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { decodeHtml } from '@wdf/import';
+import { decodeHtml } from '@wdf-dev/import';
 
 // T7.1 acceptance (plan §10.7): real-world Word "filtered web page" exports
 // and saved web pages import into valid packages; charset declarations are

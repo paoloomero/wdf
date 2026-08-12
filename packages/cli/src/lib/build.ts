@@ -5,7 +5,7 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** The real single-file viewer template built by @wdf/viewer (plan T4.5). */
+/** The real single-file viewer template built by @wdf-dev/viewer (plan T4.5). */
 export function hasViewerTemplate(): boolean {
   return loadViewerTemplate() !== undefined;
 }
@@ -13,7 +13,7 @@ export function hasViewerTemplate(): boolean {
 function loadViewerTemplate(): string | undefined {
   try {
     const require = createRequire(import.meta.url);
-    return readFileSync(require.resolve('@wdf/viewer/standalone.html'), 'utf8');
+    return readFileSync(require.resolve('@wdf-dev/viewer/standalone.html'), 'utf8');
   } catch {
     return undefined;
   }

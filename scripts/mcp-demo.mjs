@@ -1,4 +1,4 @@
-// Drives the real @wdf/mcp server over stdio and records the exchange as
+// Drives the real @wdf-dev/mcp server over stdio and records the exchange as
 // docs/mcp-demo.md — the "agent-ready" demo of plan T6.1, reproducible with:
 //   pnpm build && node scripts/mcp-demo.mjs
 import { spawn, spawnSync } from 'node:child_process';
@@ -82,7 +82,7 @@ const out = [];
 out.push('# MCP demo: an agent reading a WDF package (T6.1)');
 out.push('');
 out.push(
-  'A recorded, reproducible session with the `@wdf/mcp` server (stdio, JSON-RPC/MCP) reading',
+  'A recorded, reproducible session with the `@wdf-dev/mcp` server (stdio, JSON-RPC/MCP) reading',
   'the example decree. Regenerate with `pnpm build && node scripts/mcp-demo.mjs`.',
   'Register the server in an MCP client, e.g. Claude Code:',
   '',

@@ -9,7 +9,7 @@
 // page, a stylesheet and an image — exercising the declared cross-origin
 // report paths of §10.31 alongside the happy paths.
 //
-// Run with: pnpm --filter @wdf/extension test:e2e
+// Run with: pnpm --filter @wdf-dev/extension test:e2e
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';

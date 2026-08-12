@@ -1,7 +1,7 @@
 // Store packaging (T18.8): builds and zips the submission artifacts —
 // dist/wdf-save-as-wdf-chrome-<version>.zip  (Chrome Web Store)
 // dist/wdf-save-as-wdf-firefox-<version>.zip (addons.mozilla.org)
-// Run with: pnpm --filter @wdf/extension package
+// Run with: pnpm --filter @wdf-dev/extension package
 import { spawnSync } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';

@@ -1,4 +1,4 @@
-# @wdf/cli
+# @wdf-dev/cli
 
 Command-line tool for [WDF — Web Document Format](https://wdf.dev): an open, web-native, AI-ready document format with verifiable human/AI equivalence.
 
@@ -6,10 +6,10 @@ Command-line tool for [WDF — Web Document Format](https://wdf.dev): an open, w
 
 ```bash
 # validate a document (one-shot, nothing to install)
-npx @wdf/cli validate document.wdf
+npx @wdf-dev/cli validate document.wdf
 
 # or install the `wdf` command globally
-npm install -g @wdf/cli
+npm install -g @wdf-dev/cli
 wdf validate document.wdf
 ```
 
@@ -32,7 +32,7 @@ Validate published documents in GitHub Actions:
 ```yaml
 - uses: actions/setup-node@v4
   with: { node-version: 22 }
-- run: npx @wdf/cli validate docs/report.wdf
+- run: npx @wdf-dev/cli validate docs/report.wdf
 ```
 
 Spec: [`spec/wdf-core-0.1.md`](https://github.com/paoloomero/wdf/blob/main/spec/wdf-core-0.1.md) (CC-BY 4.0). Code is Apache-2.0. Bundled fallback fonts are OFL-1.1 (license texts in `fonts/`).

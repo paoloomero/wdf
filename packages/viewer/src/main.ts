@@ -11,9 +11,9 @@ import {
   type WdfCapture,
   type WdfOutline,
   type WdfPackage,
-} from '@wdf/core';
+} from '@wdf-dev/core';
 
-import { aggregateReport } from '@wdf/import';
+import { aggregateReport } from '@wdf-dev/import';
 
 import { convertFiles } from './convert.js';
 import {

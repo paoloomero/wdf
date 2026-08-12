@@ -2,11 +2,11 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { readPackage } from '@wdf/core';
+import { readPackage } from '@wdf-dev/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { embedFonts } from '@wdf/import';
+import { embedFonts } from '@wdf-dev/import';
 import { fsFontReader } from '../src/lib/loaders.js';
 
 // WP9 acceptance (plan §10.19): --embed-fonts embeds metric-compatible open

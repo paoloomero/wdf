@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CAPTURE_MARK, DEFAULT_CAPS } from '@wdf/import';
+import { CAPTURE_MARK, DEFAULT_CAPS } from '@wdf-dev/import';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -40,7 +40,7 @@ describe('snapshotAndMeasure', () => {
     expect(snapshot.title).toBe('Doc');
   });
 
-  it('stamps the marker attribute @wdf/import expects (CAPTURE_MARK)', () => {
+  it('stamps the marker attribute @wdf-dev/import expects (CAPTURE_MARK)', () => {
     document.documentElement.innerHTML = '<head></head><body><p>x</p></body>';
     const { snapshot } = snapshotAndMeasure(document, () => zeroGeometry);
     expect(snapshot.html).toContain(`${CAPTURE_MARK}="0"`);
@@ -183,7 +183,7 @@ describe('collectImages', () => {
   });
 });
 
-describe('caps stay in sync with @wdf/import', () => {
+describe('caps stay in sync with @wdf-dev/import', () => {
   it('CAPTURE_CAPS mirrors DEFAULT_CAPS (content bundle must not import the pipeline)', () => {
     expect(CAPTURE_CAPS.perFile).toBe(DEFAULT_CAPS.perFile);
     expect(CAPTURE_CAPS.totalBytes).toBe(DEFAULT_CAPS.totalBytes);

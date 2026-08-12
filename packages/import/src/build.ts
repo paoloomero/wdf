@@ -6,7 +6,7 @@ import {
   writePackage,
   WdfError,
   type WdfManifest,
-} from '@wdf/core';
+} from '@wdf-dev/core';
 
 const enc = new TextEncoder();
 const dec = new TextDecoder('utf-8', { fatal: true });

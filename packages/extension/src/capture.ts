@@ -2,10 +2,10 @@
 // script collects from the live page. DOM access is kept at the edges
 // (injectable measure/fetch/encode callbacks), so the assembly logic is
 // unit-testable without a browser.
-import type { CaptureElementGeometry, CapturePageGeometry } from '@wdf/import';
+import type { CaptureElementGeometry, CapturePageGeometry } from '@wdf-dev/import';
 
 // ---------------------------------------------------------------------------
-// Caps. Mirrors @wdf/import DEFAULT_CAPS (asserted by a unit test) instead
+// Caps. Mirrors @wdf-dev/import DEFAULT_CAPS (asserted by a unit test) instead
 // of importing it: the content-script bundle must not drag the import
 // pipeline into the page.
 
@@ -27,10 +27,10 @@ export const CAPTURE_CAPS: CaptureCaps = {
 // ---------------------------------------------------------------------------
 // Geometry: what only the rendering knows, recorded per element for the
 // geometric pre-filter (T18.3). The capture records facts; the policy is
-// `geometryExclusions` in @wdf/import (prefilter.ts) — same package that
+// `geometryExclusions` in @wdf-dev/import (prefilter.ts) — same package that
 // consumes this payload at conversion, so producer and consumer share the
 // types (type-only imports: nothing of the pipeline enters the bundle).
-// The marker attribute stamped below is @wdf/import's CAPTURE_MARK
+// The marker attribute stamped below is @wdf-dev/import's CAPTURE_MARK
 // ('data-wdf-cap'), kept literal here for the same reason and asserted in
 // sync by a unit test.
 

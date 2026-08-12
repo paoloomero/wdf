@@ -1,4 +1,4 @@
-import type { WdfCapture, WdfOutline, WdfOutlineNode } from '@wdf/core';
+import type { WdfCapture, WdfOutline, WdfOutlineNode } from '@wdf-dev/core';
 
 /** Pure helpers of the viewer — kept DOM-free so they are unit-testable. */
 

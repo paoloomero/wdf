@@ -1,9 +1,9 @@
 // Background service worker (MV3). T18.4: the real conversion — the
-// bundled @wdf/import pipeline turns the capture payload into a verified
+// bundled @wdf-dev/import pipeline turns the capture payload into a verified
 // package, downloaded as a standalone HTML (the T15.1 sendable default;
 // the .wdf option arrives with the popup UX, T18.5). Fully client-side:
 // the pipeline uses parse5, no DOM needed (§10.31 "Architettura").
-import type { WdfCapture } from '@wdf/core';
+import type { WdfCapture } from '@wdf-dev/core';
 import {
   aggregateReport,
   geometryExclusions,
@@ -11,8 +11,8 @@ import {
   stripCaptureMarks,
   type AssetLoad,
   type CssFetcher,
-} from '@wdf/import';
-import standaloneTemplate from '@wdf/viewer/standalone.html';
+} from '@wdf-dev/import';
+import standaloneTemplate from '@wdf-dev/viewer/standalone.html';
 
 import {
   base64ToBytes,

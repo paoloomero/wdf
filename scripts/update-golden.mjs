@@ -1,6 +1,6 @@
 // Regenerates the golden files under fixtures/golden/*/ from each input.html.
 // Golden files are contracts (CLAUDE.md): review the diff carefully.
-// Requires @wdf/core to be built: pnpm golden:update does both.
+// Requires @wdf-dev/core to be built: pnpm golden:update does both.
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

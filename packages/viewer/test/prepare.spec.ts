@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import type { WdfOutline } from '@wdf/core';
+import type { WdfOutline } from '@wdf-dev/core';
 import { describe, expect, it } from 'vitest';
 
 import {

@@ -1,4 +1,4 @@
-import type { WdfCapture } from '@wdf/core';
+import type { WdfCapture } from '@wdf-dev/core';
 import { describe, expect, it } from 'vitest';
 
 import { captureDetails, captureNote } from '../src/prepare.js';

@@ -1,4 +1,4 @@
-import { parseHtml } from '@wdf/core';
+import { parseHtml } from '@wdf-dev/core';
 import { describe, expect, it } from 'vitest';
 
 import { replaceEmbeds } from '../src/embeds.js';

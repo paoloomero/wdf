@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { readPackage } from '@wdf/core';
+import { readPackage } from '@wdf-dev/core';
 import { describe, expect, it } from 'vitest';
 
 import { cmdPack, cmdValidate, type Ctx } from '../src/commands.js';

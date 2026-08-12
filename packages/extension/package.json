@@ -1,5 +1,5 @@
 {
-  "name": "@wdf/extension",
+  "name": "@wdf-dev/extension",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "package": "node scripts/package.mjs"
   },
   "dependencies": {
-    "@wdf/core": "workspace:*",
-    "@wdf/import": "workspace:*",
-    "@wdf/viewer": "workspace:*",
+    "@wdf-dev/core": "workspace:*",
+    "@wdf-dev/import": "workspace:*",
+    "@wdf-dev/viewer": "workspace:*",
     "fflate": "^0.8.2"
   },
   "devDependencies": {

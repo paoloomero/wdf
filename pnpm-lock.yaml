@@ -32,13 +32,13 @@ importers:
 
   packages/cli:
     dependencies:
-      '@wdf/core':
+      '@wdf-dev/core':
         specifier: workspace:*
         version: link:../core
-      '@wdf/import':
+      '@wdf-dev/import':
         specifier: workspace:*
         version: link:../import
-      '@wdf/viewer':
+      '@wdf-dev/viewer':
         specifier: workspace:*
         version: link:../viewer
       commander:
@@ -62,13 +62,13 @@ importers:
 
   packages/extension:
     dependencies:
-      '@wdf/core':
+      '@wdf-dev/core':
         specifier: workspace:*
         version: link:../core
-      '@wdf/import':
+      '@wdf-dev/import':
         specifier: workspace:*
         version: link:../import
-      '@wdf/viewer':
+      '@wdf-dev/viewer':
         specifier: workspace:*
         version: link:../viewer
       fflate:
@@ -87,22 +87,22 @@ importers:
 
   packages/import:
     dependencies:
-      '@wdf/core':
+      '@wdf-dev/core':
         specifier: workspace:*
         version: link:../core
 
   packages/mcp:
     dependencies:
-      '@wdf/core':
+      '@wdf-dev/core':
         specifier: workspace:*
         version: link:../core
 
   packages/viewer:
     dependencies:
-      '@wdf/core':
+      '@wdf-dev/core':
         specifier: workspace:*
         version: link:../core
-      '@wdf/import':
+      '@wdf-dev/import':
         specifier: workspace:*
         version: link:../import
     devDependencies:

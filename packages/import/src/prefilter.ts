@@ -1,4 +1,4 @@
-import { getAttr, isElement, type WdfDocument, type WdfElement } from '@wdf/core';
+import { getAttr, isElement, type WdfDocument, type WdfElement } from '@wdf-dev/core';
 
 /**
  * Geometric pre-filter (T18.3, plan §10.31 "Estrazione articolo"): rules

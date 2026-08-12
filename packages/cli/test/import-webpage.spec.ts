@@ -2,11 +2,11 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { readPackage } from '@wdf/core';
+import { readPackage } from '@wdf-dev/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { cmdImport, cmdValidate, type Ctx } from '../src/commands.js';
-import { DEFAULT_CAPS, importHtml, collectSourceStylesheets } from '@wdf/import';
+import { DEFAULT_CAPS, importHtml, collectSourceStylesheets } from '@wdf-dev/import';
 
 // WP15 + WP16 acceptance (plan §10.23): a browser-saved page imports with
 // its main content extracted (site chrome dropped, reported) and its

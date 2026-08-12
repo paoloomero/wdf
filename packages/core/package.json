@@ -1,5 +1,5 @@
 {
-  "name": "@wdf/core",
+  "name": "@wdf-dev/core",
   "version": "0.1.0",
   "type": "module",
   "description": "WDF core library — isomorphic (Node + browser): manifest, profile validation, canonical extraction, integrity, packaging.",

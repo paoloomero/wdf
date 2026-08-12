@@ -1,4 +1,4 @@
-# @wdf/core
+# @wdf-dev/core
 
 Core library of [WDF — Web Document Format](https://wdf.dev): an open, web-native, AI-ready document format. One `.wdf` package carries a human rendering and a canonical AI layer, with hashes binding the two — same document for people and machines, verifiably.
 
@@ -7,7 +7,7 @@ Isomorphic (Node ≥ 20 and browsers). No Node-only APIs; deterministic by contr
 ## Install
 
 ```bash
-npm install @wdf/core
+npm install @wdf-dev/core
 ```
 
 ## What it does
@@ -22,7 +22,7 @@ npm install @wdf/core
 ## Example
 
 ```js
-import { readPackage, verifyPackage } from '@wdf/core';
+import { readPackage, verifyPackage } from '@wdf-dev/core';
 
 const pkg = readPackage(bytes); // Uint8Array of a .wdf file
 const result = await verifyPackage(pkg); // integrity + profile + extraction (spec §8.2)
