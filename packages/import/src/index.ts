@@ -27,6 +27,29 @@ export {
   type ImportInput,
 } from './document.js';
 export { decodeHtml } from './encoding.js';
+export {
+  CT_NS,
+  DocxContainer,
+  DocxError,
+  looksLikeDocx,
+  MAIN_DOCUMENT_CT,
+  OFFICE_DOCUMENT_REL,
+  openDocx,
+  REL_NS,
+  resolveTarget,
+  type Relationship,
+} from './docx/container.js';
+export {
+  parseXml,
+  XmlError,
+  xmlAttr,
+  xmlChild,
+  xmlChildren,
+  xmlText,
+  type XmlAttr,
+  type XmlElement,
+  type XmlNode,
+} from './docx/xml.js';
 export { embedFonts, type EmbeddedFonts, type FontReader } from './fonts.js';
 export { promoteHeadings } from './headings.js';
 export { importHtml, type HtmlImportOptions } from './html.js';

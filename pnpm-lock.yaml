@@ -90,6 +90,12 @@ importers:
       '@wdf-dev/core':
         specifier: workspace:*
         version: link:../core
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
+      saxes:
+        specifier: ^6.0.0
+        version: 6.0.0
 
   packages/mcp:
     dependencies:

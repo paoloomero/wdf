@@ -39,7 +39,9 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@wdf-dev/core": "workspace:*"
+    "@wdf-dev/core": "workspace:*",
+    "fflate": "^0.8.3",
+    "saxes": "^6.0.0"
   },
   "license": "Apache-2.0"
 }
