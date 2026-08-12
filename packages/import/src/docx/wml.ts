@@ -633,6 +633,54 @@ interface WmlContext {
   readonly bookmarkIds: ReadonlyMap<string, string>;
   /** Shared across part contexts (header/footer, T20.6): global caps. */
   readonly mediaTotal: { bytes: number };
+  /** Footnotes/endnotes (T20.7): content by id, and the reference order. */
+  readonly notes: NotesRegistry;
+}
+
+/** OOXML math namespace (T20.7): formulas flatten to their text. */
+const M_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
+const FOOTNOTES_REL =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes';
+const ENDNOTES_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes';
+
+interface NoteRef {
+  readonly number: number;
+  readonly kind: 'footnote' | 'endnote';
+  readonly noteId: string;
+  /** Whether the backlink target (noteref-N) has been emitted already. */
+  refIdEmitted: boolean;
+}
+
+interface NotesRegistry {
+  /** 'footnote:3' → assigned reference. Numbers are first-reference order. */
+  readonly byKey: Map<string, NoteRef>;
+  /** w:footnote elements by w:id (separators excluded). */
+  readonly footnotes: Map<string, XmlElement>;
+  readonly endnotes: Map<string, XmlElement>;
+  footnotesPart: string | undefined;
+  endnotesPart: string | undefined;
+}
+
+/** Loads a notes part (footnotes.xml / endnotes.xml) into an id → element map. */
+function loadNotesPart(
+  container: DocxContainer,
+  mainPart: string,
+  relType: string,
+  fallback: string,
+  local: 'footnote' | 'endnote',
+): { part: string | undefined; byId: Map<string, XmlElement> } {
+  const rel = container.relationshipsOf(mainPart).find((r) => r.type === relType);
+  const part = rel === undefined ? fallback : resolveTarget(mainPart, rel.target);
+  const xml = container.partText(part);
+  const byId = new Map<string, XmlElement>();
+  if (xml === undefined) return { part: undefined, byId };
+  for (const note of xmlChildren(parseXml(xml), W_NS, local)) {
+    const type = xmlAttr(note, W_NS, 'type');
+    if (type === 'separator' || type === 'continuationSeparator') continue;
+    const id = xmlAttr(note, W_NS, 'id');
+    if (id !== undefined) byId.set(id, note);
+  }
+  return { part, byId };
 }
 
 /** A context for another part (header/footer): same document, its own rels. */
@@ -736,9 +784,16 @@ function imageFromDrawing(drawing: XmlElement, ctx: WmlContext): MEl | undefined
   }
   const blip = findDescendant(drawing, A_NS, 'blip');
   if (blip === undefined) {
+    const data = findDescendant(drawing, A_NS, 'graphicData');
+    const uri = data === undefined ? '' : (xmlAttr(data, '', 'uri') ?? '');
+    const what = /chart/i.test(uri)
+      ? 'chart'
+      : /diagram/i.test(uri)
+        ? 'SmartArt diagram'
+        : 'drawing';
     reportOnce(
       ctx,
-      'drawing without an embedded picture skipped (shapes/charts arrive as placeholders with T20.7)',
+      `${what} without an embedded picture dropped (needs rendering — not representable in core 0.1)`,
     );
     return undefined;
   }
@@ -777,6 +832,37 @@ function imageFromVml(pict: XmlElement, ctx: WmlContext): MEl | undefined {
   const relId = xmlAttr(imagedata, R_OFFICE, 'id') ?? xmlAttr(imagedata, '', 'id');
   const alt = xmlAttr(imagedata, '', 'title') ?? '';
   return emitImage(relId, alt, 0, 0, ctx);
+}
+
+/**
+ * A footnote/endnote reference (T20.7): notes move to the final Notes
+ * section; the reference becomes a sup-wrapped fragment link. Numbers are
+ * unified across kinds, in first-reference order; the FIRST reference
+ * carries the backlink target id.
+ */
+function noteReference(
+  kind: 'footnote' | 'endnote',
+  noteId: string | undefined,
+  ctx: WmlContext,
+): MEl | undefined {
+  if (noteId === undefined) return undefined;
+  const source = kind === 'footnote' ? ctx.notes.footnotes : ctx.notes.endnotes;
+  if (!source.has(noteId)) {
+    reportOnce(ctx, `${kind} reference without a matching note dropped`);
+    return undefined;
+  }
+  const key = `${kind}:${noteId}`;
+  let ref = ctx.notes.byKey.get(key);
+  if (ref === undefined) {
+    ref = { number: ctx.notes.byKey.size + 1, kind, noteId, refIdEmitted: false };
+    ctx.notes.byKey.set(key, ref);
+  }
+  const attrs: Record<string, string> = {};
+  if (!ref.refIdEmitted) {
+    attrs['id'] = `noteref-${String(ref.number)}`;
+    ref.refIdEmitted = true;
+  }
+  return el('sup', attrs, [el('a', { href: `#note-${String(ref.number)}` }, [String(ref.number)])]);
 }
 
 function runToNodes(run: XmlElement, paraStyleId: string | undefined, ctx: WmlContext): MNode[] {
@@ -823,6 +909,19 @@ function runToNodes(run: XmlElement, paraStyleId: string | undefined, ctx: WmlCo
       case 'sym':
         reportOnce(ctx, 'symbol run (w:sym) dropped — private-use glyph');
         break;
+      case 'footnoteRef': // the marker inside the note's own text: skip
+      case 'endnoteRef':
+        break;
+      case 'footnoteReference':
+      case 'endnoteReference': {
+        const sup = noteReference(
+          child.local === 'footnoteReference' ? 'footnote' : 'endnote',
+          xmlAttr(child, W_NS, 'id'),
+          ctx,
+        );
+        if (sup !== undefined) content.push(sup);
+        break;
+      }
       default:
         if (!RUN_NOISE.has(child.local)) {
           reportOnce(ctx, `unsupported run content <w:${child.local}> skipped`);
@@ -882,7 +981,18 @@ function inlineContent(
 ): MNode[] {
   const out: MNode[] = [];
   for (const child of parent.children) {
-    if (child.kind !== 'element' || child.ns !== W_NS) continue;
+    if (child.kind !== 'element') continue;
+    if (child.ns === M_NS) {
+      // OMML math (T20.7): MathML is excluded from core 0.1 — the formula
+      // flattens to its plain text so no content is lost silently.
+      const text = xmlText(child).trim();
+      if (text !== '') {
+        reportOnce(ctx, 'math formula flattened to its text (MathML is excluded from core 0.1)');
+        appendInline(out, [text]);
+      }
+      continue;
+    }
+    if (child.ns !== W_NS) continue;
     switch (child.local) {
       case 'r':
         appendInline(out, runToNodes(child, paraStyleId, ctx));
@@ -916,6 +1026,7 @@ function inlineContent(
         break;
       }
       case 'ins': // tracked insertion, accepted (final view, T20.7 policy)
+      case 'moveTo': // tracked move destination: the final position
       case 'smartTag':
       case 'sdt': {
         const inner = child.local === 'sdt' ? xmlChild(child, W_NS, 'sdtContent') : child;
@@ -923,11 +1034,18 @@ function inlineContent(
         break;
       }
       case 'del':
+      case 'moveFrom':
         reportOnce(ctx, 'tracked deletion dropped (final view)');
         break;
-      case 'fldSimple':
+      case 'fldSimple': {
+        const instr = xmlAttr(child, W_NS, 'instr') ?? '';
+        if (/^\s*TOC\b/.test(instr)) {
+          reportOnce(ctx, 'table of contents dropped (the outline is derived from headings, §7.3)');
+          break;
+        }
         appendInline(out, inlineContent(child, paraStyleId, ctx));
         break;
+      }
       default:
         if (!PARA_NOISE.has(child.local)) {
           reportOnce(ctx, `unsupported paragraph content <w:${child.local}> skipped`);
@@ -1309,6 +1427,20 @@ export async function convertDocx(
     bookmarkIds.set(name, id);
   }
 
+  const loadedFootnotes = loadNotesPart(
+    container,
+    mainPart,
+    FOOTNOTES_REL,
+    'word/footnotes.xml',
+    'footnote',
+  );
+  const loadedEndnotes = loadNotesPart(
+    container,
+    mainPart,
+    ENDNOTES_REL,
+    'word/endnotes.xml',
+    'endnote',
+  );
   const ctx: WmlContext = {
     styles,
     numbering,
@@ -1321,6 +1453,13 @@ export async function convertDocx(
     media: new Map(),
     bookmarkIds,
     mediaTotal: { bytes: 0 },
+    notes: {
+      byKey: new Map(),
+      footnotes: loadedFootnotes.byId,
+      endnotes: loadedEndnotes.byId,
+      footnotesPart: loadedFootnotes.part,
+      endnotesPart: loadedEndnotes.part,
+    },
   };
 
   const body = xmlChild(root, W_NS, 'body');
@@ -1358,6 +1497,42 @@ export async function convertDocx(
         blocks.push(el('footer', {}, partResult.blocks));
       }
       report.push(`imported page ${kind} (${part})`);
+    }
+  }
+
+  // Notes section (T20.7): referenced footnotes/endnotes become a final
+  // "Note"/"Notes" section — an ordered list whose numbering matches the
+  // sup references; each item ends with a backlink to its first reference.
+  if (ctx.notes.byKey.size > 0) {
+    const items: MEl[] = [];
+    for (const ref of [...ctx.notes.byKey.values()].sort((a, b) => a.number - b.number)) {
+      const source = ref.kind === 'footnote' ? ctx.notes.footnotes : ctx.notes.endnotes;
+      const partName = ref.kind === 'footnote' ? ctx.notes.footnotesPart : ctx.notes.endnotesPart;
+      const note = source.get(ref.noteId);
+      if (note === undefined || partName === undefined) continue;
+      const noteCtx = partContext(ctx, partName);
+      const parts: MNode[] = [];
+      for (const para of xmlChildren(note, W_NS, 'p')) {
+        const direct = parsePPr(xmlChild(para, W_NS, 'pPr'));
+        const inline = inlineContent(para, direct.styleId, noteCtx);
+        if (inline.length === 0) continue;
+        if (parts.length > 0) appendInline(parts, [' ']);
+        appendInline(parts, inline);
+      }
+      if (ref.refIdEmitted) {
+        appendInline(parts, [' ']);
+        parts.push(el('a', { href: `#noteref-${String(ref.number)}` }, ['\u21a9']));
+      }
+      items.push(el('li', { id: `note-${String(ref.number)}` }, parts));
+    }
+    if (items.length > 0) {
+      const heading = (styles.language ?? '').toLowerCase().startsWith('it') ? 'Note' : 'Notes';
+      const notesBlocks = [el('h2', {}, [heading]), el('ol', {}, items)];
+      const footerAt = blocks.findIndex((b) => b.tag === 'footer');
+      blocks.splice(footerAt === -1 ? blocks.length : footerAt, 0, ...notesBlocks);
+      report.push(
+        `moved ${String(items.length)} note${items.length === 1 ? '' : 's'} to the final ${heading} section (footnotes/endnotes)`,
+      );
     }
   }
 
@@ -1556,6 +1731,16 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
           break;
         }
         case 'sdt': {
+          const sdtPr = xmlChild(child, W_NS, 'sdtPr');
+          const docPartObj = sdtPr === undefined ? undefined : xmlChild(sdtPr, W_NS, 'docPartObj');
+          const gallery = docPartObj === undefined ? undefined : wVal(docPartObj, 'docPartGallery');
+          if (gallery !== undefined && /table of contents/i.test(gallery)) {
+            reportOnce(
+              ctx,
+              'table of contents dropped (the outline is derived from headings, §7.3)',
+            );
+            break;
+          }
           const content = xmlChild(child, W_NS, 'sdtContent');
           if (content !== undefined) walkBody(content);
           break;
