@@ -46,6 +46,9 @@ interface ParaProps {
   spaceAfter?: number;
   /** 240ths of a line, only for w:lineRule="auto". */
   lineAuto?: number;
+  /** w:numPr — numbering instance ("0" cancels inherited numbering). */
+  numId?: string;
+  numIlvl?: number;
 }
 
 /** OOXML on/off value: element absent → undefined; w:val 0/false/none → off. */
@@ -113,6 +116,13 @@ function parsePPr(pPr: XmlElement | undefined): ParaProps {
     if (firstLine !== undefined) props.firstLine = firstLine;
     const hanging = twips(xmlAttr(ind, W_NS, 'hanging'));
     if (hanging !== undefined) props.hanging = hanging;
+  }
+  const numPr = xmlChild(pPr, W_NS, 'numPr');
+  if (numPr !== undefined) {
+    const numId = wVal(numPr, 'numId');
+    if (numId !== undefined) props.numId = numId;
+    const ilvl = twips(wVal(numPr, 'ilvl'));
+    if (ilvl !== undefined) props.numIlvl = ilvl;
   }
   const spacing = xmlChild(pPr, W_NS, 'spacing');
   if (spacing !== undefined) {
@@ -261,6 +271,159 @@ export class DocxStyles {
 }
 
 // ---------------------------------------------------------------------------
+// numbering.xml (T20.3): lists
+
+const NUMBERING_REL =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering';
+
+/** Numbering formats rendered as <ol> without a report. */
+const ORDERED_FORMATS = new Set([
+  'decimal',
+  'decimalZero',
+  'lowerLetter',
+  'upperLetter',
+  'lowerRoman',
+  'upperRoman',
+]);
+
+/**
+ * The numbering model: w:num instances point at w:abstractNum definitions;
+ * each abstract level carries a numFmt. Only the format matters here — the
+ * numbers themselves are rendered by the list element, never as text.
+ */
+export class DocxNumbering {
+  /** numId → abstractNumId. */
+  private readonly nums = new Map<string, string>();
+  /** numId → per-level format overrides (w:lvlOverride). */
+  private readonly overrides = new Map<string, Map<number, string>>();
+  /** abstractNumId → ilvl → numFmt. */
+  private readonly abstract = new Map<string, Map<number, string>>();
+
+  constructor(numberingXml: string | undefined) {
+    if (numberingXml === undefined) return;
+    const root = parseXml(numberingXml);
+    for (const abs of xmlChildren(root, W_NS, 'abstractNum')) {
+      const id = xmlAttr(abs, W_NS, 'abstractNumId');
+      if (id === undefined) continue;
+      const levels = new Map<number, string>();
+      for (const lvl of xmlChildren(abs, W_NS, 'lvl')) {
+        const ilvl = twips(xmlAttr(lvl, W_NS, 'ilvl'));
+        const fmt = wVal(lvl, 'numFmt');
+        if (ilvl !== undefined && fmt !== undefined) levels.set(ilvl, fmt);
+      }
+      this.abstract.set(id, levels);
+    }
+    for (const num of xmlChildren(root, W_NS, 'num')) {
+      const id = xmlAttr(num, W_NS, 'numId');
+      const absId = wVal(num, 'abstractNumId');
+      if (id === undefined || absId === undefined) continue;
+      this.nums.set(id, absId);
+      const overrides = new Map<number, string>();
+      for (const over of xmlChildren(num, W_NS, 'lvlOverride')) {
+        const ilvl = twips(xmlAttr(over, W_NS, 'ilvl'));
+        const lvl = xmlChild(over, W_NS, 'lvl');
+        const fmt = lvl === undefined ? undefined : wVal(lvl, 'numFmt');
+        if (ilvl !== undefined && fmt !== undefined) overrides.set(ilvl, fmt);
+      }
+      if (overrides.size > 0) this.overrides.set(id, overrides);
+    }
+  }
+
+  /** numFmt of an instance level, or undefined when the definition is missing. */
+  format(numId: string, ilvl: number): string | undefined {
+    const override = this.overrides.get(numId)?.get(ilvl);
+    if (override !== undefined) return override;
+    const absId = this.nums.get(numId);
+    if (absId === undefined) return undefined;
+    return this.abstract.get(absId)?.get(ilvl);
+  }
+}
+
+interface ListInfo {
+  readonly level: number;
+  readonly ordered: boolean;
+  readonly numId: string;
+}
+
+/**
+ * Assembles consecutive list paragraphs into nested ul/ol structures under
+ * the profile's constraints: a list contains only <li>, an <li> carries at
+ * most ONE nested list, as its last child (§6.2.4). Root lists are pushed
+ * into the block stream on creation and grow by mutation; where OOXML can
+ * express what the profile cannot (a numbering restart in a nested
+ * position), the lists merge with a report.
+ */
+class ListAssembler {
+  private stack: { list: MEl; level: number; numId: string }[] = [];
+
+  add(info: ListInfo, li: MEl, blocks: MEl[], ctx: WmlContext): void {
+    let level = info.level;
+    let popped: { list: MEl; level: number; numId: string } | undefined;
+    while (true) {
+      const top = this.stack[this.stack.length - 1];
+      if (top !== undefined && top.level > level) {
+        popped = this.stack.pop();
+        continue;
+      }
+      if (
+        top !== undefined &&
+        top.level === level &&
+        ((top.list.tag === 'ol') !== info.ordered || top.numId !== info.numId)
+      ) {
+        if (this.stack.length === 1) {
+          this.stack.pop(); // a sibling list can exist at the top level
+        } else {
+          reportOnce(
+            ctx,
+            'adjacent list continued: a restart in a nested position is not representable (§6.2.4)',
+          );
+        }
+      }
+      break;
+    }
+    let top = this.stack[this.stack.length - 1];
+    if (top === undefined) {
+      const list = el(info.ordered ? 'ol' : 'ul');
+      // A group that STARTED at a deeper level than this item (Word allows
+      // it): the emitted list re-nests under the new, shallower root.
+      if (
+        popped !== undefined &&
+        popped.numId === info.numId &&
+        blocks[blocks.length - 1] === popped.list
+      ) {
+        blocks[blocks.length - 1] = list;
+        list.children.push(el('li', {}, [popped.list]));
+      } else {
+        blocks.push(list);
+      }
+      top = { list, level, numId: info.numId };
+      this.stack.push(top);
+    } else if (top.level < level) {
+      const lastLi = [...top.list.children].reverse().find(isEl);
+      const nested = lastLi === undefined ? undefined : [...lastLi.children].reverse().find(isEl);
+      if (lastLi === undefined) {
+        level = top.level; // level skip at list start: clamp to the list
+      } else if (nested !== undefined && (nested.tag === 'ul' || nested.tag === 'ol')) {
+        // The li already carries its one nested list: continue inside it.
+        top = { list: nested, level, numId: info.numId };
+        this.stack.push(top);
+      } else {
+        const list = el(info.ordered ? 'ol' : 'ul');
+        lastLi.children.push(list);
+        top = { list, level, numId: info.numId };
+        this.stack.push(top);
+      }
+    }
+    top.list.children.push(li);
+  }
+
+  /** Ends the current group: the next list paragraph starts a fresh root. */
+  flush(): void {
+    this.stack = [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Property → CSS translation (whitelist of styles.ts; everything else out)
 
 const HIGHLIGHTS: Record<string, string> = {
@@ -373,6 +536,7 @@ const PARA_NOISE = new Set([
 
 interface WmlContext {
   readonly styles: DocxStyles;
+  readonly numbering: DocxNumbering;
   readonly report: string[];
   readonly reported: Set<string>;
 }
@@ -537,11 +701,34 @@ function hoistUniformRunStyle(children: MNode[]): { children: MNode[]; signature
   return { children: out, signature: first };
 }
 
-function paragraphToBlock(p: XmlElement, ctx: WmlContext): MEl | undefined {
-  const direct = parsePPr(xmlChild(p, W_NS, 'pPr'));
-  const level = ctx.styles.headingLevel(direct);
-  const tag = level === undefined ? 'p' : `h${String(level)}`;
+/**
+ * List membership of a paragraph, from its EFFECTIVE properties (numbering
+ * may arrive through the style chain), or undefined for plain paragraphs:
+ * numId absent or "0" (cancellation), or numFmt "none" (hidden number).
+ */
+function listInfoOf(direct: ParaProps, ctx: WmlContext): ListInfo | undefined {
+  const effective = ctx.styles.effectivePara(direct);
+  const numId = effective.numId;
+  if (numId === undefined || numId === '0') return undefined;
+  const level = effective.numIlvl ?? 0;
+  const fmt = ctx.numbering.format(numId, level);
+  if (fmt === 'none') return undefined;
+  if (fmt === undefined) {
+    reportOnce(ctx, 'list paragraph without a numbering definition rendered as a bullet list');
+    return { level, ordered: false, numId };
+  }
+  if (fmt !== 'bullet' && !ORDERED_FORMATS.has(fmt)) {
+    reportOnce(ctx, `exotic numbering format "${fmt}" rendered as a plain ordered list`);
+  }
+  return { level, ordered: fmt !== 'bullet', numId };
+}
 
+function paragraphToBlock(
+  p: XmlElement,
+  direct: ParaProps,
+  tag: string,
+  ctx: WmlContext,
+): MEl | undefined {
   let children = inlineContent(p, direct.styleId, ctx);
   // Word expresses vertical rhythm with empty paragraphs; spacing is style.
   const text = children.map((c) => (typeof c === 'string' ? c : '')).join('');
@@ -550,7 +737,7 @@ function paragraphToBlock(p: XmlElement, ctx: WmlContext): MEl | undefined {
 
   // Headings render bold natively: a strong wrapper is redundant semantics —
   // but its typographic signature must survive the unwrap.
-  if (tag !== 'p') {
+  if (/^h[1-6]$/.test(tag)) {
     children = children.flatMap((c) => {
       if (!isEl(c) || c.tag !== 'strong') return [c];
       const sig = c.attrs[STYLE_TMP_ATTR];
@@ -565,10 +752,15 @@ function paragraphToBlock(p: XmlElement, ctx: WmlContext): MEl | undefined {
   }
 
   const hoisted = hoistUniformRunStyle(children);
-  const signature = mergeSignatures(
-    signatureOf(paraDecls(ctx.styles.effectivePara(direct))),
-    hoisted.signature,
-  );
+  const effective = ctx.styles.effectivePara(direct);
+  if (tag === 'li') {
+    // The list structure conveys indentation; translated margins would
+    // double it (Word's ind on list items positions number and text).
+    delete effective.indentLeft;
+    delete effective.firstLine;
+    delete effective.hanging;
+  }
+  const signature = mergeSignatures(signatureOf(paraDecls(effective)), hoisted.signature);
   const attrs: Record<string, string> = {};
   if (signature !== undefined) attrs[STYLE_TMP_ATTR] = signature;
   return el(tag, attrs, hoisted.children);
@@ -592,6 +784,13 @@ function stylesXmlOf(container: DocxContainer, mainPart: string): string | undef
   return container.partText(name);
 }
 
+/** Locates and reads numbering.xml via the main part's relationships. */
+function numberingXmlOf(container: DocxContainer, mainPart: string): string | undefined {
+  const rel = container.relationshipsOf(mainPart).find((r) => r.type === NUMBERING_REL);
+  const name = rel === undefined ? 'word/numbering.xml' : resolveTarget(mainPart, rel.target);
+  return container.partText(name);
+}
+
 /**
  * Converts the paragraphs of a .docx into importer blocks (T20.2 scope:
  * paragraphs/runs/styles/headings — tables, images, hyperlink targets,
@@ -603,10 +802,12 @@ export function convertDocx(input: Uint8Array | DocxContainer, report: string[])
   const mainXml = container.partText(mainPart);
   if (mainXml === undefined) throw new Error(`main part ${mainPart} is unreadable`);
   const styles = new DocxStyles(stylesXmlOf(container, mainPart));
-  const ctx: WmlContext = { styles, report, reported: new Set() };
+  const numbering = new DocxNumbering(numberingXmlOf(container, mainPart));
+  const ctx: WmlContext = { styles, numbering, report, reported: new Set() };
 
   const body = xmlChild(parseXml(mainXml), W_NS, 'body');
   const blocks: MEl[] = [];
+  const lists = new ListAssembler();
   let emptyParagraphs = 0;
 
   const walkBody = (parent: XmlElement): void => {
@@ -614,12 +815,32 @@ export function convertDocx(input: Uint8Array | DocxContainer, report: string[])
       if (child.kind !== 'element' || child.ns !== W_NS) continue;
       switch (child.local) {
         case 'p': {
-          const block = paragraphToBlock(child, ctx);
-          if (block === undefined) emptyParagraphs += 1;
-          else blocks.push(block);
+          const direct = parsePPr(xmlChild(child, W_NS, 'pPr'));
+          const level = ctx.styles.headingLevel(direct);
+          const listInfo = level === undefined ? listInfoOf(direct, ctx) : undefined;
+          if (level !== undefined && listInfoOf(direct, ctx) !== undefined) {
+            reportOnce(
+              ctx,
+              'numbered heading: the list number is dropped (headings are not list items)',
+            );
+          }
+          const tag =
+            level !== undefined ? `h${String(level)}` : listInfo !== undefined ? 'li' : 'p';
+          const block = paragraphToBlock(child, direct, tag, ctx);
+          if (block === undefined) {
+            emptyParagraphs += 1;
+            break;
+          }
+          if (listInfo !== undefined) {
+            lists.add(listInfo, block, blocks, ctx);
+          } else {
+            lists.flush();
+            blocks.push(block);
+          }
           break;
         }
         case 'tbl':
+          lists.flush();
           reportOnce(ctx, 'table skipped (arrives with T20.4)');
           break;
         case 'sdt': {
