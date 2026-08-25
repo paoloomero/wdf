@@ -72,6 +72,30 @@ await build({
   legalComments: 'none',
 });
 
+// Reader-only typography (home redesign, plan §10.62): IBM Plex, self-hosted
+// as lazy deployment assets — same model as PDF.js. main.ts injects plex.css
+// only in app mode; the standalone falls back to the system font stacks, so
+// viewer.html and every .wdf.html stay single self-contained files.
+const PLEX = [
+  ['ibm-plex-sans', '400'],
+  ['ibm-plex-sans', '600'],
+  ['ibm-plex-mono', '400'],
+  ['ibm-plex-mono', '500'],
+  ['ibm-plex-mono', '600'],
+];
+mkdirSync(join(here, 'dist/plex'), { recursive: true });
+const faces = [];
+for (const [family, weight] of PLEX) {
+  const file = `${family}-latin-${weight}-normal.woff2`;
+  const src = join(here, `node_modules/@fontsource/${family}/files/${file}`);
+  writeFileSync(join(here, 'dist/plex', file), readFileSync(src));
+  const name = family === 'ibm-plex-sans' ? 'IBM Plex Sans' : 'IBM Plex Mono';
+  faces.push(
+    `@font-face { font-family: "${name}"; font-style: normal; font-weight: ${weight}; font-display: swap; src: url("plex/${file}") format("woff2"); }`,
+  );
+}
+writeFileSync(join(here, 'dist/plex.css'), `${faces.join('\n')}\n`);
+
 console.log(
-  `viewer.html (${String(Math.round(page.length / 1024))} KiB), standalone.html template, pdfjs assets written`,
+  `viewer.html (${String(Math.round(page.length / 1024))} KiB), standalone.html template, pdfjs + plex assets written`,
 );

@@ -34,6 +34,10 @@ cpSync(join(root, 'packages/viewer/dist/viewer.html'), join(site, 'viewer.html')
 // The standalone template never references them.
 cpSync(join(root, 'packages/viewer/dist/pdfjs.js'), join(site, 'pdfjs.js'));
 cpSync(join(root, 'packages/viewer/dist/pdfjs-worker.js'), join(site, 'pdfjs-worker.js'));
+// Reader-only typography (plan §10.62): IBM Plex, injected by main.ts in app
+// mode only; the standalone falls back to system fonts.
+cpSync(join(root, 'packages/viewer/dist/plex.css'), join(site, 'plex.css'));
+cpSync(join(root, 'packages/viewer/dist/plex'), join(site, 'plex'), { recursive: true });
 cpSync(join(root, 'site/index.html'), join(site, 'index.html'));
 cpSync(join(root, 'site/extension-privacy.html'), join(site, 'extension-privacy.html'));
 cpSync(join(root, 'site/site.css'), join(site, 'site.css'));
@@ -49,6 +53,7 @@ const viewerHash = createHash('sha256')
   // stale precache exactly like a viewer update does.
   .update(readFileSync(join(site, 'pdfjs.js')))
   .update(readFileSync(join(site, 'pdfjs-worker.js')))
+  .update(readFileSync(join(site, 'plex.css')))
   .digest('hex')
   .slice(0, 8);
 const sw = readFileSync(join(root, 'site/sw.js'), 'utf8');

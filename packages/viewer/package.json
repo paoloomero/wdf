@@ -42,6 +42,8 @@
     "@wdf-dev/import": "workspace:*"
   },
   "devDependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
     "esbuild": "^0.24.2",
     "pdfjs-dist": "^6.2.108"
   },

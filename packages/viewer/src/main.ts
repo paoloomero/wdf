@@ -615,6 +615,26 @@ function init(): void {
   const dropCard = $('drop-card');
   const fileInput = $('file-input') as HTMLInputElement;
 
+  // Reader-only typography (plan §10.62): IBM Plex loads lazily from the
+  // deployment (plex.css + woff2, precached by the SW). The standalone never
+  // injects it and falls back to the system stacks — the single-file rule
+  // and "no network from the document" stay intact.
+  if (document.getElementById('wdf-package') === null) {
+    const plex = document.createElement('link');
+    plex.rel = 'stylesheet';
+    plex.href = 'plex.css';
+    document.head.appendChild(plex);
+  }
+
+  // Keyboard access for the drop zone (it is a <label>, not a button).
+  const dropZone = document.querySelector<HTMLElement>('.dropzone');
+  dropZone?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+
   fileInput.addEventListener('change', () => {
     const files = fileInput.files;
     if (files !== null && files.length > 0) {
