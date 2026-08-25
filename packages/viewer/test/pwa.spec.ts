@@ -47,6 +47,25 @@ describe('WDF Reader PWA (T8.1)', () => {
     }
   });
 
+  // WP21 T21.2: the PDF.js pieces are Reader-DEPLOYMENT assets — precached
+  // by the SW, external to the main bundle, absent from the npm package.
+  it('service worker precaches the PDF.js lazy assets', () => {
+    const sw = readFileSync(join(siteDir, 'sw.js'), 'utf8');
+    expect(sw).toContain("'pdfjs.js'");
+    expect(sw).toContain("'pdfjs-worker.js'");
+  });
+
+  it('PDF.js stays out of the main bundle and out of the npm package', () => {
+    const build = readFileSync(join(root, 'packages/viewer/build.mjs'), 'utf8');
+    expect(build).toContain("external: ['./pdfjs.js']");
+    const pkg = JSON.parse(readFileSync(join(root, 'packages/viewer/package.json'), 'utf8')) as {
+      files: string[];
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.files.some((f) => f.includes('pdfjs'))).toBe(false);
+    expect(Object.keys(pkg.dependencies)).not.toContain('pdfjs-dist');
+  });
+
   it('viewer shell links the manifest; main.ts consumes launched files', () => {
     const shell = readFileSync(join(viewerSrc, 'shell.html'), 'utf8');
     expect(shell).toContain('<link rel="manifest" href="manifest.webmanifest" />');

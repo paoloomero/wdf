@@ -236,6 +236,51 @@ function setPaged(on: boolean): void {
 let originalIsBinary = false;
 let binaryUrl: string | undefined;
 let visualUrl: string | undefined;
+let currentView: 'human' | 'agent' | 'original' = 'human';
+
+// In-app rendering of the author's PDF rendition (WP21 T21.2): the Reader
+// lazy-loads the PDF.js wrapper (a same-origin asset precached by the SW)
+// the first time the Original view needs it. The standalone never loads
+// it — its Original view stays the download card. On any failure the card
+// is the fallback; no code is ever fetched from a third-party origin.
+let visualPdf: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+let pdfGen = 0;
+
+async function ensureVisualPdf(doc: Loaded): Promise<void> {
+  if (visualPdf !== 'idle') return;
+  const ext = doc.sourceExt;
+  const details = ext === undefined ? undefined : visualSourceDetails(doc.pkg.files, ext);
+  const bytes = ext?.visual === undefined ? undefined : doc.pkg.files.get(ext.visual.path);
+  const standalone = document.getElementById('wdf-package') !== null;
+  if (ext === undefined || details === undefined || bytes === undefined || standalone) {
+    visualPdf = 'failed';
+    return;
+  }
+  visualPdf = 'loading';
+  const gen = pdfGen;
+  try {
+    // dist/pdfjs.js is a separately built asset (build.mjs) external to this
+    // bundle — the literal specifier stays for esbuild, TS cannot resolve it.
+    // @ts-expect-error TS2307 — no source module behind the runtime asset
+    const mod = (await import('./pdfjs.js')) as typeof import('./pdfview.js');
+    const pages = $('original-pdf-pages');
+    pages.textContent = '';
+    const count = await mod.renderPdfInto(pages, bytes, $('content').clientWidth);
+    if (gen !== pdfGen) return; // another document took over meanwhile
+    if (count === 0) throw new Error('empty PDF');
+    $('original-pdf-name').textContent = details.fileName;
+    $('original-pdf-meta').textContent =
+      `${details.sizeLabel} · ${String(count)} page${count === 1 ? '' : 's'}`;
+    const link = $('original-pdf-download') as HTMLAnchorElement;
+    if (visualUrl !== undefined) link.href = visualUrl;
+    link.download = details.fileName;
+    visualPdf = 'ready';
+  } catch {
+    if (gen !== pdfGen) return;
+    visualPdf = 'failed';
+  }
+  if (currentView === 'original') setView('original');
+}
 
 // The author's PDF rendition (ext-source 0.5, WP21): the lean card offers
 // a download; the standalone adds a pointer to the installable Reader.
@@ -272,6 +317,10 @@ function renderOriginal(doc: Loaded): void {
     URL.revokeObjectURL(binaryUrl);
     binaryUrl = undefined;
   }
+  // A new document resets the rendition rendering (WP21 T21.2).
+  pdfGen++;
+  visualPdf = 'idle';
+  $('original-pdf-pages').textContent = '';
   renderVisual(doc);
   if (doc.sourceExt === undefined) {
     button.hidden = true;
@@ -499,10 +548,19 @@ async function copyCitation(id: string, button?: HTMLElement): Promise<void> {
 // Wiring
 
 function setView(view: 'human' | 'agent' | 'original'): void {
+  currentView = view;
+  // Reader only (WP21 T21.2): first entry into Original kicks off the lazy
+  // in-app rendering of the author's PDF rendition; until it is ready (or
+  // when it fails, or in the standalone) the download card is the view.
+  if (view === 'original' && originalIsBinary && visualPdf === 'idle' && loaded !== undefined) {
+    void ensureVisualPdf(loaded);
+  }
+  const pdfReady = originalIsBinary && visualPdf === 'ready';
   $('human').hidden = view !== 'human';
   $('agent').hidden = view !== 'agent';
   $('original').hidden = view !== 'original' || originalIsBinary;
-  $('original-binary').hidden = view !== 'original' || !originalIsBinary;
+  $('original-binary').hidden = view !== 'original' || !originalIsBinary || pdfReady;
+  $('original-pdf').hidden = view !== 'original' || !pdfReady;
   $('view-human').classList.toggle('active', view === 'human');
   $('view-agent').classList.toggle('active', view === 'agent');
   $('view-original').classList.toggle('active', view === 'original');

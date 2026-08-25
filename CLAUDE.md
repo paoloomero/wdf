@@ -10,7 +10,7 @@ Open, web-native, AI-ready document format. Monorepo: pnpm workspaces, TypeScrip
 - Golden files under `fixtures/golden/` are contracts. If your change modifies them, regenerate explicitly (`pnpm golden:update`) and explain why in the PR.
 - Whitelist thinking: WDF-HTML profile is a closed whitelist. When in doubt, reject. Adding an element/attribute to the profile is a spec decision, not a code decision.
 - No new runtime dependencies without discussion. Current budget: fflate, ajv, parse5, commander.
-- Viewer builds to ONE self-contained HTML file. No external requests at runtime, ever.
+- The viewer and the standalone template each build to ONE self-contained HTML file. The Reader DEPLOYMENT may add same-origin lazy assets (e.g. pdfjs.js/pdfjs-worker.js, precached by the service worker) — never third-party, and never referenced by the standalone. No external requests at runtime, ever (amended 25 Aug 2026, plan §10.57).
 - Every violation reported by the validator must cite the spec section it enforces.
 
 ## Commands

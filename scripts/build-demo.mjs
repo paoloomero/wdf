@@ -29,6 +29,11 @@ for (const name of ['municipal-decree', 'energy-report', 'technical-article']) {
 }
 
 cpSync(join(root, 'packages/viewer/dist/viewer.html'), join(site, 'viewer.html'));
+// Reader-only lazy assets (WP21 T21.2): PDF.js wrapper + worker, loaded on
+// demand by the Reader's Original view and precached by the service worker.
+// The standalone template never references them.
+cpSync(join(root, 'packages/viewer/dist/pdfjs.js'), join(site, 'pdfjs.js'));
+cpSync(join(root, 'packages/viewer/dist/pdfjs-worker.js'), join(site, 'pdfjs-worker.js'));
 cpSync(join(root, 'site/index.html'), join(site, 'index.html'));
 cpSync(join(root, 'site/extension-privacy.html'), join(site, 'extension-privacy.html'));
 cpSync(join(root, 'site/site.css'), join(site, 'site.css'));
@@ -40,6 +45,10 @@ cpSync(join(root, 'site/manifest.webmanifest'), join(site, 'manifest.webmanifest
 // the stale offline shell that §10.17 ran into.
 const viewerHash = createHash('sha256')
   .update(readFileSync(join(site, 'viewer.html')))
+  // The lazy assets are part of the shell: a PDF.js update must evict the
+  // stale precache exactly like a viewer update does.
+  .update(readFileSync(join(site, 'pdfjs.js')))
+  .update(readFileSync(join(site, 'pdfjs-worker.js')))
   .digest('hex')
   .slice(0, 8);
 const sw = readFileSync(join(root, 'site/sw.js'), 'utf8');

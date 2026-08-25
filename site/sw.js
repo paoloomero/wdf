@@ -5,6 +5,11 @@
 const CACHE = 'wdf-reader-v1';
 const SHELL = [
   'viewer.html',
+  // Reader-only lazy assets (WP21 T21.2): PDF.js renders the author PDF
+  // rendition (ext-source 0.5) in the Original view. Precached so the
+  // installed Reader renders it fully offline; same-origin only.
+  'pdfjs.js',
+  'pdfjs-worker.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

@@ -17,6 +17,11 @@ const result = await build({
   target: ['es2020'],
   legalComments: 'none',
   write: false,
+  // WP21 T21.2: the PDF.js wrapper is a SEPARATE same-origin asset the
+  // Reader deployment ships next to viewer.html; the main bundle keeps a
+  // native dynamic import so viewer.html itself stays one self-contained
+  // file (the standalone never calls it).
+  external: ['./pdfjs.js'],
 });
 
 // A literal "</script>" inside the bundle would terminate the host tag.
@@ -42,6 +47,31 @@ const standalone = page
   );
 writeFileSync(join(here, 'dist/standalone.html'), standalone);
 
+// Reader-only lazy assets (WP21 T21.2, plan §10.57): PDF.js wrapper and its
+// worker, deployed by the site build next to viewer.html and precached by
+// the service worker. They are NOT part of the npm package (`files` in
+// package.json) and never enter viewer.html or the standalone template.
+await build({
+  entryPoints: [join(here, 'src/pdfview.ts')],
+  outfile: join(here, 'dist/pdfjs.js'),
+  bundle: true,
+  format: 'esm',
+  minify: true,
+  target: ['es2020'],
+  legalComments: 'none',
+});
+await build({
+  entryPoints: [join(here, 'node_modules/pdfjs-dist/build/pdf.worker.mjs')],
+  outfile: join(here, 'dist/pdfjs-worker.js'),
+  bundle: true,
+  // Classic-script bundle: loads correctly whether pdf.js instantiates the
+  // worker as a module or a classic worker.
+  format: 'iife',
+  minify: true,
+  target: ['es2020'],
+  legalComments: 'none',
+});
+
 console.log(
-  `viewer.html (${String(Math.round(page.length / 1024))} KiB), standalone.html template written`,
+  `viewer.html (${String(Math.round(page.length / 1024))} KiB), standalone.html template, pdfjs assets written`,
 );
