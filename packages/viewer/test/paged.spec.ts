@@ -60,6 +60,22 @@ describe('paper view on screen (WP17, plan §10.26)', () => {
   });
 });
 
+describe('cited-element mark (UI fix, 25 Aug)', () => {
+  it('ships a persistent selection style and marks on click and on scroll', () => {
+    const out = buildSrcdoc(entry, new Map(), 'n');
+    expect(out).toContain('.wdf-selected');
+    // The controller marks the target both when the reader clicks in the
+    // document and when a citation arrives from the outline/agent view.
+    expect(CONTROLLER_JS).toContain('function wdfMark');
+    const scrollHandler = CONTROLLER_JS.slice(CONTROLLER_JS.indexOf("'wdf-scroll'"));
+    expect(scrollHandler).toContain('wdfMark(t)');
+    const clickHandler = CONTROLLER_JS.slice(
+      CONTROLLER_JS.indexOf("document.addEventListener('click'"),
+    );
+    expect(clickHandler).toContain('wdfMark(el)');
+  });
+});
+
 describe('paginatePlan (WP17)', () => {
   const u = (h: number, extra: Partial<PlanUnit> = {}): PlanUnit => ({ h, ...extra });
 

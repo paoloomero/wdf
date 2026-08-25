@@ -215,6 +215,15 @@ function renderHuman(doc: Loaded): void {
 // paged-media sheet; the browser's print engine does the pagination.
 function exportPdf(): void {
   if (loaded === undefined) return;
+  // The author's PDF rendition IS the PDF of this document (ext-source 0.5):
+  // download it instead of print-exporting a re-rendering.
+  if (visualAvailable && visualUrl !== undefined) {
+    const a = document.createElement('a');
+    a.href = visualUrl;
+    a.download = visualFileName;
+    a.click();
+    return;
+  }
   const entry = dec.decode(loaded.pkg.files.get(loaded.pkg.manifest.entry) ?? new Uint8Array());
   const frame = $('print-frame') as HTMLIFrameElement;
   frame.onload = () => {
@@ -237,6 +246,11 @@ let originalIsBinary = false;
 let binaryUrl: string | undefined;
 let visualUrl: string | undefined;
 let currentView: 'human' | 'agent' | 'original' = 'human';
+// When the package carries the author's PDF rendition, the toolbar "PDF"
+// button downloads THAT file — the authoritative page image — instead of
+// print-exporting the Human view (Paolo's UI decision, 25 Aug).
+let visualAvailable = false;
+let visualFileName = '';
 
 // In-app rendering of the author's PDF rendition (WP21 T21.2): the Reader
 // lazy-loads the PDF.js wrapper (a same-origin asset precached by the SW)
@@ -293,11 +307,18 @@ function renderVisual(doc: Loaded): void {
   const ext = doc.sourceExt;
   const details = ext === undefined ? undefined : visualSourceDetails(doc.pkg.files, ext);
   const bytes = ext?.visual === undefined ? undefined : doc.pkg.files.get(ext.visual.path);
+  const pdfButton = $('pdf-export') as HTMLButtonElement;
   if (ext === undefined || details === undefined || bytes === undefined) {
     card.hidden = true;
+    visualAvailable = false;
+    visualFileName = '';
+    pdfButton.title = 'Export the document as PDF (browser print)';
     return;
   }
   card.hidden = false;
+  visualAvailable = true;
+  visualFileName = details.fileName;
+  pdfButton.title = `Download the PDF saved by the author (${details.fileName})`;
   $('original-visual-name').textContent = details.fileName;
   $('original-visual-meta').textContent = `${details.mediaType} · ${details.sizeLabel}`;
   const link = $('original-visual-download') as HTMLAnchorElement;
@@ -564,10 +585,12 @@ function setView(view: 'human' | 'agent' | 'original'): void {
   $('view-human').classList.toggle('active', view === 'human');
   $('view-agent').classList.toggle('active', view === 'agent');
   $('view-original').classList.toggle('active', view === 'original');
-  // Paper and PDF act on the document rendering: available only where they
-  // apply (the Human view). The paper state itself survives view switches.
+  // Paper acts on the document rendering: available only where it applies
+  // (the Human view); the paper state itself survives view switches. PDF
+  // does too when it print-exports — but when it downloads the author's
+  // rendition it applies everywhere.
   ($('paged-toggle') as HTMLButtonElement).disabled = view !== 'human';
-  ($('pdf-export') as HTMLButtonElement).disabled = view !== 'human';
+  ($('pdf-export') as HTMLButtonElement).disabled = view !== 'human' && !visualAvailable;
   if (view === 'agent' && selectedId !== undefined) select(selectedId, 'outline');
 }
 

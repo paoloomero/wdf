@@ -118,6 +118,10 @@ export const BASE_CSS = `
   a { color: #1a56c4; }
   [id] { scroll-margin-top: 1rem; }
   .wdf-flash { outline: 2px solid #1a56c4; outline-offset: 4px; border-radius: 2px; }
+  /* Persistent mark of the selected/cited element (outline or agent click):
+     stays until another element is selected, so the cited part is findable
+     after the arrival flash fades. */
+  .wdf-selected { background: rgba(26, 86, 196, 0.07); box-shadow: -4px 0 0 0 #1a56c4; border-radius: 2px; }
 `;
 
 export interface PlanUnit {
@@ -401,6 +405,11 @@ export const PAGINATE_JS = `
 
 /** Controller injected into the sandboxed frame (the only script its CSP allows). */
 export const CONTROLLER_JS = `
+  function wdfMark(el) {
+    var old = document.querySelectorAll('.wdf-selected');
+    for (var i = 0; i < old.length; i++) old[i].classList.remove('wdf-selected');
+    if (el) el.classList.add('wdf-selected');
+  }
   document.addEventListener('click', function (e) {
     var target = e.target instanceof Element ? e.target : null;
     if (!target) return;
@@ -411,7 +420,10 @@ export const CONTROLLER_JS = `
       return;
     }
     var el = target.closest('[id]');
-    if (el) parent.postMessage({ type: 'wdf-click', id: el.id }, '*');
+    if (el) {
+      wdfMark(el);
+      parent.postMessage({ type: 'wdf-click', id: el.id }, '*');
+    }
   });
   addEventListener('message', function (e) {
     var d = e.data || {};
@@ -422,6 +434,7 @@ export const CONTROLLER_JS = `
     if (d.type === 'wdf-scroll' && typeof d.id === 'string') {
       var t = document.getElementById(d.id);
       if (t) {
+        wdfMark(t);
         t.scrollIntoView({ behavior: 'smooth', block: 'start' });
         t.classList.add('wdf-flash');
         setTimeout(function () { t.classList.remove('wdf-flash'); }, 1400);
