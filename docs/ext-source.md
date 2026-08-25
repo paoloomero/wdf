@@ -1,4 +1,4 @@
-# WDF extension: `source` (version 0.4)
+# WDF extension: `source` (version 0.5)
 
 Status: extension specification (outside WDF Core, per core spec §10).
 Producers MAY use it; conforming consumers MAY ignore it entirely (§10.3).
@@ -15,7 +15,7 @@ the package integrity hashes like any other file (§10.2).
 ## Manifest declaration
 
 ```json
-"extensions": [{ "name": "source", "version": "0.4" }]
+"extensions": [{ "name": "source", "version": "0.5" }]
 ```
 
 Each version is a strict superset of the previous one: a producer using
@@ -63,6 +63,18 @@ nothing to decode), and the OPTIONAL `mediaType` field records the IANA
 media type when known. A consumer cannot render a binary original; see
 the consumer guidance below.
 
+**Author visual rendition** (version 0.5): a converted document can carry,
+next to the source, a **visual rendition produced by the author** — today
+a PDF saved from the original application (e.g. Word → Save as PDF). It is
+the author's frozen page image of the same document: WDF tooling never
+generates it and **never parses it** — a consumer may only display it or
+offer it for download. The rendition is embedded byte-for-byte as
+`ext/source/<hash>.pdf` (same hash-addressing as the main file) and
+declared in the OPTIONAL `visual` field. It is allowed with any `kind`.
+Fidelity is the author's responsibility: package integrity attests that
+the bytes have not changed, not that the rendition matches the canonical
+content (same honesty rule as the `capture` extension).
+
 ## `source.json`
 
 ```json
@@ -97,6 +109,11 @@ the consumer guidance below.
 - `mediaType` — OPTIONAL (0.4, `"binary"` only). IANA media type of the
   original when known (e.g.
   `application/vnd.openxmlformats-officedocument.wordprocessingml.document`).
+- `visual` — OPTIONAL (0.5). The author-supplied visual rendition:
+  `{ "path": "ext/source/<hash>.pdf", "mediaType": "application/pdf",
+"name": "<original file name>" }`. `path` MUST point to a file in the
+  package; `mediaType` is currently always `application/pdf` (other types
+  are reserved); `name` is the original file name (display only).
 - `resources` — original `src` value (verbatim, URL-encoding included) →
   package path. Keys are sorted; serialization is canonical JSON with
   two-space indent and a trailing newline, so identical input produces
@@ -117,3 +134,12 @@ and offer the embedded bytes for download, so the user can open the
 original in its native application. The no-network rule is unaffected —
 the bytes come from the package. A consumer MUST NOT attempt to render a
 binary original as text.
+
+For `visual` (0.5) two consumer profiles are legitimate: a **rich viewer**
+(e.g. the installed WDF Reader) MAY render the rendition with a PDF
+renderer **bundled with the application** — never loaded from the network
+at runtime; the no-network rule of the document view applies unchanged. A
+**lean consumer** (e.g. the standalone distribution file) SHOULD offer the
+rendition for download alongside the source, and MAY point the user to an
+installable rich viewer. A consumer MUST NOT fetch renderer code from a
+remote origin to display the rendition.

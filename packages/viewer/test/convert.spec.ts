@@ -151,3 +151,56 @@ describe('browser converter ↔ CLI parity — docx (T20.8)', () => {
     expect(pkg.manifest.extensions?.map((e) => e.name)).toEqual(['pagination', 'source']);
   });
 });
+
+describe('author PDF rendition on drop (ext-source 0.5, WP21)', () => {
+  const PDF = new TextEncoder().encode('%PDF-1.4\n1 0 obj\nendobj\n%%EOF\n');
+
+  async function docxDrop(): Promise<Map<string, Uint8Array>> {
+    const { makeDocx, W_NS } = await import('../../import/test/docx-fixtures.js');
+    const document =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      `<w:document xmlns:w="${W_NS}"><w:body>` +
+      '<w:p><w:r><w:t>Documento con istantanea.</w:t></w:r></w:p>' +
+      '</w:body></w:document>';
+    return new Map([
+      ['delibera.docx', makeDocx({ document })],
+      ['delibera.pdf', PDF],
+    ]);
+  }
+
+  it('a same-basename PDF attaches as the visual rendition, byte-identical to the CLI', async () => {
+    const files = await docxDrop();
+    const result = await convertFiles(files, { withSource: true, date: DATE });
+    expect(result).toBeDefined();
+
+    const pkg = readPackage(result?.wdfBytes ?? new Uint8Array());
+    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.5' }]);
+    const sourceJson = JSON.parse(
+      new TextDecoder().decode(pkg.files.get('ext/source/source.json')),
+    ) as { visual?: { path: string; name: string } };
+    expect(sourceJson.visual?.name).toBe('delibera.pdf');
+    expect(pkg.files.has(sourceJson.visual?.path ?? '')).toBe(true);
+
+    const dir = mkdtempSync(join(tmpdir(), 'wdf-visual-par-'));
+    const docxPath = join(dir, 'delibera.docx');
+    const pdfPath = join(dir, 'delibera.pdf');
+    writeFileSync(docxPath, files.get('delibera.docx') ?? new Uint8Array());
+    writeFileSync(pdfPath, PDF);
+    const out = join(dir, 'out.wdf');
+    expect(
+      await cmdImport(
+        docxPath,
+        { output: out, date: DATE, withSource: true, withPdf: pdfPath },
+        silent(),
+      ),
+    ).toBe(0);
+    expect(new Uint8Array(result?.wdfBytes ?? [])).toEqual(new Uint8Array(readFileSync(out)));
+  });
+
+  it('without the source the PDF is ignored (the rendition cannot travel alone)', async () => {
+    const result = await convertFiles(await docxDrop(), { date: DATE });
+    expect(result).toBeDefined();
+    const pkg = readPackage(result?.wdfBytes ?? new Uint8Array());
+    expect(pkg.manifest.extensions ?? []).toEqual([]);
+  });
+});

@@ -3,6 +3,7 @@ import {
   DEFAULT_CAPS,
   importDocument,
   looksLikeDocx,
+  looksLikePdf,
   type AssetLoader,
   type CssFetcher,
   type ImportedDocument,
@@ -161,6 +162,19 @@ export async function convertFiles(
     sourceEncoding,
   };
   if (isDocx) input.bytes = bytes;
+  // WP21 (ext-source 0.5): a dropped PDF sharing the document's basename is
+  // taken as the author's visual rendition. It rides inside the source
+  // extension, so it attaches only together with the source.
+  if (opts.withSource === true) {
+    const dir = mainPath.split('/').slice(0, -1).join('/');
+    const pdfPath = `${dir === '' ? '' : `${dir}/`}${baseName}.pdf`.toLowerCase();
+    const candidate = [...files.keys()].find((p) => p.toLowerCase() === pdfPath);
+    const pdfBytes = candidate === undefined ? undefined : files.get(candidate);
+    if (candidate !== undefined && pdfBytes !== undefined && looksLikePdf(pdfBytes)) {
+      input.visualBytes = pdfBytes;
+      input.visualName = candidate.split('/').pop() ?? candidate;
+    }
+  }
   const result = await importDocument(
     input,
     {

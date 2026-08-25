@@ -28,6 +28,7 @@ import {
   citation,
   outlineTree,
   parseSourceExt,
+  visualSourceDetails,
   type OutlineTreeNode,
   type SourceExt,
 } from './prepare.js';
@@ -234,6 +235,34 @@ function setPaged(on: boolean): void {
 // metadata and offers the embedded bytes for download instead.
 let originalIsBinary = false;
 let binaryUrl: string | undefined;
+let visualUrl: string | undefined;
+
+// The author's PDF rendition (ext-source 0.5, WP21): the lean card offers
+// a download; the standalone adds a pointer to the installable Reader.
+function renderVisual(doc: Loaded): void {
+  const card = $('original-visual');
+  if (visualUrl !== undefined) {
+    URL.revokeObjectURL(visualUrl);
+    visualUrl = undefined;
+  }
+  const ext = doc.sourceExt;
+  const details = ext === undefined ? undefined : visualSourceDetails(doc.pkg.files, ext);
+  const bytes = ext?.visual === undefined ? undefined : doc.pkg.files.get(ext.visual.path);
+  if (ext === undefined || details === undefined || bytes === undefined) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  $('original-visual-name').textContent = details.fileName;
+  $('original-visual-meta').textContent = `${details.mediaType} · ${details.sizeLabel}`;
+  const link = $('original-visual-download') as HTMLAnchorElement;
+  visualUrl = URL.createObjectURL(new Blob([bytes as BlobPart], { type: details.mediaType }));
+  link.href = visualUrl;
+  link.download = details.fileName;
+  // Spec §9 standalone (embedded package): no bundled renderer — point to
+  // the installable Reader instead (docs/ext-source.md consumer guidance).
+  $('original-visual-hint').hidden = document.getElementById('wdf-package') === null;
+}
 
 function renderOriginal(doc: Loaded): void {
   const frame = $('original') as HTMLIFrameElement;
@@ -243,6 +272,7 @@ function renderOriginal(doc: Loaded): void {
     URL.revokeObjectURL(binaryUrl);
     binaryUrl = undefined;
   }
+  renderVisual(doc);
   if (doc.sourceExt === undefined) {
     button.hidden = true;
     frame.srcdoc = '';

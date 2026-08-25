@@ -22,6 +22,7 @@ export {
 export { buildPackage } from './build.js';
 export {
   importDocument,
+  looksLikePdf,
   type ImportDocumentOptions,
   type ImportedDocument,
   type ImportInput,

@@ -553,6 +553,8 @@ export interface SourceExt {
   encoding: string;
   /** IANA media type of a binary original, when declared (v0.4). */
   mediaType?: string;
+  /** Author-supplied visual rendition — a PDF saved by the author (v0.5). */
+  visual?: { path: string; mediaType: string; name: string };
   resources: Record<string, string>;
   /** Original stylesheet href → embedded ext/source/*.css (WP15, v0.2). */
   stylesheets: Record<string, string>;
@@ -569,6 +571,7 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
       mainName?: unknown;
       encoding?: unknown;
       mediaType?: unknown;
+      visual?: unknown;
       resources?: unknown;
       stylesheets?: unknown;
     };
@@ -592,6 +595,21 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
       stylesheets: stringMap(parsed.stylesheets),
     };
     if (typeof parsed.mediaType === 'string') ext.mediaType = parsed.mediaType;
+    // v0.5 `visual`: tolerated consumer read — a malformed or dangling
+    // declaration drops the field, never the whole extension.
+    if (typeof parsed.visual === 'object' && parsed.visual !== null) {
+      const v = parsed.visual as { path?: unknown; mediaType?: unknown; name?: unknown };
+      if (typeof v.path === 'string' && files.has(v.path)) {
+        ext.visual = {
+          path: v.path,
+          mediaType: typeof v.mediaType === 'string' ? v.mediaType : 'application/pdf',
+          name:
+            typeof v.name === 'string' && v.name !== ''
+              ? v.name
+              : (v.path.split('/').pop() ?? 'rendition.pdf'),
+        };
+      }
+    }
     return ext;
   } catch {
     return undefined;
@@ -631,17 +649,40 @@ export function binarySourceDetails(
 ): { fileName: string; mediaType: string; sizeLabel: string } | undefined {
   const bytes = files.get(ext.main);
   if (bytes === undefined) return undefined;
+  return {
+    fileName: ext.mainName !== '' ? ext.mainName : (ext.main.split('/').pop() ?? 'original'),
+    mediaType: ext.mediaType ?? 'unknown type',
+    sizeLabel: formatSize(bytes.length),
+  };
+}
+
+function formatSize(length: number): string {
   const units = ['bytes', 'KB', 'MB'];
-  let size = bytes.length;
+  let size = length;
   let unit = 0;
   while (size >= 1024 && unit < units.length - 1) {
     size /= 1024;
     unit += 1;
   }
+  return `${unit === 0 ? String(size) : size.toFixed(1)} ${units[unit] ?? ''}`.trim();
+}
+
+/**
+ * Details of the author's visual rendition (ext-source 0.5 `visual`) for
+ * the Original view: a lean consumer offers it for download next to the
+ * source (docs/ext-source.md, consumer guidance).
+ */
+export function visualSourceDetails(
+  files: ReadonlyMap<string, Uint8Array>,
+  ext: SourceExt,
+): { fileName: string; mediaType: string; sizeLabel: string } | undefined {
+  if (ext.visual === undefined) return undefined;
+  const bytes = files.get(ext.visual.path);
+  if (bytes === undefined) return undefined;
   return {
-    fileName: ext.mainName !== '' ? ext.mainName : (ext.main.split('/').pop() ?? 'original'),
-    mediaType: ext.mediaType ?? 'unknown type',
-    sizeLabel: `${unit === 0 ? String(size) : size.toFixed(1)} ${units[unit] ?? ''}`.trim(),
+    fileName: ext.visual.name,
+    mediaType: ext.visual.mediaType,
+    sizeLabel: formatSize(bytes.length),
   };
 }
 

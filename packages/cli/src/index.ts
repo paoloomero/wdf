@@ -59,6 +59,10 @@ program
   .option('--date <iso>', 'created/modified timestamp (default: now)')
   .option('--with-source', 'embed the original input byte-for-byte (extension "source", §10)')
   .option(
+    '--with-pdf <file>',
+    'embed an author-saved PDF rendition of the input (ext-source 0.5; requires --with-source)',
+  )
+  .option(
     '--embed-fonts',
     'embed open metric-compatible clones of referenced fonts (extension "fonts", §10)',
   )
@@ -80,6 +84,7 @@ program
         lang?: string;
         date?: string;
         withSource?: boolean;
+        withPdf?: string;
         embedFonts?: boolean;
         fetchRemote?: boolean;
         fullPage?: boolean;

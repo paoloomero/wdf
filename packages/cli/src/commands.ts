@@ -20,6 +20,7 @@ import {
   decodeHtml,
   DEFAULT_CAPS,
   looksLikeDocx,
+  looksLikePdf,
   fetchPage,
   importDocument,
   urlAssetLoader,
@@ -209,6 +210,7 @@ export async function cmdImport(
     lang?: string;
     date?: string;
     withSource?: boolean;
+    withPdf?: string;
     embedFonts?: boolean;
     fetchRemote?: boolean;
     fullPage?: boolean;
@@ -219,6 +221,28 @@ export async function cmdImport(
   const isUrl = /^https?:\/\//i.test(input);
   const isMarkdown = !isUrl && /\.(md|markdown)$/i.test(input);
   const report: string[] = [];
+
+  // WP21 (ext-source 0.5): the author's PDF rendition rides inside the
+  // source extension — it cannot travel alone, and it must be a real PDF.
+  let visualBytes: Uint8Array | undefined;
+  let visualName = '';
+  if (opts.withPdf !== undefined) {
+    if (opts.withSource !== true) {
+      ctx.err('error: --with-pdf requires --with-source (ext-source 0.5)');
+      return 2;
+    }
+    try {
+      visualBytes = readFileSync(opts.withPdf);
+    } catch (e) {
+      ctx.err(`error: cannot read ${opts.withPdf} (${String(e)})`);
+      return 2;
+    }
+    if (!looksLikePdf(visualBytes)) {
+      ctx.err(`error: ${opts.withPdf} is not a PDF (missing %PDF- signature)`);
+      return 2;
+    }
+    visualName = basename(opts.withPdf);
+  }
 
   let text: string;
   let loader: AssetLoader | undefined;
@@ -332,6 +356,10 @@ export async function cmdImport(
   };
   if (docxBytes !== undefined) docInput.bytes = docxBytes;
   if (sourceBytes !== undefined) docInput.sourceBytes = sourceBytes;
+  if (visualBytes !== undefined) {
+    docInput.visualBytes = visualBytes;
+    docInput.visualName = visualName;
+  }
 
   const importOpts: Parameters<typeof importDocument>[1] = { readFont: fsFontReader };
   if (opts.title !== undefined) importOpts.title = opts.title;

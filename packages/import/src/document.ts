@@ -41,6 +41,26 @@ export interface ImportInput {
    * captured from a live page (docs/ext-source.md, docs/ext-capture.md).
    */
   sourceKind?: 'fetched-html' | 'dom-snapshot';
+  /**
+   * Author-supplied visual rendition (ext-source 0.5 `visual`, WP21): a
+   * PDF the author saved from the original application, embedded verbatim.
+   * Never generated or parsed by the pipeline. Requires `withSource`.
+   */
+  visualBytes?: Uint8Array;
+  /** Original file name of the visual rendition (display only). */
+  visualName?: string;
+}
+
+/** PDF magic-number sniff (`%PDF-`), mirroring looksLikeDocx (T20.8). */
+export function looksLikePdf(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= 5 &&
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46 &&
+    bytes[4] === 0x2d
+  );
 }
 
 export interface ImportDocumentOptions {
@@ -228,13 +248,37 @@ export async function importDocument(
           encoding: input.sourceEncoding ?? 'utf-8',
           resources: sourceMap,
         };
+    // ext-source 0.5 (WP21): the author's visual rendition (a PDF saved
+    // from the original application) travels next to the source. The
+    // pipeline embeds it verbatim — it never generates or parses a PDF.
+    let version = isDocx ? '0.4' : '0.3';
+    if (input.visualBytes !== undefined) {
+      if (!looksLikePdf(input.visualBytes)) {
+        throw new Error('visual rendition is not a PDF (missing %PDF- signature)');
+      }
+      const visualPath = `ext/source/${(await sha256Hex(input.visualBytes)).slice(0, 16)}.pdf`;
+      extFiles.set(visualPath, input.visualBytes);
+      sourceJson['visual'] = {
+        path: visualPath,
+        mediaType: 'application/pdf',
+        name: input.visualName ?? '',
+      };
+      version = '0.5';
+      sourceJson['source'] = version;
+      report.push(
+        `embedded the author's PDF rendition as ${visualPath} (extension "source" 0.5, docs/ext-source.md)`,
+      );
+    }
     if (Object.keys(stylesheets).length > 0) sourceJson['stylesheets'] = stylesheets;
-    extensions.push({ name: 'source', version: isDocx ? '0.4' : '0.3' });
+    extensions.push({ name: 'source', version });
     extFiles.set(mainPath, input.sourceBytes);
     extFiles.set('ext/source/source.json', enc.encode(`${JSON.stringify(sourceJson, null, 2)}\n`));
     report.push(
       `embedded the original source as ${mainPath} (extension "source", docs/ext-source.md)`,
     );
+  } else if (input.visualBytes !== undefined) {
+    // The rendition lives inside ext/source/ — it cannot travel alone.
+    throw new Error('a visual rendition requires withSource (ext-source 0.5)');
   }
   // T18.4 (docs/ext-capture.md §4): capture provenance travels in the
   // package, hashed like every other file.

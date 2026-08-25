@@ -6,6 +6,7 @@ import {
   buildSrcdoc,
   fontsCss,
   parseSourceExt,
+  visualSourceDetails,
   type SourceExt,
 } from '../src/prepare.js';
 
@@ -251,4 +252,84 @@ describe('binary source kind (ext-source 0.4)', () => {
     };
     expect(binarySourceDetails(files, ext)).toBeUndefined();
   });
+});
+
+// WP21 (docs/ext-source.md 0.5): the author's visual rendition — parsed
+// tolerantly, surfaced by the download card in the Original view.
+describe('the visual rendition (ext-source 0.5, WP21)', () => {
+  function visualFiles(overrides?: Record<string, unknown>): Map<string, Uint8Array> {
+    const meta: Record<string, unknown> = {
+      source: '0.5',
+      kind: 'binary',
+      main: 'ext/source/cafebabe12345678.docx',
+      mainName: 'delibera 42.docx',
+      mediaType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      visual: {
+        path: 'ext/source/0123456789abcdef.pdf',
+        mediaType: 'application/pdf',
+        name: 'delibera 42.pdf',
+        ...overrides,
+      },
+      resources: {},
+    };
+    return new Map([
+      ['ext/source/source.json', enc.encode(JSON.stringify(meta))],
+      ['ext/source/cafebabe12345678.docx', new Uint8Array(2048)],
+      ['ext/source/0123456789abcdef.pdf', new Uint8Array(3 * 1024)],
+    ]);
+  }
+
+  it('parseSourceExt reads a well-formed visual', () => {
+    const ext = parseSourceExt(visualFiles());
+    expect(ext?.visual).toEqual({
+      path: 'ext/source/0123456789abcdef.pdf',
+      mediaType: 'application/pdf',
+      name: 'delibera 42.pdf',
+    });
+  });
+
+  it('drops a dangling visual without losing the extension', () => {
+    const files = visualFiles();
+    files.delete('ext/source/0123456789abcdef.pdf');
+    const ext = parseSourceExt(files);
+    expect(ext).toBeDefined();
+    expect(ext?.visual).toBeUndefined();
+  });
+
+  it('defaults mediaType and name when malformed', () => {
+    const ext = parseSourceExt(visualFiles({ mediaType: 42, name: '' }));
+    expect(ext?.visual?.mediaType).toBe('application/pdf');
+    expect(ext?.visual?.name).toBe('0123456789abcdef.pdf');
+  });
+
+  it('visualSourceDetails reports name, type and size', () => {
+    const files = visualFiles();
+    const ext = parseSourceExt(files);
+    expect(visualSourceDetails(files, ext as SourceExt)).toEqual({
+      fileName: 'delibera 42.pdf',
+      mediaType: 'application/pdf',
+      sizeLabel: '3.0 KB',
+    });
+  });
+
+  it('visualSourceDetails is undefined without a visual or without bytes', () => {
+    const files = binaryNoVisual();
+    const ext = parseSourceExt(files);
+    expect(ext).toBeDefined();
+    expect(visualSourceDetails(files, ext as SourceExt)).toBeUndefined();
+  });
+
+  function binaryNoVisual(): Map<string, Uint8Array> {
+    const meta = {
+      source: '0.4',
+      kind: 'binary',
+      main: 'ext/source/cafebabe12345678.docx',
+      mainName: 'delibera 42.docx',
+      resources: {},
+    };
+    return new Map([
+      ['ext/source/source.json', enc.encode(JSON.stringify(meta))],
+      ['ext/source/cafebabe12345678.docx', new Uint8Array(2048)],
+    ]);
+  }
 });
