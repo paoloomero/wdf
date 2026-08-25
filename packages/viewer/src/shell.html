@@ -14,20 +14,54 @@
   <body>
     <div id="drop-screen">
       <div class="drop-card" id="drop-card">
-        <h1>WDF Viewer</h1>
+        <h1>WDF Reader</h1>
         <p>
-          Open a <strong>Web Document Format</strong> package: what the human reads and what an AI
-          agent reads are the same thing — verifiably.
+          <strong>Web Document Format</strong>: what the human reads and what an AI agent reads are
+          the same thing — verifiably.
         </p>
-        <p class="drop-hint">
-          Drop a <code>.wdf</code> file here — or an HTML export from your word processor (with its
-          images folder) to convert it into one. Everything happens in your browser: no upload, no
-          network requests.
-        </p>
-        <label class="file-button">
-          Choose files
+        <label class="drop-zone">
+          <span class="drop-zone-title">Drop files here</span>
+          <span class="drop-zone-sub">or click to choose</span>
+          <span class="drop-zone-privacy"
+            >Everything happens in your browser — no upload, no network requests.</span
+          >
           <input type="file" id="file-input" multiple hidden />
         </label>
+        <div class="drop-duo">
+          <section>
+            <h2>Read</h2>
+            <p class="recipe">
+              <code class="chip">.wdf</code><span class="arrow">→</span
+              ><span class="recipe-out"
+                >opens verified, with the Human, Agent and Original views</span
+              >
+            </p>
+          </section>
+          <section>
+            <h2>Create</h2>
+            <p class="recipe">
+              <code class="chip">.docx</code><span class="arrow">→</span
+              ><code class="chip">.wdf</code>
+            </p>
+            <p class="recipe">
+              <code class="chip">.docx</code> + <code class="chip">.pdf</code>
+              <span class="recipe-note">same name</span><span class="arrow">→</span
+              ><span class="recipe-out"
+                ><code class="chip">.wdf</code> with the original PDF attached</span
+              >
+            </p>
+            <p class="recipe">
+              <code class="chip">.html</code> + <span class="recipe-note">images folder</span>
+              <span class="recipe-note">(Word export)</span><span class="arrow">→</span
+              ><code class="chip">.wdf</code>
+            </p>
+          </section>
+        </div>
+        <p class="ext-hint">
+          Saving <strong>web pages</strong>? Get the
+          <a href="https://wdf.dev" target="_blank" rel="noopener">browser extension</a> — one click
+          turns any page into a WDF.
+        </p>
         <p id="install-hint" class="drop-hint small">
           Tip: install this page as an app (Chrome/Edge, install icon in the address bar) and
           <code>.wdf</code> files will open with a double click — offline, like any reader.

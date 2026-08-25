@@ -44,16 +44,113 @@ code {
   background: var(--panel);
 }
 .drop-card {
-  max-width: 26rem;
+  max-width: 34rem;
   background: var(--bg);
-  border: 1.5px dashed var(--line);
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 2rem;
   text-align: center;
 }
-.drop-card.dragover {
+/* The universal drop target: one zone, the app does the right thing with
+   whatever lands on it (.wdf opens, documents convert). */
+.drop-zone {
+  display: block;
+  margin: 1.25rem 0 0.5rem;
+  padding: 1.5rem 1rem;
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.drop-zone:hover {
+  border-color: var(--accent);
+}
+.drop-card.dragover .drop-zone {
   border-color: var(--accent);
   background: #f0f5ff;
+}
+.drop-zone-title {
+  display: block;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.drop-zone-sub {
+  display: block;
+  color: var(--accent);
+  font-size: 0.9rem;
+  margin-top: 0.15rem;
+}
+.drop-zone-privacy {
+  display: block;
+  color: #7a8494;
+  font-size: 0.8rem;
+  margin-top: 0.6rem;
+}
+/* Read | Create: the two functions of the app, side by side. */
+.drop-duo {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 0 1.25rem;
+  margin-top: 1.1rem;
+  text-align: left;
+}
+.drop-duo section + section {
+  border-left: 1px solid var(--line);
+  padding-left: 1.25rem;
+}
+.drop-duo h2 {
+  margin: 0.3rem 0 0.4rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a8494;
+}
+.recipe {
+  margin: 0.35rem 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.chip {
+  display: inline-block;
+  background: #eef1f6;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 0.35em;
+  font-size: 0.82em;
+  color: #1c2330;
+  white-space: nowrap;
+}
+.arrow {
+  color: var(--accent);
+  font-weight: 700;
+  margin: 0 0.4em;
+}
+.recipe-note {
+  font-size: 0.78em;
+  color: #7a8494;
+  white-space: nowrap;
+}
+.ext-hint {
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.86rem;
+}
+.ext-hint a {
+  color: var(--accent);
+  font-weight: 600;
+}
+@media (max-width: 34rem) {
+  .drop-duo {
+    grid-template-columns: 1fr;
+  }
+  .drop-duo section + section {
+    border-left: none;
+    padding-left: 0;
+    margin-top: 0.6rem;
+    border-top: 1px solid var(--line);
+    padding-top: 0.6rem;
+  }
 }
 .drop-card h1 {
   margin: 0 0 0.5rem;
