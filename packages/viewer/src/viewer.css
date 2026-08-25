@@ -152,6 +152,11 @@ code {
   padding: 0.25rem 0.5rem;
   cursor: pointer;
 }
+/* The outline cannot navigate the Original view: its toggle disables there. */
+#sidebar-toggle:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 #doc-head {
   flex: 1;
   min-width: 0;

@@ -568,8 +568,25 @@ async function copyCitation(id: string, button?: HTMLElement): Promise<void> {
 // ---------------------------------------------------------------------------
 // Wiring
 
+// The outline navigates by element ids — meaningless in the Original view
+// (PDF rendition, download card, or untouched source): there it closes and
+// its toggle disables; the previous open state returns with Human/Agent.
+let sidebarWasOpen = false;
+
 function setView(view: 'human' | 'agent' | 'original'): void {
   currentView = view;
+  const app = $('app');
+  const sidebarToggle = $('sidebar-toggle') as HTMLButtonElement;
+  if (view === 'original') {
+    // Only remember the state on the way IN (repeated setView('original')
+    // calls — e.g. when the PDF render completes — must not overwrite it).
+    if (!sidebarToggle.disabled) sidebarWasOpen = app.classList.contains('sidebar-open');
+    app.classList.remove('sidebar-open');
+    sidebarToggle.disabled = true;
+  } else if (sidebarToggle.disabled) {
+    sidebarToggle.disabled = false;
+    app.classList.toggle('sidebar-open', sidebarWasOpen);
+  }
   // Reader only (WP21 T21.2): first entry into Original kicks off the lazy
   // in-app rendering of the author's PDF rendition; until it is ready (or
   // when it fails, or in the standalone) the download card is the view.
