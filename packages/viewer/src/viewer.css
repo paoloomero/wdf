@@ -1028,20 +1028,20 @@ code {
   gap: 14px;
 }
 
-/* Citation chip */
+/* Citation bar (design tokens: white chrome, ink primary action) */
 #chip {
   position: fixed;
-  bottom: 0.9rem;
+  bottom: calc(var(--status-h) + 10px);
   left: 50%;
   transform: translateX(-50%);
-  background: #101728;
-  color: #e7ecf6;
-  border-radius: 10px;
-  padding: 0.45rem 0.7rem;
   display: flex;
-  gap: 0.6rem;
+  gap: 10px;
   align-items: center;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  padding: 6px 6px 6px 12px;
+  background: var(--chrome);
+  border: 1px solid var(--line-c);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(16, 18, 21, 0.16);
   z-index: 20;
   max-width: calc(100vw - 2rem);
 }
@@ -1049,15 +1049,21 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font: 500 11px/1.4 var(--font-mono);
+  color: var(--ink-2);
 }
 #chip button {
-  border: none;
-  background: var(--accent);
+  border: 0;
+  background: var(--ink);
   color: #fff;
-  border-radius: 6px;
-  padding: 0.3rem 0.7rem;
+  border-radius: var(--r-md);
+  padding: 6px 11px;
+  font: 600 11px/1 var(--font-sans);
   cursor: pointer;
   flex: none;
+}
+#chip button:hover {
+  opacity: 0.85;
 }
 
 /* Mobile */
