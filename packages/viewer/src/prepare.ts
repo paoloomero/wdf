@@ -117,11 +117,11 @@ export const BASE_CSS = `
   hr { border: none; border-top: 1px solid #d5d9df; margin: 1.6em 0; }
   a { color: #1a56c4; }
   [id] { scroll-margin-top: 1rem; }
-  .wdf-flash { outline: 2px solid #1a56c4; outline-offset: 4px; border-radius: 2px; }
+  /* Arrival flash: a brief signal-yellow wash that fades (no frames). */
+  .wdf-flash { background: oklch(0.82 0.17 95 / 0.3); transition: background 0.4s ease; }
   /* Persistent mark of the selected/cited element (outline or agent click):
-     stays until another element is selected, so the cited part is findable
-     after the arrival flash fades. */
-  .wdf-selected { background: rgba(26, 86, 196, 0.07); box-shadow: -4px 0 0 0 #1a56c4; border-radius: 2px; }
+     a signal-yellow bar on the left, until another element is selected. */
+  .wdf-selected { box-shadow: -4px 0 0 0 oklch(0.82 0.17 95); }
 `;
 
 export interface PlanUnit {

@@ -53,6 +53,51 @@ let loaded: Loaded | undefined;
 let selectedId: string | undefined;
 // Paper view (WP10): rendering-only A4 sheet look for the Human view.
 let paged = false;
+// An anchor requested via the URL fragment, honoured once the Human frame
+// is ready — so a shared link like document.html#p-0012 opens AT the spot.
+let pendingAnchor: string | undefined;
+
+// ---------------------------------------------------------------------------
+// Status bar: normal text is sticky; flash messages restore it.
+
+let statusText = '';
+let statusTimer: ReturnType<typeof setTimeout> | undefined;
+function setStatus(text: string): void {
+  statusText = text;
+  $('status-left').textContent = text;
+}
+function statusFlash(message: string): void {
+  $('status-left').textContent = message;
+  if (statusTimer !== undefined) clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => {
+    $('status-left').textContent = statusText;
+  }, 3500);
+}
+
+// ---------------------------------------------------------------------------
+// Citation resolution (the consumer side of "copy citation"): paste a
+// wdf:<document-id>#<element-id> URI — or a bare element id — into the
+// sidebar search and the Reader jumps to the cited element (spec §7.10).
+
+function resolveCitation(raw: string): boolean {
+  if (loaded === undefined) return false;
+  const text = raw.trim();
+  const uri = /^wdf:(.+)#([A-Za-z][\w:.-]*)$/.exec(text);
+  const id = uri !== null ? (uri[2] ?? '') : (/^#?([A-Za-z][\w:.-]*)$/.exec(text)?.[1] ?? '');
+  if (id === '') return false;
+  if (uri !== null && uri[1] !== loaded.pkg.manifest.id) {
+    statusFlash('this citation refers to a different document');
+    return true;
+  }
+  if (!loaded.outline.some((n) => n.id === id)) {
+    if (uri === null) return false; // plain text: fall through to the filter
+    statusFlash(`anchor "${id}" not found in this document`);
+    return true;
+  }
+  select(id, 'outline');
+  statusFlash(`jumped to ${id}`);
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Opening packages
@@ -204,6 +249,9 @@ function openBytes(bytes: Uint8Array, name: string): void {
   ($('outline-search') as HTMLInputElement).value = '';
   setView('human');
   setBadgeState('wait', 'checking…');
+  // A URL fragment names the anchor to open at (resolved when the Human
+  // frame is ready) — the human-consumable end of a citation link.
+  pendingAnchor = /^#([A-Za-z][\w:.-]*)$/.exec(location.hash)?.[1];
   void verify(loaded);
 }
 
@@ -465,7 +513,7 @@ function renderOutline(doc: Loaded): void {
   nav.append(render(outlineTree(doc.outline)));
   const count = doc.outline.length;
   $('anchor-count').textContent = String(count);
-  $('status-left').textContent = `${String(count)} anchors`;
+  setStatus(`${String(count)} anchors`);
   $('status-right').textContent = `wdf ${doc.pkg.manifest.wdf}`;
 }
 
@@ -543,7 +591,7 @@ async function verify(doc: Loaded): Promise<void> {
       const short =
         entryHash === undefined ? '' : ` · sha-256 ${entryHash.slice(0, 4)}…${entryHash.slice(-4)}`;
       const verdict = result.verified ? 'verified locally' : 'INTEGRITY FAILED';
-      $('status-left').textContent = `${String(doc.outline.length)} anchors${short} · ${verdict}`;
+      setStatus(`${String(doc.outline.length)} anchors${short} · ${verdict}`);
     } catch {
       /* status bar is informational — never block on it */
     }
@@ -729,6 +777,11 @@ function init(): void {
   // A reloaded Human frame starts unpaged: re-apply the paper view.
   $('human').addEventListener('load', () => {
     if (paged) postToHuman({ type: 'wdf-paged', on: true });
+    if (pendingAnchor !== undefined && loaded !== undefined) {
+      const id = pendingAnchor;
+      if (loaded.outline.some((n) => n.id === id)) select(id, 'outline');
+      pendingAnchor = undefined;
+    }
   });
   // The outline column starts closed everywhere; the ☰ icon opens it.
   $('sidebar-toggle').addEventListener('click', () => {
@@ -749,12 +802,30 @@ function init(): void {
   });
   // Anchor search (design "app shell 4A"): filters the outline by title or
   // id; an ancestor of a match stays visible (textContent includes children).
+  // A pasted citation URI resolves immediately; Enter jumps to an exact id
+  // or to the first visible match.
   const searchInput = $('outline-search') as HTMLInputElement;
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value.trim().toLowerCase();
+  const applyFilter = (q: string): void => {
     for (const li of $('outline').querySelectorAll('li')) {
       li.hidden = q !== '' && !(li.textContent ?? '').toLowerCase().includes(q);
     }
+  };
+  searchInput.addEventListener('input', () => {
+    const v = searchInput.value.trim();
+    if (/^wdf:.+#/.test(v)) {
+      resolveCitation(v);
+      searchInput.value = '';
+      applyFilter('');
+      return;
+    }
+    applyFilter(v.toLowerCase());
+  });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (resolveCitation(searchInput.value)) return;
+    const first = $('outline').querySelector<HTMLElement>('li:not([hidden]) .ol-label');
+    first?.click();
   });
   $('chip-copy').addEventListener('click', () => {
     if (selectedId !== undefined) void copyCitation(selectedId, $('chip-copy'));
