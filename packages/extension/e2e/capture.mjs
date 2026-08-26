@@ -20,6 +20,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
 
+import { captureTab } from './harness.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '../../..');
 const extensionDir = join(here, '../dist/chrome-e2e');
@@ -110,18 +112,9 @@ try {
   await page.goto(pageUrl, { waitUntil: 'networkidle' });
   await page.waitForSelector('#video-slot iframe');
 
-  const tabId = await worker.evaluate(
-    (url) =>
-      new Promise((res) => {
-        chrome.tabs.query({ url: `${url}*` }, (tabs) => res(tabs[0]?.id));
-      }),
-    pageUrl,
-  );
-  assert.notEqual(tabId, undefined, 'fixture tab not found from the service worker');
-
-  const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
-  await worker.evaluate((id) => globalThis.wdfStartCapture(id), tabId);
-  const download = await downloadPromise;
+  // 0.1.1: downloads go through chrome.downloads — captureTab polls the
+  // extension's downloads API (Playwright's page event never fires).
+  const download = await captureTab(worker, page);
 
   // Default output: the sendable standalone HTML, double-suffixed (§10.38).
   assert.equal(download.suggestedFilename(), `${PAGE_TITLE}.wdf.html`);
@@ -177,12 +170,7 @@ try {
   assert.ok(/content\/assets\/[0-9a-f]{16}\.png/.test(html), 'captured image not packaged');
 
   // ---- Second run: full page, bare .wdf (the popup's options, T18.5). ----
-  const wdfDownloadPromise = page.waitForEvent('download', { timeout: 30000 });
-  await worker.evaluate(({ id, options }) => globalThis.wdfStartCapture(id, options), {
-    id: tabId,
-    options: { mode: 'full-page', output: 'wdf' },
-  });
-  const wdfDownload = await wdfDownloadPromise;
+  const wdfDownload = await captureTab(worker, page, { mode: 'full-page', output: 'wdf' });
   assert.equal(wdfDownload.suggestedFilename(), `${PAGE_TITLE}.wdf`);
   const rawWdf = readFileSync(await wdfDownload.path());
   const cliWdf = spawnSync(

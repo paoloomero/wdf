@@ -56,6 +56,11 @@ plan §10.32). The zips come from `pnpm --filter @wdf-dev/extension package`:
   time; there is no static content script and no host permission.
 - **storage** — one local flag: the acknowledged one-time privacy
   notice.
+- **downloads** (0.1.1) — save the converted document to the user's
+  Downloads folder. The save must run in the extension, not in the
+  captured page: sites served with a CSP `sandbox` directive (without
+  `allow-downloads`) silently block any download initiated inside the
+  page. Nothing is read from existing downloads.
 
 ## Data-use disclosures (CWS "Privacy practices")
 

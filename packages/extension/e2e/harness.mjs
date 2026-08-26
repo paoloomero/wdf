@@ -41,6 +41,11 @@ export async function launchWithExtension() {
  * Triggers a capture of the page's tab through the background's
  * wdfStartCapture hook (the same entry point the popup uses — automation
  * cannot click the toolbar) and returns the resulting download.
+ *
+ * 0.1.1: the background saves via chrome.downloads, which Playwright's
+ * page 'download' event does not observe — the harness polls the
+ * extension's own downloads API instead and hands back a Download-like
+ * shim (suggestedFilename / path / saveAs, the methods the suites use).
  */
 export async function captureTab(worker, page, options) {
   const tabId = await worker.evaluate(
@@ -51,12 +56,44 @@ export async function captureTab(worker, page, options) {
     page.url(),
   );
   assert.notEqual(tabId, undefined, `tab not found for ${page.url()}`);
-  const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+  const listDownloads = () =>
+    worker.evaluate(
+      () =>
+        new Promise((res) => {
+          chrome.downloads.search({}, (items) =>
+            res(items.map((i) => ({ id: i.id, state: i.state, filename: i.filename }))),
+          );
+        }),
+    );
+  const before = new Set((await listDownloads()).map((i) => i.id));
   await worker.evaluate(({ id, options }) => globalThis.wdfStartCapture(id, options), {
     id: tabId,
     options,
   });
-  return downloadPromise;
+  const deadline = Date.now() + 30000;
+  for (;;) {
+    const items = await listDownloads();
+    const item = items.find((i) => !before.has(i.id) && i.state === 'complete');
+    if (item) {
+      const { copyFileSync } = await import('node:fs');
+      const { basename } = await import('node:path');
+      // Playwright reroutes browser-level downloads to GUID-named files;
+      // the intended name comes from the background's test hook.
+      const saved = await worker.evaluate(() => globalThis.wdfLastSavedFilename);
+      return {
+        suggestedFilename: () => saved ?? basename(item.filename),
+        path: () => Promise.resolve(item.filename),
+        saveAs: (dest) => {
+          copyFileSync(item.filename, dest);
+          return Promise.resolve();
+        },
+      };
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`download did not complete: ${JSON.stringify(items)}`);
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
 }
 
 /** Extracts the embedded .wdf bytes from a standalone .wdf.html file. */

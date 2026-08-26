@@ -81,7 +81,18 @@ export interface ErrorReply {
   message: string;
 }
 
-export type ConvertReply = DownloadReply | ErrorReply;
+/**
+ * Background's ack when it saved the file itself via chrome.downloads
+ * (0.1.1): the content script has nothing to do. The in-page anchor stays
+ * as the fallback — some sites (e.g. CSP `sandbox` without
+ * `allow-downloads`) forbid downloads initiated inside the page, which is
+ * why the downloads API is the primary path.
+ */
+export interface SavedReply {
+  type: 'wdf-saved';
+}
+
+export type ConvertReply = DownloadReply | ErrorReply | SavedReply;
 
 export function bytesToBase64(bytes: Uint8Array): string {
   let bin = '';

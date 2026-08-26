@@ -22,6 +22,7 @@ import {
   type CaptureOptions,
   type CaptureRequest,
   type ConvertReply,
+  type DownloadReply,
   type GdocsCaptureRequest,
   type StartRequest,
   type StatusMessage,
@@ -214,6 +215,39 @@ async function convertGdocs(
   return buildReply(result, options, report);
 }
 
+/**
+ * Saves a converted document with the downloads API. Firefox's event page
+ * has createObjectURL (blob URL); the Chrome MV3 service worker does not —
+ * there a data: URL carries the bytes. Returns false on any failure so the
+ * caller falls back to in-page delivery.
+ */
+async function saveViaDownloadsApi(reply: DownloadReply): Promise<boolean> {
+  try {
+    let url: string;
+    let revoke: (() => void) | undefined;
+    if (typeof URL.createObjectURL === 'function') {
+      url = URL.createObjectURL(
+        new Blob([base64ToBytes(reply.base64) as BlobPart], { type: reply.mediaType }),
+      );
+      const blobUrl = url;
+      revoke = () => {
+        URL.revokeObjectURL(blobUrl);
+      };
+    } else {
+      url = `data:${reply.mediaType};base64,${reply.base64}`;
+    }
+    await ext.downloads.download({ url, filename: reply.filename, saveAs: false });
+    // Test hook (like wdfStartCapture): Playwright reroutes browser-level
+    // downloads to GUID-named artifact files, losing the suggested name —
+    // the harness reads it back from here.
+    (globalThis as Record<string, unknown>)['wdfLastSavedFilename'] = reply.filename;
+    if (revoke !== undefined) setTimeout(revoke, 60_000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 ext.runtime.onMessage.addListener(
   (message: unknown, sender, sendResponse: (reply: ConvertReply) => void) => {
     const typed = message as { type?: string; tabId?: number; options?: StartRequest['options'] };
@@ -229,10 +263,19 @@ ext.runtime.onMessage.addListener(
       ? convertGdocs(message as GdocsCaptureRequest, options)
       : convertCapture(message as CaptureRequest, options)
     )
-      .then((reply) => {
-        sendResponse(reply);
+      .then(async (reply) => {
+        // 0.1.1: the background saves via chrome.downloads — immune to the
+        // page's CSP (a `sandbox` without `allow-downloads` silently blocks
+        // any download initiated inside the page, e.g. techcrunch.com).
+        // On any failure the bytes still go to the content script, whose
+        // in-page anchor remains the fallback.
+        if (reply.type === 'wdf-download' && (await saveViaDownloadsApi(reply))) {
+          sendResponse({ type: 'wdf-saved' });
+        } else {
+          sendResponse(reply);
+        }
         if (reply.type === 'wdf-download') notify(tabId, true, reply.report);
-        else notify(tabId, false, [reply.message]);
+        else if (reply.type === 'wdf-error') notify(tabId, false, [reply.message]);
       })
       .catch((e: unknown) => {
         sendResponse({ type: 'wdf-error', message: `conversion failed: ${String(e)}` });
