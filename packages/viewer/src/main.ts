@@ -201,7 +201,9 @@ function openBytes(bytes: Uint8Array, name: string): void {
   renderAgent(loaded);
   renderOriginal(loaded);
   renderOutline(loaded);
+  ($('outline-search') as HTMLInputElement).value = '';
   setView('human');
+  setBadgeState('wait', 'checking…');
   void verify(loaded);
 }
 
@@ -414,6 +416,11 @@ function typeLabel(type: string): string {
   return map[type] ?? '·';
 }
 
+const LINK_SVG =
+  '<svg class="icon icon--sm icon--muted" viewBox="0 0 24 24" aria-hidden="true">' +
+  '<path d="M10.2 13.8a3.6 3.6 0 0 0 5.1 0l2.6-2.6a3.6 3.6 0 0 0-5.1-5.1l-1 1"></path>' +
+  '<path d="M13.8 10.2a3.6 3.6 0 0 0-5.1 0l-2.6 2.6a3.6 3.6 0 0 0 5.1 5.1l1-1"></path></svg>';
+
 function renderOutline(doc: Loaded): void {
   const nav = $('outline');
   nav.textContent = '';
@@ -429,7 +436,12 @@ function renderOutline(doc: Loaded): void {
       const type = document.createElement('span');
       type.className = 'ol-type';
       type.textContent = typeLabel(node.type);
-      label.append(type, document.createTextNode(node.title ?? node.id));
+      const text = document.createElement('span');
+      // Titled nodes read as prose; untitled ones show their anchor id in
+      // mono, as in the design's anchor list.
+      text.className = node.title === undefined ? 'ol-text ol-text--id' : 'ol-text';
+      text.textContent = node.title ?? node.id;
+      label.append(type, text);
       label.title = node.id;
       label.addEventListener('click', () => {
         select(node.id, 'outline');
@@ -437,7 +449,7 @@ function renderOutline(doc: Loaded): void {
 
       const cite = document.createElement('button');
       cite.className = 'ol-cite';
-      cite.textContent = '❞';
+      cite.innerHTML = LINK_SVG;
       cite.title = `Copy citation for ${node.id}`;
       cite.addEventListener('click', () => {
         void copyCitation(node.id, cite);
@@ -451,14 +463,27 @@ function renderOutline(doc: Loaded): void {
     return ul;
   };
   nav.append(render(outlineTree(doc.outline)));
+  const count = doc.outline.length;
+  $('anchor-count').textContent = String(count);
+  $('status-left').textContent = `${String(count)} anchors`;
+  $('status-right').textContent = `wdf ${doc.pkg.manifest.wdf}`;
 }
 
 // ---------------------------------------------------------------------------
 // Verification badge (T4.2)
 
+// Chip + popover share one state vocabulary; green stays reserved for
+// verification (design rule, plan §10.63).
+function setBadgeState(state: 'wait' | 'ok' | 'bad' | 'warn', text: string): void {
+  const glyph = { wait: '…', ok: '✓', bad: '✕', warn: '!' }[state];
+  $('badge').className = `chipv chipv--${state}`;
+  $('badge-icon').textContent = glyph;
+  $('badge-label').textContent = text;
+  $('details-panel').className = `popover popover--${state}`;
+  $('details-head-label').textContent = text;
+}
+
 async function verify(doc: Loaded): Promise<void> {
-  const badge = $('badge');
-  const label = $('badge-label');
   const list = $('details-list');
   list.textContent = '';
   const add = (text: string, cls: string): void => {
@@ -470,8 +495,7 @@ async function verify(doc: Loaded): Promise<void> {
 
   try {
     const result = await verifyPackage(doc.pkg);
-    badge.className = result.verified ? 'badge badge-ok' : 'badge badge-bad';
-    label.textContent = result.verified ? 'verified' : 'tampered';
+    setBadgeState(result.verified ? 'ok' : 'bad', result.verified ? 'Verified' : 'Tampered');
     add(
       result.integrity
         ? 'Integrity: every file matches its SHA-256 digest (§8.2)'
@@ -500,8 +524,7 @@ async function verify(doc: Loaded): Promise<void> {
     if (styles !== undefined) violations.push(...validateStylesheet(dec.decode(styles)));
     const errors = violations.filter((v) => v.severity === 'error');
     if (errors.length > 0 && result.verified) {
-      badge.className = 'badge badge-warn';
-      label.textContent = 'profile errors';
+      setBadgeState('warn', 'Profile errors');
     }
     for (const v of violations) {
       add(
@@ -510,9 +533,22 @@ async function verify(doc: Loaded): Promise<void> {
       );
     }
     if (errors.length === 0) add('WDF-HTML profile: conforming (§6)', 'ok');
+
+    // Status bar (design "app shell 4A"): anchors · content hash · verdict.
+    try {
+      const hashes = JSON.parse(
+        dec.decode(doc.pkg.files.get('integrity/hashes.json') ?? new Uint8Array()),
+      ) as { files?: Record<string, string> };
+      const entryHash = hashes.files?.[doc.pkg.manifest.entry];
+      const short =
+        entryHash === undefined ? '' : ` · sha-256 ${entryHash.slice(0, 4)}…${entryHash.slice(-4)}`;
+      const verdict = result.verified ? 'verified locally' : 'INTEGRITY FAILED';
+      $('status-left').textContent = `${String(doc.outline.length)} anchors${short} · ${verdict}`;
+    } catch {
+      /* status bar is informational — never block on it */
+    }
   } catch (e) {
-    badge.className = 'badge badge-warn';
-    label.textContent = 'not verifiable';
+    setBadgeState('warn', 'Not verifiable');
     add(`Verification failed to run: ${String(e)}`, 'bad');
   }
 }
@@ -698,11 +734,27 @@ function init(): void {
   $('sidebar-toggle').addEventListener('click', () => {
     $('app').classList.toggle('sidebar-open');
   });
+  // The chip toggles the verification popover, anchored under itself.
   $('badge').addEventListener('click', () => {
-    $('details-panel').hidden = false;
+    const panel = $('details-panel');
+    if (panel.hidden) {
+      panel.style.left = `${String(Math.max(10, Math.min($('badge').offsetLeft, window.innerWidth - 400)))}px`;
+      panel.hidden = false;
+    } else {
+      panel.hidden = true;
+    }
   });
   $('details-close').addEventListener('click', () => {
     $('details-panel').hidden = true;
+  });
+  // Anchor search (design "app shell 4A"): filters the outline by title or
+  // id; an ancestor of a match stays visible (textContent includes children).
+  const searchInput = $('outline-search') as HTMLInputElement;
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    for (const li of $('outline').querySelectorAll('li')) {
+      li.hidden = q !== '' && !(li.textContent ?? '').toLowerCase().includes(q);
+    }
   });
   $('chip-copy').addEventListener('click', () => {
     if (selectedId !== undefined) void copyCitation(selectedId, $('chip-copy'));

@@ -197,47 +197,136 @@
     </div>
 
     <div id="app" hidden>
-      <header id="topbar">
-        <button id="sidebar-toggle" title="Outline" aria-label="Toggle outline">☰</button>
-        <div id="doc-head">
-          <span id="doc-title"></span>
-          <button id="badge" class="badge badge-wait" title="Verification details">
+      <header id="topbar" class="toolbar">
+        <div class="toolbar__left">
+          <button
+            id="sidebar-toggle"
+            class="iconbtn"
+            title="Toggle anchors panel"
+            aria-label="Toggle anchors panel"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"></rect>
+              <path d="M9.5 4.7v14.6"></path>
+            </svg>
+          </button>
+          <span class="sep"></span>
+          <svg class="doc-icon" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="0" y="0" width="64" height="64" rx="13" fill="#ffffff"></rect>
+            <path d="M0 13A13 13 0 0 1 13 0h38a13 13 0 0 1 13 13v21H0Z" fill="#101418"></path>
+            <g fill="#ffffff">
+              <rect x="12" y="12" width="7" height="14" rx="3.5"></rect>
+              <rect x="24" y="12" width="7" height="14" rx="3.5"></rect>
+            </g>
+            <g fill="#101418">
+              <rect x="12" y="42" width="40" height="6" rx="3"></rect>
+              <rect x="12" y="52" width="24" height="6" rx="3"></rect>
+            </g>
+          </svg>
+          <h1 id="doc-title" class="doc-title"></h1>
+          <button id="badge" class="chipv chipv--wait" title="Verification details">
+            <span id="badge-icon" aria-hidden="true">…</span>
             <span id="badge-label">checking…</span>
           </button>
           <span id="capture-note" hidden></span>
         </div>
-        <nav id="view-toggle" aria-label="View">
-          <button id="view-human" class="active">Human</button>
-          <button id="view-agent">Agent</button>
-          <button
-            id="view-original"
-            hidden
-            title="The embedded original source (extension: source)"
-          >
-            Original
-          </button>
-        </nav>
-        <nav id="doc-actions" aria-label="Document actions">
-          <button
-            id="paged-toggle"
-            title="Paper view: paginated A4 preview with repeating header/footer (the exported PDF is the reference layout)"
-          >
-            Paper
-          </button>
-          <button id="pdf-export" title="Print / export as PDF (browser print, A4)">PDF</button>
-        </nav>
+        <div class="toolbar__right">
+          <nav id="view-toggle" class="segmented" role="tablist" aria-label="Reading mode">
+            <button id="view-human" class="seg active" title="Human view — the rendered document">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="8" r="3.4"></circle>
+                <path d="M5.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"></path>
+              </svg>
+              <span class="seg__label">Human</span>
+            </button>
+            <button
+              id="view-agent"
+              class="seg"
+              title="Agent view — the canonical machine-readable derivation"
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3.2v2.6"></path>
+                <rect x="4.6" y="5.8" width="14.8" height="11.4" rx="2.6"></rect>
+                <path d="M9 10.6v2.2M15 10.6v2.2M8.4 20.6h7.2"></path>
+              </svg>
+              <span class="seg__label">Agent</span>
+            </button>
+            <button
+              id="view-original"
+              class="seg"
+              hidden
+              title="The embedded original source (extension: source)"
+            >
+              Original
+            </button>
+          </nav>
+          <span class="sep"></span>
+          <nav id="doc-actions" class="tools" aria-label="Document actions">
+            <button
+              id="paged-toggle"
+              class="tool"
+              title="Paper view: paginated A4 preview with repeating header/footer (the exported PDF is the reference layout)"
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6.5 3.5h11v5.6h-11z"></path>
+                <path d="M6.5 14.9h11v5.6h-11z"></path>
+                <path d="M3 12h3.2M9.4 12h1.8M14.4 12h1.8M19.2 12H21"></path>
+              </svg>
+              <span>Paper</span>
+            </button>
+            <button id="pdf-export" class="tool" title="Print / export as PDF (browser print, A4)">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6.4 3.5h7.2L18.2 8v12.5H6.4z"></path>
+                <path d="M13.4 3.6V8h4.6"></path>
+                <path d="M9 16.6v-4.4h1.6a1.3 1.3 0 0 1 0 2.6H9"></path>
+                <path
+                  d="M13.4 16.6v-4.4h1.2a1.4 1.4 0 0 1 1.4 1.5v1.4a1.4 1.4 0 0 1-1.4 1.5z"
+                ></path>
+              </svg>
+              <span>PDF</span>
+            </button>
+          </nav>
+        </div>
       </header>
 
-      <div id="details-panel" hidden>
-        <div id="details-inner">
-          <h2>Verification</h2>
+      <div
+        id="details-panel"
+        class="popover"
+        role="dialog"
+        aria-label="Verification details"
+        hidden
+      >
+        <div class="popover__head" id="details-head">
+          <span id="details-head-label">Verification</span>
+        </div>
+        <div class="popover__body">
           <ul id="details-list"></ul>
           <button id="details-close">Close</button>
         </div>
       </div>
 
-      <div id="layout">
-        <nav id="outline" aria-label="Document outline"></nav>
+      <div id="layout" class="body">
+        <aside id="sidebar" class="sidebar">
+          <div class="sidebar__search">
+            <label class="search">
+              <svg class="icon icon--muted" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.2"></circle>
+                <path d="M15.6 15.6L20 20"></path>
+              </svg>
+              <input
+                type="search"
+                id="outline-search"
+                placeholder="Search anchors"
+                aria-label="Search anchors"
+              />
+            </label>
+          </div>
+          <div class="sidebar__head">
+            <span class="eyebrow">Anchors</span>
+            <span class="count" id="anchor-count"></span>
+          </div>
+          <nav id="outline" class="anchors" aria-label="Document outline"></nav>
+        </aside>
         <main id="content">
           <iframe id="human" sandbox="allow-scripts" title="Document"></iframe>
           <div id="agent" hidden></div>
@@ -277,6 +366,11 @@
           <iframe id="print-frame" sandbox="allow-same-origin allow-modals" title="Print"></iframe>
         </main>
       </div>
+
+      <footer id="statusbar" class="statusbar">
+        <span id="status-left"></span>
+        <span class="statusbar__right"><span id="status-right"></span></span>
+      </footer>
 
       <div id="chip" hidden>
         <code id="chip-id"></code>
