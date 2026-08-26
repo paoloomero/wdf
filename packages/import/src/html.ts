@@ -1,5 +1,6 @@
 import {
   computeTableGrid,
+  DATE_OR_DATETIME,
   elementChildren,
   findChild,
   getAttr,
@@ -151,6 +152,25 @@ function pickAttrs(node: WdfElement, tag: string): Record<string, string> {
     if (height !== undefined && !valid.test(height)) {
       delete attrs['height'];
       activeReport?.push(`dropped img height="${height}" (must be a positive integer, §6.3.3)`);
+    }
+  }
+  // §6.3.4: time datetime must be an RFC 3339 date or date-time. HTML allows
+  // looser forms (news sites emit e.g. "2026-03-25T10:23" — no seconds, no
+  // offset). The date part is certain: truncate to it; without a valid date
+  // prefix the attribute goes (the visible text stays either way).
+  if (tag === 'time') {
+    const v = attrs['datetime'];
+    if (v !== undefined && !DATE_OR_DATETIME.test(v)) {
+      const date = /^(\d{4}-\d{2}-\d{2})[T ]/.exec(v)?.[1];
+      if (date !== undefined) {
+        attrs['datetime'] = date;
+        activeReport?.push(`truncated time datetime="${v}" to "${date}" (RFC 3339, §6.3.4)`);
+      } else {
+        delete attrs['datetime'];
+        activeReport?.push(
+          `dropped time datetime="${v}" (not an RFC 3339 date or date-time, §6.3.4)`,
+        );
+      }
     }
   }
   // T7.2 style translation: carry the resolved style signature until hoisting.

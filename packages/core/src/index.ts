@@ -39,7 +39,12 @@ export {
 } from './html/ast.js';
 export { parseHtml } from './html/parse.js';
 export { parseHtmlDom } from './html/domparser.js';
-export { validateProfile, validateStylesheet, type Violation } from './profile.js';
+export {
+  DATE_OR_DATETIME,
+  validateProfile,
+  validateStylesheet,
+  type Violation,
+} from './profile.js';
 export {
   computeTableGrid,
   parseSpan,

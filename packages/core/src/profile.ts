@@ -94,7 +94,10 @@ const IMG_SRC = /^content\/assets(\/[A-Za-z0-9][A-Za-z0-9._-]*)+$/;
 const DATASET_PATH = /^data(\/[A-Za-z0-9][A-Za-z0-9._-]*)+\.json$/;
 const POSITIVE_INT = /^[1-9][0-9]*$/;
 const LANGUAGE_TAG = /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/;
-const DATE_OR_DATETIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2}))?$/;
+// Exported for producers (the importer must never emit a non-conforming
+// datetime — §6.3.4 is validated with this exact pattern).
+export const DATE_OR_DATETIME =
+  /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2}))?$/;
 // Control characters other than TAB (spec §6.3.5).
 const FORBIDDEN_CONTROL = /[\x00-\x08\x0b\x0c\x0e-\x1f]/;
 

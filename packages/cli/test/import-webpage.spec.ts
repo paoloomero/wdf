@@ -137,6 +137,32 @@ describe('img dimension sanitization (§6.3.3, field test 7 Aug)', () => {
   });
 });
 
+describe('time datetime sanitization (§6.3.4, field test 26 Aug — repubblica.it)', () => {
+  it('keeps RFC 3339 values, truncates date-prefixed ones, drops the rest', async () => {
+    const result = await importHtml(
+      '<html><body><main>' +
+        '<p><time datetime="2026-08-26">a</time></p>' +
+        '<p><time datetime="2026-08-26T10:23:00Z">b</time></p>' +
+        '<p><time datetime="2026-03-25T10:23">c</time></p>' + // HTML-valid, not RFC 3339
+        '<p><time datetime="10:23">d</time></p>' +
+        '</main></body></html>',
+      {},
+    );
+    const html = result.blocks.map((b) => JSON.stringify(b)).join('');
+    expect(html).toContain('"datetime":"2026-08-26"');
+    expect(html).toContain('"datetime":"2026-08-26T10:23:00Z"');
+    expect(html).toContain('"datetime":"2026-03-25"');
+    expect(html).not.toContain('2026-03-25T10:23');
+    expect(html).not.toContain('"datetime":"10:23"');
+    expect(
+      result.report.some((r) => r.includes('truncated time datetime="2026-03-25T10:23"')),
+    ).toBe(true);
+    expect(result.report.some((r) => r.includes('dropped time datetime="10:23"'))).toBe(true);
+    // The visible text always survives.
+    expect(html).toContain('"d"');
+  });
+});
+
 describe('import --standalone (T15.1, plan §10.28)', () => {
   it('writes the standalone HTML next to the package', async () => {
     const work = mkdtempSync(join(tmpdir(), 'wdf-standalone-'));
