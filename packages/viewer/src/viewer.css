@@ -815,41 +815,57 @@ code {
   height: 100%;
   background: #fff;
 }
-/* Binary original (ext-source 0.4): metadata + download, nothing to render. */
+/* Binary original (ext-source 0.4): metadata + download, nothing to render.
+   Design tokens: sidebar-coloured ground, white cards, ink primary action. */
 #original-binary {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 24px;
+  background: var(--chrome-2);
+  font-family: var(--font-sans);
 }
 #original-binary .binary-card {
   max-width: 26rem;
-  padding: 1.5rem 1.75rem;
-  border: 1px solid #d8dce4;
-  border-radius: 10px;
-  color: #1c2330;
-  font-size: 0.92rem;
-  line-height: 1.5;
+  padding: 18px 20px;
+  background: var(--chrome);
+  border: 1px solid var(--line-c);
+  border-radius: 8px;
+  color: var(--ink-2);
+  font: 400 13px/1.55 var(--font-sans);
 }
-#original-binary #original-binary-name {
-  font-weight: 600;
+#original-binary #original-binary-name,
+#original-binary #original-visual-name {
+  font: 600 13px/1.3 var(--font-sans);
+  color: var(--ink);
   word-break: break-all;
-  margin: 0 0 0.25rem;
+  margin: 0 0 3px;
 }
-#original-binary #original-binary-meta {
-  color: #5b6472;
-  margin: 0 0 0.75rem;
+#original-binary #original-binary-meta,
+#original-binary #original-visual-meta {
+  font: 400 11px/1.4 var(--font-mono);
+  color: var(--ink-4);
+  margin: 0 0 10px;
+}
+#original-binary #original-visual-hint {
+  font-size: 12px;
+  color: var(--ink-3);
 }
 #original-binary a.button {
   display: inline-block;
-  margin-top: 0.5rem;
-  padding: 0.45rem 0.9rem;
-  border-radius: 8px;
-  background: #2f5fd0;
+  margin-top: 6px;
+  padding: 7px 12px;
+  border-radius: var(--r-md);
+  background: var(--ink);
   color: #fff;
   text-decoration: none;
-  font-weight: 600;
+  font: 600 11.5px/1 var(--font-sans);
+}
+#original-binary a.button:hover {
+  opacity: 0.85;
 }
 /* Author PDF rendition rendered in-app (ext-source 0.5, WP21 T21.2): grey
    desk like the Paper view, one canvas per page, slim bar with the download. */
