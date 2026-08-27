@@ -25,10 +25,5 @@
     "page": "options.html",
     "open_in_tab": false
   },
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "storage",
-    "downloads"
-  ]
+  "permissions": ["activeTab", "scripting", "storage", "downloads"]
 }
