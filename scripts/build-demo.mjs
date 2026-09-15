@@ -39,6 +39,9 @@ cpSync(join(root, 'packages/viewer/dist/pdfjs-worker.js'), join(site, 'pdfjs-wor
 cpSync(join(root, 'packages/viewer/dist/plex.css'), join(site, 'plex.css'));
 cpSync(join(root, 'packages/viewer/dist/plex'), join(site, 'plex'), { recursive: true });
 cpSync(join(root, 'site/index.html'), join(site, 'index.html'));
+cpSync(join(root, 'site/manifesto.html'), join(site, 'manifesto.html'));
+// Feature illustrations (brand/illustrations, web-sized in site/illustrations).
+cpSync(join(root, 'site/illustrations'), join(site, 'illustrations'), { recursive: true });
 cpSync(join(root, 'site/extension-privacy.html'), join(site, 'extension-privacy.html'));
 cpSync(join(root, 'site/site.css'), join(site, 'site.css'));
 cpSync(join(root, 'site/favicon.ico'), join(site, 'favicon.ico'));

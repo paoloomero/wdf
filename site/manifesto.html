@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>We need a new type of document — WDF Manifesto</title>
+    <meta
+      name="description"
+      content="Why WDF exists: documents have two audiences now, people and software, and you can't parse your way to proof."
+    />
+    <link rel="icon" href="icons/wdf-favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="icons/wdf-favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="icons/wdf-favicon-180.png" />
+    <link rel="stylesheet" href="plex.css" />
+    <link rel="stylesheet" href="site.css" />
+    <meta name="theme-color" content="#f2f2ef" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar__in">
+        <a class="brand" href="./" aria-label="WDF home">
+          <svg class="brand__icon" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="0" y="0" width="64" height="64" rx="13" fill="#ffffff"></rect>
+            <path d="M0 13A13 13 0 0 1 13 0h38a13 13 0 0 1 13 13v21H0Z" fill="#101418"></path>
+            <g fill="#ffffff">
+              <rect x="12" y="12" width="7" height="14" rx="3.5"></rect>
+              <rect x="24" y="12" width="7" height="14" rx="3.5"></rect>
+            </g>
+            <g fill="#101418">
+              <rect x="12" y="42" width="40" height="6" rx="3"></rect>
+              <rect x="12" y="52" width="24" height="6" rx="3"></rect>
+            </g>
+          </svg>
+          <span class="brand__name">WDF · Web Document Format</span>
+        </a>
+        <nav class="nav" aria-label="Site">
+          <a href="manifesto.html" aria-current="page">Manifesto</a>
+          <a href="viewer.html">Reader</a>
+          <a href="https://chromewebstore.google.com/detail/mfdcdphphjljdhaglmafkecnkpdbnnfn"
+            >Extension</a
+          >
+          <a href="wdf-core-0.1.md">Spec</a>
+          <a href="https://github.com/paoloomero/wdf">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="article">
+      <header class="band hero">
+        <div class="band__in">
+          <p class="eyebrow">Manifesto</p>
+          <h1 class="article__title">We need a new type of document.</h1>
+          <p class="article__standfirst">
+            Not a better PDF, and not a better parser. A file that carries its own proof, its own
+            accessibility and its own data — because the reader changed, and the format didn't.
+          </p>
+        </div>
+      </header>
+
+      <div class="band">
+        <div class="band__in">
+          <section aria-labelledby="s1">
+            <p class="eyebrow">What a document is now</p>
+            <h2 id="s1">Two audiences, one format designed for neither.</h2>
+            <p>
+              For five centuries, a document was a printed page: fixed size, fixed type, one kind of
+              reader. Almost everything we believe about documents — pages, margins, “print-ready” —
+              descends from that.
+            </p>
+            <p>
+              But look at how a document actually gets read today. It is opened on a screen, more
+              often than not a phone. It is read aloud by screen readers. It is indexed by search
+              engines, quoted by researchers, checked by auditors, and — increasingly — read,
+              summarized and acted upon by AI systems. Printing it is the edge case.
+            </p>
+            <p class="thesis">
+              A document today has two audiences: people and software. Every format we use was
+              designed for exactly one of them.
+            </p>
+          </section>
+
+          <section aria-labelledby="s2">
+            <p class="eyebrow">The fracture</p>
+            <h2 id="s2">The reader changed. The format didn't.</h2>
+            <p>
+              PDF was born in 1993 to do one thing perfectly: carry the printed page, unchanged, to
+              any machine. It still does. But it does it by freezing the print view and discarding
+              the structure the document had while it was being written — headings become font
+              sizes, tables become aligned glyphs, data becomes a picture of digits.
+            </p>
+            <p>
+              The web solved semantics thirty years ago. But a web page is not a document: it is not
+              a file you can hand over, it can change silently under your citation, it makes no
+              promise of integrity, and it dies with its server.
+            </p>
+            <p class="thesis">
+              So this is where we are: we publish documents by throwing away what the reader needs,
+              and we share pages that can't promise to stay the same.
+            </p>
+          </section>
+
+          <section aria-labelledby="s3">
+            <p class="eyebrow">The tax</p>
+            <h2 id="s3">You can't parse your way to proof.</h2>
+            <p>
+              An entire industry now exists to undo the damage. Extraction pipelines — Unstructured,
+              Reducto, and hundreds more — are paid every day to guess back the structure that
+              documents had before publication destroyed it. Microsoft, the owner of
+              <code>.docx</code> and <code>.pptx</code>, ships MarkItDown: a tool whose only job is
+              to demolish its own formats into something machines can read. Its README is candid
+              about the result — the output “is meant to be consumed by text analysis tools”, not by
+              people. Even after conversion, you hold two diverging artifacts: the document for
+              humans and the text for machines, with no verifiable link between them.
+            </p>
+            <p>
+              Parsing is a workaround, and good parsers make it a tolerable one. But there are three
+              things no parser will ever give you:
+            </p>
+            <ul>
+              <li>
+                <strong>Proof.</strong> An extraction is an interpretation. No pipeline can
+                demonstrate that what the machine read is what you saw.
+              </li>
+              <li>
+                <strong>Access.</strong> Semantics lost at print time is lost. A PDF does not become
+                readable on a phone, or to a screen reader, downstream.
+              </li>
+              <li>
+                <strong>Data.</strong> <code>14640</code> drawn in a table cell is a picture of
+                digits. Its type, its unit, its column are guesses.
+              </li>
+            </ul>
+            <p>
+              If we want documents that carry their own proof, their own accessibility and their own
+              data, the format has to be born with them. That is why we need a new type of document.
+            </p>
+          </section>
+
+          <section aria-labelledby="s4">
+            <p class="eyebrow">Principles</p>
+            <h2 id="s4">What would have to be true.</h2>
+            <p>Before writing a line of code, we wrote down what such a format must be:</p>
+            <ul>
+              <li>
+                <strong>Web-native.</strong> HTML solved document semantics decades ago. Don't
+                invent a rendering model; use the one every device already has.
+              </li>
+              <li>
+                <strong>Verifiable by construction.</strong> The machine view must derive from the
+                human view deterministically — same bytes in, same bytes out, on any platform — and
+                hashes must bind them. Verification must work offline, with no authority to call.
+              </li>
+              <li>
+                <strong>Additive, not destructive.</strong> People must deliver PDFs; fine. The
+                author's own PDF travels <em>inside</em> the document, pixel-faithful, next to the
+                real structure. Keep the PDF. Gain the rest.
+              </li>
+              <li>
+                <strong>Honest about origin.</strong> A document declares how it was born: authored,
+                captured from the web, or extracted by heuristics — never one passed off as another.
+              </li>
+              <li>
+                <strong>A file.</strong> One portable artifact. Opens offline, attaches to email,
+                needs no platform, phones no server. Ever.
+              </li>
+              <li>
+                <strong>Open, and boring on purpose.</strong> A closed whitelist of plain HTML, ZIP
+                and JSON, a spec anyone can read in an evening (CC-BY), code under Apache-2.0.
+                Formats survive by being dull.
+              </li>
+            </ul>
+          </section>
+
+          <section aria-labelledby="s5">
+            <p class="eyebrow">Today</p>
+            <h2 id="s5">This already works.</h2>
+            <p>WDF 0.1 ships today, and every claim below has something you can open:</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">You need</th>
+                    <th scope="col">WDF today</th>
+                    <th scope="col"><span class="visually-hidden">Try it</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Readable on a phone, accessible</th>
+                    <td>Semantic HTML on a closed whitelist; native reflow; installable Reader.</td>
+                    <td><a href="viewer.html?doc=examples/municipal-decree.wdf">Reader</a></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Machines read what you read — provably</th>
+                    <td>
+                      Byte-deterministic <code>extract</code>, SHA-256 manifest, offline
+                      verification.
+                    </td>
+                    <td><a href="wdf-core-0.1.md">Spec</a></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Citations that outlive “page 2”</th>
+                    <td>Stable anchors, resolvable <code>wdf:</code> URIs, one-click copy.</td>
+                    <td><a href="llm-extraction-comparison.md">Comparison</a></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Tables you can compute on</th>
+                    <td>Typed datasets bound to the visible tables, validated.</td>
+                    <td><a href="viewer.html?doc=examples/energy-report.wdf">Energy report</a></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">“But I must deliver a PDF”</th>
+                    <td>
+                      The author's PDF travels inside; the Reader shows it as the Original view.
+                    </td>
+                    <td><a href="viewer.html">Drop a .docx</a></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Provenance for a captured page</th>
+                    <td>Browser extension with declared capture provenance.</td>
+                    <td>
+                      <a
+                        href="https://chromewebstore.google.com/detail/mfdcdphphjljdhaglmafkecnkpdbnnfn"
+                        >Extension</a
+                      >
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">AI integration</th>
+                    <td>MCP server: agents navigate by identifier, never by parsing.</td>
+                    <td><a href="mcp-demo.md">MCP session</a></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">No lock-in</th>
+                    <td>
+                      ZIP + JSON + HTML; single-file standalone opens anywhere; Apache-2.0 / CC-BY.
+                    </td>
+                    <td><a href="https://github.com/paoloomero/wdf">GitHub</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section aria-labelledby="s6">
+            <p class="eyebrow">Not yet</p>
+            <h2 id="s6">What it is not — yet.</h2>
+            <p>Honesty is part of the design, so here are the limits:</p>
+            <ul>
+              <li>
+                <strong>Verification today proves integrity, not identity.</strong> It tells you the
+                document is intact and the views agree — not who wrote it. Cryptographic signatures
+                and capture witnessing are next on the road.
+              </li>
+              <li>
+                <strong>It will not replace PDF for print-perfect archival</strong>, and does not
+                pretend to. PDF/A is good at what it does; WDF carries the PDF rather than fighting
+                it.
+              </li>
+              <li>
+                <strong>It is not an authoring tool.</strong> WDF is a format. Documents come from
+                what you already use — Word, Google Docs, the web — through converters that keep the
+                source.
+              </li>
+              <li>
+                <strong>Its governance is young.</strong> The spec is versioned and open; a
+                community group is the plan, and the format's future should not belong to us.
+              </li>
+            </ul>
+          </section>
+
+          <div class="closing">
+            <p>WDF is our answer. The spec is short — read it, break it, tell us.</p>
+            <div class="btnrow">
+              <a class="btn btn--primary" href="wdf-core-0.1.md">Read the spec</a>
+              <a class="btn" href="viewer.html?doc=examples/municipal-decree.wdf"
+                >Open the Reader</a
+              >
+              <a class="btn" href="https://github.com/paoloomero/wdf">GitHub</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="foot">
+      <p>
+        WDF is an open format under development by
+        <a href="https://www.infofactory.it/">infoFACTORY</a>. Specification CC-BY 4.0 · Code
+        Apache-2.0.
+      </p>
+      <p>
+        <a href="./">Home</a> · <a href="wdf-core-0.1.md">Spec</a> ·
+        <a href="https://github.com/paoloomero/wdf">GitHub</a> ·
+        <a href="extension-privacy.html">Privacy</a>
+      </p>
+    </footer>
+  </body>
+</html>

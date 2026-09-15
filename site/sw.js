@@ -51,7 +51,9 @@ self.addEventListener('fetch', (event) => {
           // Opportunistically refresh shell entries.
           const url = new URL(event.request.url);
           const path = url.pathname.split('/').pop() ?? '';
-          if (response.ok && SHELL.some((s) => s.endsWith(path))) {
+          // path is '' for the site root: every string endsWith(''), which
+          // would pin the landing page in the cache forever.
+          if (response.ok && path !== '' && SHELL.some((s) => s.endsWith(path))) {
             const copy = response.clone();
             void caches.open(CACHE).then((cache) => cache.put(event.request, copy));
           }
