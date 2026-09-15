@@ -1,6 +1,6 @@
 import { unzipSync, zipSync, type UnzipFileInfo, type Zippable } from 'fflate';
 
-import { WdfError } from './errors.js';
+import { UnsupportedVersionError, WdfError } from './errors.js';
 import { getSchemaValidators } from './schemas.js';
 import type { WdfManifest } from './types.js';
 
@@ -45,6 +45,14 @@ function parseManifest(bytes: Uint8Array): WdfManifest {
     data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   } catch (e) {
     throw new WdfError(`manifest.json is not valid UTF-8 JSON (${String(e)})`, '§4');
+  }
+  // A foreign `wdf` version is reported as such (§4.1), before the schema's
+  // `const: "0.1"` would turn it into a generic manifest error.
+  if (typeof data === 'object' && data !== null && 'wdf' in data) {
+    const version = (data as { wdf: unknown }).wdf;
+    if (typeof version === 'string' && version !== '0.1') {
+      throw new UnsupportedVersionError(version);
+    }
   }
   const validate = getSchemaValidators().manifest;
   if (!validate(data)) {

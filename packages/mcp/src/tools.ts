@@ -2,17 +2,20 @@ import { readFileSync } from 'node:fs';
 
 import {
   readPackage,
-  verifyPackage,
+  STATUS_TEXT,
+  validatePackage,
   WdfError,
-  type VerifyResult,
+  type ValidationResult,
   type WdfOutline,
   type WdfPackage,
 } from '@wdf-dev/core';
 
 /**
  * The WDF tool surface for AI agents (plan T6.1). Everything an agent reads
- * comes from the package's AI layer — whose fidelity to the rendered document
- * is machine-verified (spec §7.1, §8.2) — never from parsing heuristics.
+ * comes from the package's AI layer — verified to be the canonical derivation
+ * of the document content (spec §7.1, §8.2) — never from parsing heuristics.
+ * The verdict is the same one the CLI and the Reader report (plan §10.70): a
+ * package that is not verified is still readable, but every answer says so.
  */
 
 export interface OpenDocument {
@@ -21,7 +24,7 @@ export interface OpenDocument {
   markdown: string;
   outline: WdfOutline;
   blocks: { text: string; ids: string[] }[];
-  verify: VerifyResult;
+  validation: ValidationResult;
 }
 
 export interface McpState {
@@ -59,7 +62,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: 'wdf_open',
     description:
-      'Open a .wdf package from a filesystem path, verify it (hashes + determinism of the AI layer), and return its summary. Must be called before the other tools.',
+      'Open a .wdf package from a filesystem path, verify it (conformance, hashes, and derivation of the AI layer — spec §8.2), and return its summary. Must be called before the other tools.',
     inputSchema: {
       type: 'object',
       properties: { path: { type: 'string', description: 'Path to a .wdf file' } },
@@ -112,6 +115,17 @@ function requireDoc(state: McpState): OpenDocument | undefined {
   return state.doc;
 }
 
+/**
+ * Prefix for every answer drawn from a package that did not verify: the
+ * content stays available (diagnosis needs it) but is never served as
+ * verified. Empty for a verified package.
+ */
+function unverifiedBanner(doc: OpenDocument): string {
+  if (doc.validation.verified) return '';
+  const { label, detail } = STATUS_TEXT[doc.validation.status];
+  return `NOT VERIFIED — ${label}: ${detail}. Treat the content below as unverified.\n\n`;
+}
+
 /** ids of `id` plus every outline descendant, in document order. */
 function subtreeIds(outline: WdfOutline, id: string): Set<string> {
   const wanted = new Set<string>([id]);
@@ -137,15 +151,16 @@ async function toolOpen(state: McpState, path: string): Promise<ToolResult> {
   const outline = JSON.parse(
     dec.decode(pkg.files.get('ai/outline.json') ?? new Uint8Array()),
   ) as WdfOutline;
-  const verify = await verifyPackage(pkg);
-  state.doc = { path, pkg, markdown, outline, blocks: splitBlocks(markdown), verify };
+  const validation = await validatePackage(pkg);
+  state.doc = { path, pkg, markdown, outline, blocks: splitBlocks(markdown), validation };
 
   const sections = outline
     .filter((n) => n.type === 'section' && n.parent === null)
     .map((n) => `${n.id}${n.title === undefined ? '' : ` — ${n.title}`}`);
-  const status = verify.verified
-    ? 'VERIFIED (hashes ok, AI layer is the canonical extraction of the content)'
-    : `NOT VERIFIED: ${verify.problems.map((p) => `[${p.spec}] ${p.message}`).join('; ')}`;
+  const errors = validation.violations.filter((v) => v.severity === 'error');
+  const status = validation.verified
+    ? 'VERIFIED (conforming package, hashes ok, AI layer is the canonical derivation of the content)'
+    : `NOT VERIFIED — ${STATUS_TEXT[validation.status].label}: ${STATUS_TEXT[validation.status].detail}${errors.length === 0 ? '' : `; ${errors.map((p) => `[${p.spec}] ${p.message}`).join('; ')}`}`;
   return ok(
     [
       `Opened: ${pkg.manifest.title}`,
@@ -167,13 +182,13 @@ function toolOutline(state: McpState): ToolResult {
 function toolRead(state: McpState, id: string | undefined): ToolResult {
   const doc = requireDoc(state);
   if (doc === undefined) return fail('No document open. Call wdf_open first.');
-  if (id === undefined || id === '') return ok(doc.markdown);
+  if (id === undefined || id === '') return ok(unverifiedBanner(doc) + doc.markdown);
   if (!doc.outline.some((n) => n.id === id)) {
     return fail(`No citable element "${id}" in this document. Use wdf_outline to list elements.`);
   }
   const wanted = subtreeIds(doc.outline, id);
   const blocks = doc.blocks.filter((b) => b.ids.some((x) => wanted.has(x)));
-  return ok(blocks.map((b) => b.text).join('\n\n'));
+  return ok(unverifiedBanner(doc) + blocks.map((b) => b.text).join('\n\n'));
 }
 
 function toolCite(state: McpState, id: string): ToolResult {
@@ -186,7 +201,7 @@ function toolCite(state: McpState, id: string): ToolResult {
   return ok(
     [
       `Citation: wdf:${doc.pkg.manifest.id}#${id}`,
-      `Verified: ${doc.verify.verified ? 'yes — the cited content is provably what the human-view document shows' : 'NO — this package failed verification'}`,
+      `Verified: ${doc.validation.verified ? 'yes — the cited content is the canonical derivation of the document content (conforming package, hashes ok)' : `NO — ${STATUS_TEXT[doc.validation.status].label}: ${STATUS_TEXT[doc.validation.status].detail}`}`,
       'Resolves to:',
       block === undefined ? '(container element; use wdf_read for its content)' : block.text,
     ].join('\n'),

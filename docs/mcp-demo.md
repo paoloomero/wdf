@@ -70,7 +70,7 @@ claude mcp add wdf -- node <repo>/packages/mcp/dist/index.js
 Opened: Decree no. 87/2026 — Award of document digitisation services
 Document id: urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7
 Language: en · 22 citable elements · 16 blocks
-Verification: VERIFIED (hashes ok, AI layer is the canonical extraction of the content)
+Verification: VERIFIED (conforming package, hashes ok, AI layer is the canonical derivation of the content)
 Top-level sections: sec-recitals — Recitals, sec-operative — Operative part, sec-publication — Publication and effect
 Use wdf_outline to navigate, wdf_read to read, wdf_cite for verifiable citations.
 ```
@@ -227,7 +227,7 @@ No citable element "sec-dispositivo" in this document. Use wdf_outline to list e
 
 ```
 Citation: wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-commitments
-Verified: yes — the cited content is provably what the human-view document shows
+Verified: yes — the cited content is the canonical derivation of the document content (conforming package, hashes ok)
 Resolves to:
 Spending commitments by chapter and year {#tbl-commitments}
 ```

@@ -18,3 +18,18 @@ export class WdfError extends Error {
     this.path = path;
   }
 }
+
+/**
+ * The manifest declares a `wdf` version this implementation does not
+ * implement (§4.1). Consumers report it as *unsupported version* — never as
+ * tampering: nothing about the package was checked.
+ */
+export class UnsupportedVersionError extends WdfError {
+  readonly version: string;
+
+  constructor(version: string) {
+    super(`unsupported WDF version "${version}" (this implementation validates 0.1 only)`, '§4.1');
+    this.name = 'UnsupportedVersionError';
+    this.version = version;
+  }
+}

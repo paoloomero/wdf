@@ -3,13 +3,11 @@ import { basename, dirname, join } from 'node:path';
 
 import {
   readPackage,
-  validateCaptureExt,
-  validateDatasets,
-  validatePaginationExt,
+  STATUS_TEXT,
+  validatePackage,
   validateProfile,
-  validateStylesheet,
-  verifyPackage,
   WdfError,
+  type ValidationResult,
   type Violation,
   type WdfManifest,
 } from '@wdf-dev/core';
@@ -72,43 +70,39 @@ export async function cmdValidate(
     return 2;
   }
 
-  let violations: Violation[] = [];
-  let integrity = false;
-  let determinism = false;
+  // One pipeline for every consumer (spec §8.2 errata 2026-09-15, plan §10.70):
+  // CLI, Reader and MCP all report validatePackage()'s verdict.
+  let result: ValidationResult;
   try {
-    const pkg = readPackage(bytes);
-    const entry = dec.decode(pkg.files.get(pkg.manifest.entry) ?? new Uint8Array());
-    violations.push(...validateProfile(entry));
-    const styles = pkg.files.get('content/styles.css');
-    if (styles !== undefined) violations.push(...validateStylesheet(dec.decode(styles)));
-    violations.push(...validateDatasets(pkg));
-    violations.push(...validateCaptureExt(pkg));
-    violations.push(...validatePaginationExt(pkg));
-    const verify = await verifyPackage(pkg);
-    integrity = verify.integrity;
-    determinism = verify.determinism;
-    violations.push(...verify.problems);
+    result = await validatePackage(bytes);
   } catch (e) {
-    if (e instanceof WdfError) {
-      violations = [
-        { spec: e.spec, path: e.path ?? '(package)', message: e.message, severity: 'error' },
-      ];
-    } else {
-      ctx.err(`error: ${String(e)}`);
-      return 2;
-    }
+    ctx.err(`error: ${String(e)}`);
+    return 2;
   }
 
-  const errors = violations.filter((v) => v.severity === 'error');
-  const warnings = violations.filter((v) => v.severity === 'warning');
-  const valid = errors.length === 0 && integrity && determinism;
+  const errors = result.violations.filter((v) => v.severity === 'error');
+  const warnings = result.violations.filter((v) => v.severity === 'warning');
+  const valid = result.verified;
 
   if (opts.json === true) {
-    ctx.log(JSON.stringify({ valid, integrity, determinism, violations }, null, 2));
-  } else {
-    for (const v of violations) ctx.log(formatViolation(v));
     ctx.log(
-      `${valid ? 'VALID' : 'INVALID'}: ${String(errors.length)} error(s), ${String(warnings.length)} warning(s); integrity ${integrity ? 'ok' : 'FAILED'}, determinism ${determinism ? 'ok' : 'FAILED'}`,
+      JSON.stringify(
+        {
+          valid,
+          status: result.status,
+          conformance: result.conformance,
+          integrity: result.integrity,
+          determinism: result.determinism,
+          violations: result.violations,
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
+    for (const v of result.violations) ctx.log(formatViolation(v));
+    ctx.log(
+      `${valid ? 'VALID' : 'INVALID'}: ${String(errors.length)} error(s), ${String(warnings.length)} warning(s); status ${result.status} (${STATUS_TEXT[result.status].label}); integrity ${result.integrity ? 'ok' : 'FAILED'}, determinism ${result.determinism ? 'ok' : 'FAILED'}`,
     );
   }
   return valid ? 0 : 1;

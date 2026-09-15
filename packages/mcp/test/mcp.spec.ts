@@ -101,6 +101,61 @@ describe('WDF tools (T6.1)', () => {
   });
 });
 
+describe('one verdict on every surface (plan §10.70, T05)', () => {
+  let mismatchPath: string;
+
+  beforeAll(async () => {
+    // The review's T05: the first commitment becomes 99999 in the dataset
+    // while the table still shows 14640; hashes are regenerated, so the
+    // old verdict (hashes + derivation only) said VERIFIED.
+    const files = readDirFiles(join(examplesDir, 'municipal-decree'));
+    const dataPath = 'data/commitments.json';
+    const data = JSON.parse(new TextDecoder().decode(files.get(dataPath))) as {
+      rows: number[][];
+    };
+    (data.rows[0] as number[])[2] = 99999;
+    files.set(dataPath, new TextEncoder().encode(JSON.stringify(data)));
+    mismatchPath = join(mkdtempSync(join(tmpdir(), 'wdf-mcp-t05-')), 'mismatch.wdf');
+    writeFileSync(mismatchPath, await buildPackage(files));
+  });
+
+  it('wdf_open reports the dataset mismatch as NOT VERIFIED / Not conforming', async () => {
+    const state: McpState = {};
+    const result = await callTool(state, 'wdf_open', { path: mismatchPath });
+    expect(result.isError).toBeUndefined();
+    const out = text(result);
+    expect(out).not.toContain('Verification: VERIFIED');
+    expect(out).toContain('NOT VERIFIED');
+    expect(out).toContain('Not conforming');
+    expect(out).toContain('§6.5.4');
+    expect(state.doc?.validation.status).toBe('not-conforming');
+  });
+
+  it('wdf_read still serves the content, but every answer is marked unverified', async () => {
+    const state: McpState = {};
+    await callTool(state, 'wdf_open', { path: mismatchPath });
+    const whole = text(await callTool(state, 'wdf_read', {}));
+    expect(whole.startsWith('NOT VERIFIED')).toBe(true);
+    expect(whole).toContain('14640');
+    const part = text(await callTool(state, 'wdf_read', { id: 'tbl-commitments' }));
+    expect(part.startsWith('NOT VERIFIED')).toBe(true);
+  });
+
+  it('wdf_cite says NO with the status, never "provably"', async () => {
+    const state: McpState = {};
+    await callTool(state, 'wdf_open', { path: mismatchPath });
+    const out = text(await callTool(state, 'wdf_cite', { id: 'tbl-commitments' }));
+    expect(out).toContain('Verified: NO');
+    expect(out).toContain('Not conforming');
+  });
+
+  it('a verified package carries no banner', async () => {
+    const state: McpState = {};
+    await callTool(state, 'wdf_open', { path: wdfPath });
+    expect(text(await callTool(state, 'wdf_read', {})).startsWith('NOT VERIFIED')).toBe(false);
+  });
+});
+
 describe('JSON-RPC layer', () => {
   it('speaks the MCP handshake and lists tools', async () => {
     const state: McpState = {};

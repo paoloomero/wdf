@@ -1,14 +1,10 @@
 import {
+  INTEGRITY_NOT_AUTHENTICITY,
   parseCaptureExt,
   readPackage,
-  validateCaptureExt,
-  validatePaginationExt,
-  validateDatasets,
-  validateProfile,
-  validateStylesheet,
-  verifyPackage,
+  STATUS_TEXT,
+  validatePackage,
   WdfError,
-  type Violation,
   type WdfCapture,
   type WdfOutline,
   type WdfPackage,
@@ -542,47 +538,49 @@ async function verify(doc: Loaded): Promise<void> {
   };
 
   try {
-    const result = await verifyPackage(doc.pkg);
-    setBadgeState(result.verified ? 'ok' : 'bad', result.verified ? 'Verified' : 'Tampered');
+    // One pipeline, one verdict, shared with the CLI and MCP (spec §8.2
+    // errata 2026-09-15, plan §10.70). Green only for `verified`; a digest
+    // mismatch is the only case called tampering.
+    const result = await validatePackage(doc.pkg);
+    const text = STATUS_TEXT[result.status];
+    const state: 'ok' | 'bad' | 'warn' = result.verified
+      ? 'ok'
+      : result.status === 'unsupported-version' || result.status === 'not-verifiable'
+        ? 'warn'
+        : 'bad';
+    setBadgeState(state, text.label);
+    add(`${text.label}: ${text.detail}`, result.verified ? 'ok' : 'bad');
     add(
       result.integrity
         ? 'Integrity: every file matches its SHA-256 digest (§8.2)'
-        : 'Integrity: FAILED',
+        : 'Integrity: FAILED (§8.2)',
       result.integrity ? 'ok' : 'bad',
     );
     add(
       result.determinism
         ? 'Determinism: the AI layer is the canonical extraction of the content (§7.1)'
-        : 'Determinism: FAILED',
+        : 'Determinism: FAILED (§7.1)',
       result.determinism ? 'ok' : 'bad',
     );
-    for (const p of result.problems) add(`[${p.spec}] ${p.path} — ${p.message}`, 'bad');
-    if (doc.captureExt !== undefined) {
-      for (const line of captureDetails(doc.captureExt)) add(line, '');
-    }
-
-    const entry = dec.decode(doc.pkg.files.get(doc.pkg.manifest.entry) ?? new Uint8Array());
-    const violations: Violation[] = [
-      ...validateProfile(entry),
-      ...validateDatasets(doc.pkg),
-      ...validateCaptureExt(doc.pkg),
-      ...validatePaginationExt(doc.pkg),
-    ];
-    const styles = doc.pkg.files.get('content/styles.css');
-    if (styles !== undefined) violations.push(...validateStylesheet(dec.decode(styles)));
-    const errors = violations.filter((v) => v.severity === 'error');
-    if (errors.length > 0 && result.verified) {
-      setBadgeState('warn', 'Profile errors');
-    }
-    for (const v of violations) {
+    add(
+      result.conformance
+        ? 'Conformance: WDF-HTML profile, datasets and extensions (§5–§6, §10)'
+        : 'Conformance: FAILED (§5–§6, §10)',
+      result.conformance ? 'ok' : 'bad',
+    );
+    for (const v of result.violations) {
       add(
         `[${v.spec}] ${v.severity === 'warning' ? 'warning: ' : ''}${v.path} — ${v.message}`,
         v.severity === 'warning' ? '' : 'bad',
       );
     }
-    if (errors.length === 0) add('WDF-HTML profile: conforming (§6)', 'ok');
+    if (doc.captureExt !== undefined) {
+      for (const line of captureDetails(doc.captureExt)) add(line, '');
+    }
+    add(INTEGRITY_NOT_AUTHENTICITY, '');
 
-    // Status bar (design "app shell 4A"): anchors · content hash · verdict.
+    // Status bar (design "app shell 4A"): anchors · content hash · verdict —
+    // the same verdict as the badge, never a second opinion.
     try {
       const hashes = JSON.parse(
         dec.decode(doc.pkg.files.get('integrity/hashes.json') ?? new Uint8Array()),
@@ -590,13 +588,13 @@ async function verify(doc: Loaded): Promise<void> {
       const entryHash = hashes.files?.[doc.pkg.manifest.entry];
       const short =
         entryHash === undefined ? '' : ` · sha-256 ${entryHash.slice(0, 4)}…${entryHash.slice(-4)}`;
-      const verdict = result.verified ? 'verified locally' : 'INTEGRITY FAILED';
+      const verdict = result.verified ? 'verified locally' : text.label.toUpperCase();
       setStatus(`${String(doc.outline.length)} anchors${short} · ${verdict}`);
     } catch {
       /* status bar is informational — never block on it */
     }
   } catch (e) {
-    setBadgeState('warn', 'Not verifiable');
+    setBadgeState('warn', STATUS_TEXT['not-verifiable'].label);
     add(`Verification failed to run: ${String(e)}`, 'bad');
   }
 }

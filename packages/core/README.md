@@ -22,10 +22,12 @@ npm install @wdf-dev/core
 ## Example
 
 ```js
-import { readPackage, verifyPackage } from '@wdf-dev/core';
+import { validatePackage } from '@wdf-dev/core';
 
-const pkg = readPackage(bytes); // Uint8Array of a .wdf file
-const result = await verifyPackage(pkg); // integrity + profile + extraction (spec §8.2)
+const result = await validatePackage(bytes); // Uint8Array of a .wdf file
+result.status; // 'verified' | 'not-conforming' | 'integrity-failed' | 'derivation-failed'
+//             | 'unsupported-version' | 'not-verifiable'  (spec §8.2)
+result.violations; // every problem, each citing the spec section it enforces
 ```
 
 The specification lives in the repository under [`spec/wdf-core-0.1.md`](https://github.com/paoloomero/wdf/blob/main/spec/wdf-core-0.1.md) (CC-BY 4.0). Code is Apache-2.0.

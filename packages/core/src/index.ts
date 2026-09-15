@@ -1,6 +1,6 @@
 export const WDF_VERSION = '0.1';
 
-export { WdfError } from './errors.js';
+export { WdfError, UnsupportedVersionError } from './errors.js';
 export { validateCaptureExt, parseCaptureExt, CAPTURE_PATH } from './capture.js';
 export { validatePaginationExt, parsePaginationExt, PAGINATION_PATH } from './pagination.js';
 export {
@@ -53,6 +53,13 @@ export {
   type TableGrid,
 } from './table.js';
 export { readPackage, writePackage, checkPackageStructure, type WdfPackage } from './package.js';
+export {
+  validatePackage,
+  STATUS_TEXT,
+  INTEGRITY_NOT_AUTHENTICITY,
+  type PackageStatus,
+  type ValidationResult,
+} from './validate.js';
 export {
   createSchemaValidators,
   getSchemaValidators,

@@ -51,8 +51,9 @@ _This section is non-normative._
   canonical extraction algorithm of §7. Agents never parse HTML heuristically,
   and citations resolve to stable element identifiers.
 - **Deterministic and verifiable.** The extraction algorithm is
-  byte-deterministic. A validator can prove that the AI representation
-  matches the human-readable content, and package hashes detect tampering.
+  byte-deterministic. A validator can prove that the AI representation is
+  the canonical derivation of the document's content (the same DOM the
+  reader's browser renders), and package hashes detect tampering.
 - **Boring on purpose.** WDF invents as little as possible: ZIP for the
   container (the EPUB/OCF model), JSON plus JSON Schema for metadata,
   CommonMark plus GFM tables for the AI layer, SHA-256 for integrity.
@@ -700,15 +701,36 @@ A verifier MUST perform, in order:
 
 1. **Structure**: §3 and §4 checks (paths, required files, manifest
    validity, listings).
-2. **Hashes**: every package file except `integrity/hashes.json` has a
+2. **Conformance**: every machine-checkable requirement of §5, §6 and §10
+   (dataset files, the WDF-HTML profile including stylesheet rules and
+   dataset binding, declared extensions).
+3. **Hashes**: every package file except `integrity/hashes.json` has a
    matching digest; no digest lacks its file; no file lacks its digest.
-3. **Determinism**: re-run extraction (§7) on `content/index.html` and
+4. **Determinism**: re-run extraction (§7) on `content/index.html` and
    compare byte-for-byte with `ai/content.md` and `ai/outline.json`.
 
-The package is **verified** only if all three pass. Viewers SHOULD display
-the verification status prominently (e.g. _verified_ / _tampered_ /
-_not verifiable_) and MUST NOT display _verified_ without having performed
-all three checks.
+The package is **verified** only if all four pass. A consumer MUST NOT
+report _verified_ without having performed all four checks, and MUST
+distinguish the failing outcomes:
+
+- _not conforming_ — step 1 or 2 failed;
+- _integrity failed_ — step 3 failed: the package was tampered with or
+  corrupted (the only outcome that MAY be described as tampering);
+- _derivation failed_ — step 4 failed;
+- _unsupported version_ — the manifest declares a `wdf` version the
+  verifier does not implement; nothing was checked, and this MUST NOT be
+  reported as tampering;
+- _not verifiable_ — a check could not run.
+
+Viewers SHOULD display the status prominently, and SHOULD show next to a
+_verified_ status that integrity is not authenticity (§8.3, §11.4).
+
+> _Errata 2026-09-15:_ conformance (step 2) was added to the definition of
+> _verified_ and the outcome vocabulary was made normative. Before this
+> erratum a consumer could report _verified_ for a package whose bound
+> table contradicted its dataset (§6.5.4), because §5–§6 checks were
+> assigned to validators but not to verifiers. Rationale and reproduction:
+> project plan §10.70.
 
 ### 8.3 Limits of 0.1
 
