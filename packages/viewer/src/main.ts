@@ -22,6 +22,7 @@ import {
   captureDetails,
   captureNote,
   citation,
+  conversionReport,
   outlineTree,
   parseSourceExt,
   visualSourceDetails,
@@ -49,6 +50,12 @@ let loaded: Loaded | undefined;
 let selectedId: string | undefined;
 // Paper view (WP10): rendering-only A4 sheet look for the Human view.
 let paged = false;
+// Plain view (spec §6.7.4, plan §10.70): the author's stylesheet off.
+let plain = false;
+// Bound tables get their "typed data ✓" mark only once the package verified.
+let datasetsOk = false;
+// Conversion report (ext-source 0.6) available for the Original view.
+let reportAvailable = false;
 // An anchor requested via the URL fragment, honoured once the Human frame
 // is ready — so a shared link like document.html#p-0012 opens AT the spot.
 let pendingAnchor: string | undefined;
@@ -244,6 +251,7 @@ function openBytes(bytes: Uint8Array, name: string): void {
   renderOutline(loaded);
   ($('outline-search') as HTMLInputElement).value = '';
   setView('human');
+  datasetsOk = false;
   setBadgeState('wait', 'checking…');
   // A URL fragment names the anchor to open at (resolved when the Human
   // frame is ready) — the human-consumable end of a citation link.
@@ -254,7 +262,38 @@ function openBytes(bytes: Uint8Array, name: string): void {
 function renderHuman(doc: Loaded): void {
   const entry = dec.decode(doc.pkg.files.get(doc.pkg.manifest.entry) ?? new Uint8Array());
   const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  ($('human') as HTMLIFrameElement).srcdoc = buildSrcdoc(entry, doc.pkg.files, nonce);
+  ($('human') as HTMLIFrameElement).srcdoc = buildSrcdoc(entry, doc.pkg.files, nonce, { plain });
+}
+
+function setPlain(on: boolean): void {
+  plain = on;
+  $('plain-toggle').classList.toggle('active', on);
+  if (loaded !== undefined) renderHuman(loaded);
+  statusFlash(on ? 'Plain view: author stylesheet off (§6.7.4)' : 'Author stylesheet on');
+}
+
+// The Original view's conversion report (ext-source 0.6, review F04): what
+// the producer transformed or dropped, next to the original it describes.
+function renderReport(doc: Loaded): void {
+  const panel = $('original-report');
+  const list = $('original-report-list');
+  list.textContent = '';
+  panel.hidden = true;
+  const report =
+    doc.sourceExt === undefined ? undefined : conversionReport(doc.pkg.files, doc.sourceExt);
+  reportAvailable = report !== undefined;
+  if (report === undefined) return;
+  const parts = [`${String(report.entries.length)} note(s)`];
+  if (report.losses > 0) parts.push(`${String(report.losses)} dropped`);
+  if (report.changes > 0) parts.push(`${String(report.changes)} transformed`);
+  $('original-report-summary').textContent =
+    `Original included as-is, not compared with the canonical content · conversion report: ${parts.join(', ')}${report.toolVersion === '' ? '' : ` (${report.tool} ${report.toolVersion})`}`;
+  for (const e of report.entries) {
+    const li = document.createElement('li');
+    li.className = `report__${e.kind}`;
+    li.textContent = `${e.kind}: ${e.message}${e.count > 1 ? ` (×${String(e.count)})` : ''}`;
+    list.append(li);
+  }
 }
 
 // Print / export as PDF (WP10): a dedicated script-less frame with the
@@ -389,6 +428,7 @@ function renderOriginal(doc: Loaded): void {
   visualPdf = 'idle';
   $('original-pdf-pages').textContent = '';
   renderVisual(doc);
+  renderReport(doc);
   if (doc.sourceExt === undefined) {
     button.hidden = true;
     frame.srcdoc = '';
@@ -593,9 +633,13 @@ async function verify(doc: Loaded): Promise<void> {
     } catch {
       /* status bar is informational — never block on it */
     }
+    // Bound tables (§6.5) are marked as typed data only on a verified package.
+    datasetsOk = result.verified;
+    postToHuman({ type: 'wdf-datasets', ok: datasetsOk });
   } catch (e) {
     setBadgeState('warn', STATUS_TEXT['not-verifiable'].label);
     add(`Verification failed to run: ${String(e)}`, 'bad');
+    datasetsOk = false;
   }
 }
 
@@ -689,6 +733,8 @@ function setView(view: 'human' | 'agent' | 'original'): void {
   // does too when it print-exports — but when it downloads the author's
   // rendition it applies everywhere.
   ($('paged-toggle') as HTMLButtonElement).disabled = view !== 'human';
+  ($('plain-toggle') as HTMLButtonElement).disabled = view !== 'human';
+  $('original-report').hidden = view !== 'original' || !reportAvailable;
   ($('pdf-export') as HTMLButtonElement).disabled = view !== 'human' && !visualAvailable;
   if (view === 'agent' && selectedId !== undefined) select(selectedId, 'outline');
 }
@@ -769,12 +815,16 @@ function init(): void {
   $('paged-toggle').addEventListener('click', () => {
     setPaged(!paged);
   });
+  $('plain-toggle').addEventListener('click', () => {
+    setPlain(!plain);
+  });
   $('pdf-export').addEventListener('click', () => {
     exportPdf();
   });
-  // A reloaded Human frame starts unpaged: re-apply the paper view.
+  // A reloaded Human frame starts unpaged and unmarked: re-apply both.
   $('human').addEventListener('load', () => {
     if (paged) postToHuman({ type: 'wdf-paged', on: true });
+    if (datasetsOk) postToHuman({ type: 'wdf-datasets', ok: true });
     if (pendingAnchor !== undefined && loaded !== undefined) {
       const id = pendingAnchor;
       if (loaded.outline.some((n) => n.id === id)) select(id, 'outline');

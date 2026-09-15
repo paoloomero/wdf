@@ -17,6 +17,7 @@ import {
   buildPackage,
   decodeHtml,
   DEFAULT_CAPS,
+  documentIdForUrl,
   looksLikeDocx,
   looksLikePdf,
   fetchPage,
@@ -25,6 +26,7 @@ import {
   type AssetLoader,
   type CssFetcher,
   type ImportInput,
+  type PreviousRevision,
 } from '@wdf-dev/import';
 
 import { hasViewerTemplate, makeStandalone } from './lib/build.js';
@@ -203,6 +205,8 @@ export async function cmdImport(
     title?: string;
     lang?: string;
     date?: string;
+    id?: string;
+    previous?: string;
     withSource?: boolean;
     withPdf?: string;
     embedFonts?: boolean;
@@ -213,6 +217,22 @@ export async function cmdImport(
   ctx: Ctx = defaultCtx,
 ): Promise<number> {
   const isUrl = /^https?:\/\//i.test(input);
+  // Revision of an earlier document (review F07, plan §10.70): inherit its
+  // id, its creation date and the ids of unchanged elements (§4.1, §6.4.4).
+  let previous: PreviousRevision | undefined;
+  if (opts.previous !== undefined) {
+    try {
+      const prev = readPackage(readFileSync(opts.previous));
+      previous = {
+        id: prev.manifest.id,
+        created: prev.manifest.created,
+        html: dec.decode(prev.files.get(prev.manifest.entry) ?? new Uint8Array()),
+      };
+    } catch (e) {
+      ctx.err(`error: cannot read the previous revision ${opts.previous} (${String(e)})`);
+      return 2;
+    }
+  }
   const isMarkdown = !isUrl && /\.(md|markdown)$/i.test(input);
   const report: string[] = [];
 
@@ -356,6 +376,16 @@ export async function cmdImport(
   }
 
   const importOpts: Parameters<typeof importDocument>[1] = { readFont: fsFontReader };
+  if (previous !== undefined) importOpts.previous = previous;
+  if (opts.id !== undefined) {
+    importOpts.id = opts.id;
+  } else if (isUrl && previous === undefined) {
+    // Captures and fetches of one address are revisions of one document.
+    importOpts.id = await documentIdForUrl(input);
+    report.push(
+      'document id derived from the URL (imports of the same address share it, spec §4.1)',
+    );
+  }
   if (opts.title !== undefined) importOpts.title = opts.title;
   if (opts.lang !== undefined) importOpts.lang = opts.lang;
   if (opts.date !== undefined) importOpts.date = opts.date;

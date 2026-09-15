@@ -57,6 +57,14 @@ program
   .option('--title <title>', 'document title (default: from the source)')
   .option('--lang <tag>', 'document language (default: from the source, or "en")')
   .option('--date <iso>', 'created/modified timestamp (default: now)')
+  .option(
+    '--id <urn>',
+    'document id to record (urn:uuid:…), e.g. the id of the document this import revises (§4.1)',
+  )
+  .option(
+    '--previous <file.wdf>',
+    'earlier revision of this document: inherit its id and creation date, keep the ids of unchanged elements (§6.4.4)',
+  )
   .option('--with-source', 'embed the original input byte-for-byte (extension "source", §10)')
   .option(
     '--with-pdf <file>',
@@ -83,6 +91,8 @@ program
         title?: string;
         lang?: string;
         date?: string;
+        id?: string;
+        previous?: string;
         withSource?: boolean;
         withPdf?: string;
         embedFonts?: boolean;

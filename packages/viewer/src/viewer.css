@@ -822,6 +822,10 @@ code {
   flex: 1;
   min-width: 0;
   display: flex;
+  /* One visible view at a time, except the Original view's report bar,
+     which takes a full-width line above the original (wrap + 100% basis). */
+  flex-wrap: wrap;
+  align-content: stretch;
 }
 #human,
 #original {
@@ -1121,4 +1125,36 @@ code {
   #capture-note {
     display: none;
   }
+}
+
+/* Conversion report (ext-source 0.6): a collapsible bar above the Original view. */
+#original-report {
+  flex: 0 0 100%;
+  min-width: 0;
+  align-self: flex-start;
+  margin: 0;
+  padding: 0.35rem 0.9rem;
+  font: 500 12.5px/1.5 var(--font-mono, ui-monospace, monospace);
+  color: var(--ink, #101418);
+  background: var(--paper, #fff);
+  border-bottom: 1px solid var(--line, #d5d9df);
+}
+#original-report summary {
+  cursor: pointer;
+  list-style: revert;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#original-report ul {
+  margin: 0.4rem 0 0.2rem;
+  padding-left: 1.2rem;
+  font-weight: 400;
+  max-height: 14rem;
+  overflow: auto;
+}
+#original-report li.report__loss {
+  color: #a13a2f;
+}
+#original-report li.report__change {
+  color: #6b5a00;
 }

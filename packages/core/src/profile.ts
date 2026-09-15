@@ -694,9 +694,40 @@ const CSS_RULES: [RegExp, string][] = [
   [/\burl\s*\(/i, 'url(…) is not permitted in any form'],
   [/\bposition\s*:\s*fixed\b/i, 'position: fixed is not permitted'],
   [/\bposition\s*:\s*sticky\b/i, 'position: sticky is not permitted'],
+  // Errata 2026-09-15 (plan §10.70, review F01): declarations that hide
+  // content from the human view or add text to it. Anchored to the start of
+  // a declaration so that selectors such as `.content:hover` do not match.
+  [
+    /(?:^|[{;])\s*display\s*:\s*none\b/i,
+    'display: none is not permitted (hides content from the human view)',
+  ],
+  [
+    /(?:^|[{;])\s*visibility\s*:\s*(?:hidden|collapse)\b/i,
+    'visibility: hidden / collapse is not permitted (hides content from the human view)',
+  ],
+  [
+    /(?:^|[{;])\s*opacity\s*:\s*0+(?:\.0+)?\s*(?:!important\s*)?(?:[;}]|$)/i,
+    'opacity: 0 is not permitted (hides content from the human view)',
+  ],
+  [
+    /(?:^|[{;])\s*font-size\s*:\s*0+(?:\.0+)?(?:px|em|rem|%|pt|vw|vh|ch)?\s*(?:!important\s*)?(?:[;}]|$)/i,
+    'font-size: 0 is not permitted (hides content from the human view)',
+  ],
+  [
+    /(?:^|[{;])\s*clip\s*:(?!\s*auto\b)/i,
+    'clip is not permitted except clip: auto (clips content out of view)',
+  ],
+  [
+    /(?:^|[{;])\s*clip-path\s*:(?!\s*none\b)/i,
+    'clip-path is not permitted except clip-path: none (clips content out of view)',
+  ],
+  [
+    /(?:^|[{;])\s*content\s*:(?!\s*(?:none|normal|""|'')\s*(?:!important\s*)?(?:[;}]|$))/i,
+    'content: is not permitted except none, normal or the empty string (generated text is invisible to extraction)',
+  ],
 ];
 
-/** Validates content/styles.css against spec §6.7.2. */
+/** Validates content/styles.css against spec §6.7.2 (with the 2026-09-15 errata). */
 export function validateStylesheet(css: string): Violation[] {
   const stripped = css.replace(CSS_COMMENT, '');
   const violations: Violation[] = [];

@@ -97,7 +97,7 @@ describe('wdf import <file.docx> (T20.8)', () => {
     const pkg = readPackage(wdf);
     expect(pkg.manifest.extensions).toEqual([
       { name: 'pagination', version: '0.1' },
-      { name: 'source', version: '0.4' },
+      { name: 'source', version: '0.6' },
     ]);
     const source = JSON.parse(dec.decode(pkg.files.get('ext/source/source.json'))) as {
       kind: string;

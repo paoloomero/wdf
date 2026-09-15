@@ -1,4 +1,4 @@
-# WDF extension: `source` (version 0.5)
+# WDF extension: `source` (version 0.6)
 
 Status: extension specification (outside WDF Core, per core spec §10).
 Producers MAY use it; conforming consumers MAY ignore it entirely (§10.3).
@@ -15,7 +15,7 @@ the package integrity hashes like any other file (§10.2).
 ## Manifest declaration
 
 ```json
-"extensions": [{ "name": "source", "version": "0.5" }]
+"extensions": [{ "name": "source", "version": "0.6" }]
 ```
 
 Each version is a strict superset of the previous one: a producer using
@@ -75,6 +75,43 @@ Fidelity is the author's responsibility: package integrity attests that
 the bytes have not changed, not that the rendition matches the canonical
 content (same honesty rule as the `capture` extension).
 
+**Conversion report** (version 0.6): the notes an importer emits while
+converting — what it dropped, what it carried in a different form, what it
+embedded — used to live only on the producer's console. They now travel
+**inside the package**, as `ext/source/report.json`, declared in the
+OPTIONAL `report` field, so that a reader can see the conversion's losses
+without re-running it. The report is producer-asserted and covered by the
+integrity hashes like every other file. Keeping the original never
+compensates for an unreported loss in the canonical document: the point of
+the report is that no loss is silent. Format:
+
+```json
+{
+  "report": "0.1",
+  "tool": "@wdf-dev/import",
+  "toolVersion": "0.1.0",
+  "sourceDigest": "<sha-256 of the embedded main file, lowercase hex>",
+  "entries": [
+    { "kind": "loss", "message": "dropped <button> (not representable in WDF-HTML)", "count": 3 },
+    { "kind": "change", "message": "promoted styled paragraph (26pt) to <h1>: \"…\"", "count": 1 },
+    { "kind": "info", "message": "imported image \"a.png\" → content/assets/….png", "count": 1 }
+  ]
+}
+```
+
+- `kind` — `loss` (content the canonical document does not carry),
+  `change` (content carried in a different form) or `info` (what was
+  embedded or recorded). The producer classifies its own notes; the
+  classification is a reading aid, not a conformance claim.
+- `message` — the note verbatim; `count` — occurrences of the identical note.
+- Entries keep first-occurrence order. Serialization is two-space JSON with a
+  trailing newline; identical input produces identical bytes.
+
+An **original included is not an original compared**: neither the source
+nor the visual rendition is checked against the canonical content by any
+WDF tool. A consumer presenting the original SHOULD say so, and SHOULD show
+the report next to it.
+
 ## `source.json`
 
 ```json
@@ -109,6 +146,9 @@ content (same honesty rule as the `capture` extension).
 - `mediaType` — OPTIONAL (0.4, `"binary"` only). IANA media type of the
   original when known (e.g.
   `application/vnd.openxmlformats-officedocument.wordprocessingml.document`).
+- `report` — OPTIONAL (0.6). Package path of the conversion report
+  (`ext/source/report.json`, format above). MUST point to a file in the
+  package.
 - `visual` — OPTIONAL (0.5). The author-supplied visual rendition:
   `{ "path": "ext/source/<hash>.pdf", "mediaType": "application/pdf",
 "name": "<original file name>" }`. `path` MUST point to a file in the

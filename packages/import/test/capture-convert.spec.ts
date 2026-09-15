@@ -127,7 +127,7 @@ describe('capture conversion (T18.4 acceptance, pipeline level)', () => {
     expect(validateCaptureExt(pkg)).toEqual([]);
     expect(pkg.manifest.extensions).toEqual([
       { name: 'capture', version: '0.1' },
-      { name: 'source', version: '0.3' },
+      { name: 'source', version: '0.6' },
     ]);
     const captureJson = JSON.parse(dec.decode(pkg.files.get('ext/capture/capture.json')));
     expect(captureJson).toEqual(capture);
@@ -155,7 +155,7 @@ describe('capture conversion (T18.4 acceptance, pipeline level)', () => {
       main: string;
       mainName: string;
     };
-    expect(sourceJson.source).toBe('0.3');
+    expect(sourceJson.source).toBe('0.6');
     expect(sourceJson.kind).toBe('dom-snapshot');
     expect(sourceJson.mainName).toBe(BASE);
     const original = dec.decode(pkg.files.get(sourceJson.main));

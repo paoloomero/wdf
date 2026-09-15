@@ -7,6 +7,7 @@ import type { WdfCapture } from '@wdf-dev/core';
 import {
   aggregateReport,
   geometryExclusions,
+  documentIdForUrl,
   importDocument,
   stripCaptureMarks,
   type AssetLoad,
@@ -118,6 +119,8 @@ async function convertCapture(
       captureExclusions: new Set(geometryExclusions(request.geometry).map((e) => e.id)),
       captureEmbeds: { baseUrl, hasPoster: (url) => images.has(url) },
       capture,
+      // Re-captures of one address are revisions of one document (§4.1).
+      id: await documentIdForUrl(request.provenance.url),
       withSource: true,
       loadAsset,
       fetchCss,
@@ -197,6 +200,8 @@ async function convertGdocs(
     },
     {
       capture,
+      // Re-captures of one address are revisions of one document (§4.1).
+      id: await documentIdForUrl(request.provenance.url),
       withSource: true,
       loadAsset: (src) => {
         const bytes = exported.files.get(src) ?? exported.files.get(decodeURIComponent(src));

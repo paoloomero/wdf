@@ -427,9 +427,27 @@ _(Reserved for future profile additions; numbering kept stable.)_
   exactly that path. Inline `style` attributes and `style` elements are
   forbidden.
 - **6.7.2** The stylesheet MUST NOT contain: `@import`, `@font-face`,
-  `url(…)` in any form, `position: fixed`, or `position: sticky`.
+  `url(…)` in any form, `position: fixed`, or `position: sticky`; nor any
+  declaration that hides content from the human view or adds text to it
+  (_errata 2026-09-15_): `display: none`, `visibility: hidden` or
+  `collapse`, `opacity: 0`, `font-size: 0`, `clip` other than `auto`,
+  `clip-path` other than `none`, and `content` with any value other than
+  `none`, `normal` or the empty string. (A negative `text-indent` is
+  _not_ in the list: hanging indents are ordinary typography, and the
+  off-screen trick built on it needs `overflow: hidden` and an absurd
+  magnitude that a validator cannot draw a line for.)
 - **6.7.3** Everything else in CSS is permitted. Responsive layout is a
   feature, not a risk: `@media` queries are explicitly encouraged.
+
+  > _Errata note (2026-09-15):_ the AI layer is derived from the DOM (§7),
+  > not from the rendered page. The additions to 6.7.2 close the two
+  > cheapest divergences between the two — text the reader cannot see, and
+  > generated text the extraction cannot cite — but a blacklist cannot
+  > close every hiding technique (a text colour equal to its background,
+  > for one). Consumers SHOULD therefore offer a rendering with the
+  > stylesheet disabled (6.7.4); a property whitelist is under
+  > consideration for a later version.
+
 - **6.7.4** Consumers MUST render the document acceptably with the
   stylesheet disabled (the content is semantic HTML; the stylesheet is
   presentational only).

@@ -71,6 +71,23 @@ export {
   type ExclusionReason,
 } from './prefilter.js';
 export { aggregateReport } from './report.js';
+export {
+  buildConversionReport,
+  classifyNote,
+  reportEntries,
+  type ConversionNote,
+  type ConversionNoteKind,
+  type ConversionReport,
+} from './conversion-report.js';
+export {
+  deterministicUuid,
+  DOCUMENT_ID_PATTERN,
+  documentIdForUrl,
+  inheritIds,
+  type IdSeed,
+  type PreviousRevision,
+} from './revision.js';
+export { IMPORT_VERSION } from './version.js';
 export { collectSourceStylesheets, type CssFetcher } from './sourcecss.js';
 export {
   parseDeclarations,

@@ -288,6 +288,16 @@
               </svg>
               <span>Paper</span>
             </button>
+            <button
+              id="plain-toggle"
+              class="tool"
+              title="Plain view: render without the author's stylesheet (spec §6.7.4) — what the semantic HTML carries by itself"
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 5.5h14M5 10h14M5 14.5h9M5 19h6"></path>
+              </svg>
+              <span>Plain</span>
+            </button>
             <button id="pdf-export" class="tool" title="Print / export as PDF (browser print, A4)">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M6.4 3.5h7.2L18.2 8v12.5H6.4z"></path>
@@ -357,6 +367,10 @@
         <main id="content">
           <iframe id="human" sandbox="allow-scripts" title="Document"></iframe>
           <div id="agent" hidden></div>
+          <details id="original-report" class="report" hidden>
+            <summary id="original-report-summary"></summary>
+            <ul id="original-report-list"></ul>
+          </details>
           <iframe id="original" sandbox="" title="Original source" hidden></iframe>
           <div id="original-binary" hidden>
             <div class="binary-card">
@@ -373,7 +387,8 @@
               <p id="original-visual-meta"></p>
               <p>
                 The author also saved a PDF rendition of this document — the page image frozen by
-                the original application (ext-source 0.5).
+                the original application (ext-source 0.5). It is included as-is: the package proves
+                its bytes are unchanged, not that it matches the canonical content.
               </p>
               <a id="original-visual-download" class="button">Download PDF</a>
               <p id="original-visual-hint" hidden>

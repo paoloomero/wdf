@@ -87,11 +87,11 @@ describe('wdf import --with-pdf (ext-source 0.5, WP21)', () => {
     expect(await cmdValidate(wdf, {}, capture())).toBe(0);
 
     const pkg = readPackage(readFileSync(wdf));
-    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.5' }]);
+    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.6' }]);
     const sourceJson = JSON.parse(
       new TextDecoder().decode(pkg.files.get('ext/source/source.json')),
     ) as SourceJson;
-    expect(sourceJson.source).toBe('0.5');
+    expect(sourceJson.source).toBe('0.6');
     expect(sourceJson.visual).toBeDefined();
     expect(sourceJson.visual?.mediaType).toBe('application/pdf');
     expect(sourceJson.visual?.name).toBe('delibera.pdf');
@@ -126,7 +126,7 @@ describe('wdf import --with-pdf (ext-source 0.5, WP21)', () => {
     expect(await cmdValidate(wdf, {}, capture())).toBe(0);
 
     const pkg = readPackage(readFileSync(wdf));
-    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.5' }]);
+    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.6' }]);
     const sourceJson = JSON.parse(
       new TextDecoder().decode(pkg.files.get('ext/source/source.json')),
     ) as SourceJson;

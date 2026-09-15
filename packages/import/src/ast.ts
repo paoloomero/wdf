@@ -39,9 +39,18 @@ export function slugify(text: string): string {
  * headings/sections, zero-padded counters for the rest. Existing conforming
  * ids are kept; malformed or duplicate ones are replaced (and reported).
  */
-export function ensureIds(blocks: MEl[], report: string[]): void {
-  const used = new Set<string>();
-  const counters = { p: 0, li: 0, tbl: 0, fig: 0, bq: 0, sec: 0, h: 0 };
+export function ensureIds(
+  blocks: MEl[],
+  report: string[],
+  seed?: {
+    used: Set<string>;
+    counters: Partial<Record<'p' | 'li' | 'tbl' | 'fig' | 'bq' | 'sec' | 'h', number>>;
+  },
+): void {
+  // A revision (revision.ts) seeds the pool: ids of the previous revision
+  // are never reissued, and counters continue from where it stopped.
+  const used = new Set<string>(seed?.used ?? []);
+  const counters = { p: 0, li: 0, tbl: 0, fig: 0, bq: 0, sec: 0, h: 0, ...seed?.counters };
 
   const claim = (candidate: string): string => {
     let id = candidate;

@@ -3,13 +3,21 @@ import { sha256Hex, type WdfCapture, type WdfManifest } from '@wdf-dev/core';
 import { ensureIds, fixDanglingFragments, serializeDocument, textOf, type MEl } from './ast.js';
 import { DEFAULT_CAPS, type AssetCaps, type AssetLoader, type LoadedAsset } from './assets.js';
 import { buildPackage } from './build.js';
+import { buildConversionReport } from './conversion-report.js';
 import { type EmbedPlaceholderOptions } from './embeds.js';
 import { embedFonts, type FontReader } from './fonts.js';
 import { DOCX_MEDIA_TYPE } from './docx/container.js';
 import { convertDocx } from './docx/wml.js';
 import { importHtml, type HtmlImportOptions } from './html.js';
 import { importMarkdown } from './markdown.js';
+import {
+  deterministicUuid,
+  DOCUMENT_ID_PATTERN,
+  inheritIds,
+  type PreviousRevision,
+} from './revision.js';
 import { collectSourceStylesheets, type CssFetcher } from './sourcecss.js';
+import { IMPORT_VERSION } from './version.js';
 
 const enc = new TextEncoder();
 
@@ -68,6 +76,18 @@ export interface ImportDocumentOptions {
   lang?: string;
   /** Manifest created/modified timestamp; defaults to the current time. */
   date?: string;
+  /**
+   * Document id to record (`urn:uuid:…`, spec §4.1) instead of the default
+   * derivation from the canonical HTML — e.g. the id of the document this
+   * import revises, or a URL-derived id for captures (revision.ts).
+   */
+  id?: string;
+  /**
+   * The earlier revision this import updates: its id is inherited, its
+   * `created` preserved, and unchanged elements keep their ids (§6.4.4).
+   * `id` takes precedence over the inherited id when both are given.
+   */
+  previous?: PreviousRevision;
   withSource?: boolean;
   embedFonts?: boolean;
   fullPage?: boolean;
@@ -152,7 +172,9 @@ export async function importDocument(
   }
 
   if (blocks.length === 0) return undefined;
-  ensureIds(blocks, report);
+  const seed =
+    opts.previous === undefined ? undefined : inheritIds(blocks, opts.previous.html, report);
+  ensureIds(blocks, report, seed);
   fixDanglingFragments(blocks, report);
 
   const firstHeading = blocks.find((b) => /^h[1-6]$/.test(b.tag));
@@ -165,12 +187,25 @@ export async function importDocument(
   const htmlBytes = enc.encode(html);
 
   const date = opts.date ?? docxDate ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+  // Identity (§4.1): explicit id, else the previous revision's, else derived
+  // from the canonical HTML (a new document per distinct content).
+  if (opts.id !== undefined && !DOCUMENT_ID_PATTERN.test(opts.id)) {
+    throw new Error(`document id must be a lowercase UUID URN, urn:uuid:… (spec §4.1): ${opts.id}`);
+  }
+  if (opts.previous !== undefined && !DOCUMENT_ID_PATTERN.test(opts.previous.id)) {
+    throw new Error(
+      `previous revision has an invalid document id (spec §4.1): ${opts.previous.id}`,
+    );
+  }
+  const id = opts.id ?? opts.previous?.id ?? deterministicUuid(await sha256Hex(htmlBytes));
+  const previousCreated = opts.previous?.created;
+  const created = previousCreated !== undefined && previousCreated <= date ? previousCreated : date;
   const manifest: WdfManifest = {
     wdf: '0.1',
-    id: deterministicUuid(await sha256Hex(htmlBytes)),
+    id,
     title,
     language: lang,
-    created: date,
+    created,
     modified: date,
     entry: 'content/index.html',
   };
@@ -218,9 +253,14 @@ export async function importDocument(
     }
   }
 
+  // ext-source 0.6 (review F04, plan §10.70): the conversion report travels
+  // in the package next to the original it describes.
+  let reportPath: string | undefined;
+  let sourceDigest = '';
   if (opts.withSource === true && input.sourceBytes !== undefined) {
     const ext = isDocx ? 'docx' : isMarkdown ? 'md' : 'html';
-    const mainPath = `ext/source/${(await sha256Hex(input.sourceBytes)).slice(0, 16)}.${ext}`;
+    sourceDigest = await sha256Hex(input.sourceBytes);
+    const mainPath = `ext/source/${sourceDigest.slice(0, 16)}.${ext}`;
     // WP15: a web page's look lives in its external stylesheets — embed
     // them so the Original view is not an unstyled skeleton.
     let stylesheets: Record<string, string> = {};
@@ -233,7 +273,7 @@ export async function importDocument(
     // its media type and no encoding — the Original view offers a download.
     const sourceJson: Record<string, unknown> = isDocx
       ? {
-          source: '0.4',
+          source: '0.6',
           kind: 'binary',
           main: mainPath,
           mainName: input.sourceName ?? '',
@@ -241,7 +281,7 @@ export async function importDocument(
           resources: {},
         }
       : {
-          source: '0.3',
+          source: '0.6',
           kind: input.sourceKind ?? 'fetched-html',
           main: mainPath,
           mainName: input.sourceName ?? '',
@@ -251,7 +291,7 @@ export async function importDocument(
     // ext-source 0.5 (WP21): the author's visual rendition (a PDF saved
     // from the original application) travels next to the source. The
     // pipeline embeds it verbatim — it never generates or parses a PDF.
-    let version = isDocx ? '0.4' : '0.3';
+    const version = '0.6';
     if (input.visualBytes !== undefined) {
       if (!looksLikePdf(input.visualBytes)) {
         throw new Error('visual rendition is not a PDF (missing %PDF- signature)');
@@ -263,13 +303,13 @@ export async function importDocument(
         mediaType: 'application/pdf',
         name: input.visualName ?? '',
       };
-      version = '0.5';
-      sourceJson['source'] = version;
       report.push(
         `embedded the author's PDF rendition as ${visualPath} (extension "source" 0.5, docs/ext-source.md)`,
       );
     }
     if (Object.keys(stylesheets).length > 0) sourceJson['stylesheets'] = stylesheets;
+    reportPath = 'ext/source/report.json';
+    sourceJson['report'] = reportPath;
     extensions.push({ name: 'source', version });
     extFiles.set(mainPath, input.sourceBytes);
     extFiles.set('ext/source/source.json', enc.encode(`${JSON.stringify(sourceJson, null, 2)}\n`));
@@ -290,6 +330,17 @@ export async function importDocument(
     extensions.push({ name: 'capture', version: '0.1' });
     report.push('recorded capture provenance (extension "capture", docs/ext-capture.md)');
   }
+  // Written last so it covers every note of this conversion (its own line
+  // included); hashed like every other file.
+  if (reportPath !== undefined) {
+    report.push(
+      `recorded the conversion report as ${reportPath} (extension "source" 0.6, docs/ext-source.md)`,
+    );
+    extFiles.set(
+      reportPath,
+      enc.encode(buildConversionReport(report, sourceDigest, IMPORT_VERSION)),
+    );
+  }
   if (extensions.length > 0) {
     manifest.extensions = extensions.sort((a, b) => (a.name < b.name ? -1 : 1));
   }
@@ -309,9 +360,4 @@ export async function importDocument(
   }
 
   return { wdfBytes: await buildPackage(source), html, title, report };
-}
-
-function deterministicUuid(hex: string): string {
-  const variant = ((parseInt(hex[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
-  return `urn:uuid:${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }

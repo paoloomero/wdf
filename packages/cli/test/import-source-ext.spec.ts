@@ -66,7 +66,7 @@ beforeAll(async () => {
 
 describe('the source extension (WP13)', () => {
   it('declares the extension in the manifest', () => {
-    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.3' }]);
+    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.6' }]);
   });
 
   it('embeds the original main file byte-for-byte', () => {

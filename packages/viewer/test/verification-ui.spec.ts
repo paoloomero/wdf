@@ -31,3 +31,25 @@ describe('Reader verification UI', () => {
     expect(mainTs).toContain("result.verified ? 'verified locally' : text.label.toUpperCase()");
   });
 });
+
+describe('Plain view, typed-data mark and conversion report (plan §10.70)', () => {
+  const shell = readFileSync(join(resolve(import.meta.dirname, '../src'), 'shell.html'), 'utf8');
+
+  it('the toolbar has a Plain toggle wired to a re-render without the author stylesheet', () => {
+    expect(shell).toContain('id="plain-toggle"');
+    expect(mainTs).toContain("$('plain-toggle').addEventListener('click'");
+    expect(mainTs).toContain('buildSrcdoc(entry, doc.pkg.files, nonce, { plain })');
+  });
+
+  it('bound tables are marked only once the package verified, and after every frame reload', () => {
+    expect(mainTs).toContain('datasetsOk = result.verified');
+    expect(mainTs).toContain("postToHuman({ type: 'wdf-datasets', ok: datasetsOk })");
+    expect(mainTs).toContain("if (datasetsOk) postToHuman({ type: 'wdf-datasets', ok: true })");
+  });
+
+  it('the Original view carries the conversion report and says the original is not compared', () => {
+    expect(shell).toContain('id="original-report"');
+    expect(mainTs).toContain('Original included as-is, not compared with the canonical content');
+    expect(shell).toContain('not that it matches the canonical content');
+  });
+});

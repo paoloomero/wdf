@@ -39,9 +39,15 @@ export function toDataUri(path: string, bytes: Uint8Array): string {
  * <style> element, image sources become data: URIs. The sandboxed frame can
  * then render with zero requests (spec §11.3).
  */
-export function inlineResources(html: string, files: ReadonlyMap<string, Uint8Array>): string {
+export function inlineResources(
+  html: string,
+  files: ReadonlyMap<string, Uint8Array>,
+  opts: { plain?: boolean } = {},
+): string {
   let out = html.replace(/<link\b[^>]*rel="stylesheet"[^>]*\/?>/, () => {
-    const css = files.get('content/styles.css');
+    // Plain view (spec §6.7.4, plan §10.70): the author's stylesheet is
+    // dropped and the semantic HTML renders with the base styles only.
+    const css = opts.plain === true ? undefined : files.get('content/styles.css');
     if (css === undefined) return '';
     return `<style>\n${new TextDecoder().decode(css)}\n</style>`;
   });
@@ -117,6 +123,11 @@ export const BASE_CSS = `
   hr { border: none; border-top: 1px solid #d5d9df; margin: 1.6em 0; }
   a { color: #1a56c4; }
   [id] { scroll-margin-top: 1rem; }
+  /* A table bound to a typed dataset (§6.5), once the package verified:
+     the reader sees which tables are checked data, not just layout. */
+  html.wdf-datasets-ok table[data-wdf-dataset] > caption::after {
+    content: " · typed data ✓"; font-weight: 400; font-size: 0.85em; color: #2f6f3e; white-space: nowrap;
+  }
   /* Arrival flash: a brief signal-yellow wash that fades (no frames). */
   .wdf-flash { background: oklch(0.82 0.17 95 / 0.3); transition: background 0.4s ease; }
   /* Persistent mark of the selected/cited element (outline or agent click):
@@ -431,6 +442,10 @@ export const CONTROLLER_JS = `
       wdfSetPaged(d.on === true);
       return;
     }
+    if (d.type === 'wdf-datasets') {
+      document.documentElement.classList.toggle('wdf-datasets-ok', d.ok === true);
+      return;
+    }
     if (d.type === 'wdf-scroll' && typeof d.id === 'string') {
       var t = document.getElementById(d.id);
       if (t) {
@@ -467,10 +482,12 @@ export function buildSrcdoc(
   entryHtml: string,
   files: ReadonlyMap<string, Uint8Array>,
   nonce: string,
+  opts: { plain?: boolean } = {},
 ): string {
   const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; script-src 'nonce-${nonce}'" />`;
-  let out = inlineResources(entryHtml, files);
-  const fonts = fontsCss(files);
+  let out = inlineResources(entryHtml, files, opts);
+  // Plain view: no author typography either (the fonts extension serves it).
+  const fonts = opts.plain === true ? undefined : fontsCss(files);
   const fontStyle = fonts === undefined ? '' : `<style>${fonts}</style>`;
   out = out.replace(
     /<head([^>]*)>/,
@@ -568,9 +585,65 @@ export interface SourceExt {
   mediaType?: string;
   /** Author-supplied visual rendition — a PDF saved by the author (v0.5). */
   visual?: { path: string; mediaType: string; name: string };
+  /** Package path of the conversion report (v0.6), when present in the package. */
+  report?: string;
   resources: Record<string, string>;
   /** Original stylesheet href → embedded ext/source/*.css (WP15, v0.2). */
   stylesheets: Record<string, string>;
+}
+
+export interface ConversionNoteView {
+  kind: 'loss' | 'change' | 'info';
+  message: string;
+  count: number;
+}
+
+export interface ConversionReportView {
+  tool: string;
+  toolVersion: string;
+  entries: ConversionNoteView[];
+  losses: number;
+  changes: number;
+}
+
+/**
+ * Reads ext/source/report.json (ext-source 0.6): what the conversion
+ * transformed or dropped, as recorded by the producer. Tolerant: a
+ * malformed report is simply absent.
+ */
+export function conversionReport(
+  files: ReadonlyMap<string, Uint8Array>,
+  ext: SourceExt,
+): ConversionReportView | undefined {
+  if (ext.report === undefined) return undefined;
+  const raw = files.get(ext.report);
+  if (raw === undefined) return undefined;
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(raw)) as {
+      tool?: unknown;
+      toolVersion?: unknown;
+      entries?: unknown;
+    };
+    if (!Array.isArray(parsed.entries)) return undefined;
+    const entries: ConversionNoteView[] = [];
+    for (const e of parsed.entries as { kind?: unknown; message?: unknown; count?: unknown }[]) {
+      if (typeof e.message !== 'string') continue;
+      entries.push({
+        kind: e.kind === 'loss' || e.kind === 'change' ? e.kind : 'info',
+        message: e.message,
+        count: typeof e.count === 'number' && e.count > 0 ? e.count : 1,
+      });
+    }
+    return {
+      tool: typeof parsed.tool === 'string' ? parsed.tool : '',
+      toolVersion: typeof parsed.toolVersion === 'string' ? parsed.toolVersion : '',
+      entries,
+      losses: entries.filter((e) => e.kind === 'loss').reduce((n, e) => n + e.count, 0),
+      changes: entries.filter((e) => e.kind === 'change').reduce((n, e) => n + e.count, 0),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 /** Reads ext/source/source.json, or undefined when absent or malformed. */
@@ -585,6 +658,7 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
       encoding?: unknown;
       mediaType?: unknown;
       visual?: unknown;
+      report?: unknown;
       resources?: unknown;
       stylesheets?: unknown;
     };
@@ -608,6 +682,8 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
       stylesheets: stringMap(parsed.stylesheets),
     };
     if (typeof parsed.mediaType === 'string') ext.mediaType = parsed.mediaType;
+    // v0.6 `report`: tolerated consumer read, like `visual`.
+    if (typeof parsed.report === 'string' && files.has(parsed.report)) ext.report = parsed.report;
     // v0.5 `visual`: tolerated consumer read — a malformed or dangling
     // declaration drops the field, never the whole extension.
     if (typeof parsed.visual === 'object' && parsed.visual !== null) {

@@ -174,7 +174,7 @@ describe('author PDF rendition on drop (ext-source 0.5, WP21)', () => {
     expect(result).toBeDefined();
 
     const pkg = readPackage(result?.wdfBytes ?? new Uint8Array());
-    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.5' }]);
+    expect(pkg.manifest.extensions).toEqual([{ name: 'source', version: '0.6' }]);
     const sourceJson = JSON.parse(
       new TextDecoder().decode(pkg.files.get('ext/source/source.json')),
     ) as { visual?: { path: string; name: string } };

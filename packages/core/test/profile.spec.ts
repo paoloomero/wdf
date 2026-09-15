@@ -79,3 +79,52 @@ describe('validateStylesheet (§6.7.2)', () => {
     expect(validateStylesheet('/* url(x) @import position: fixed */ p { color: red }')).toEqual([]);
   });
 });
+
+describe('validateStylesheet — errata 2026-09-15 (§6.7.2, review F01, plan §10.70)', () => {
+  const forbidden: [string, string][] = [
+    ['#p-hidden { display: none; }', 'display: none'],
+    ['.x{display:none}', 'display: none'],
+    ['p { visibility: hidden }', 'visibility'],
+    ['p { visibility: collapse; }', 'visibility'],
+    ['p { opacity: 0; }', 'opacity: 0'],
+    ['p { opacity: 0.0 !important; }', 'opacity: 0'],
+    ['p{opacity:0}', 'opacity: 0'],
+    ['p { font-size: 0; }', 'font-size: 0'],
+    ['p { font-size: 0px }', 'font-size: 0'],
+    ['p { clip: rect(0 0 0 0); }', 'clip is not permitted'],
+    ['p { clip-path: inset(50%); }', 'clip-path'],
+    ['p::before { content: "Hidden: 999"; }', 'content:'],
+    ["p::after { content: 'x' }", 'content:'],
+    ['p::after { content: counter(n); }', 'content:'],
+    ['p::after { content: attr(title); }', 'content:'],
+  ];
+  it.each(forbidden)('rejects %s', (css, expected) => {
+    const violations = validateStylesheet(css);
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.every((v) => v.spec === '§6.7.2')).toBe(true);
+    expect(violations.some((v) => v.message.includes(expected))).toBe(true);
+  });
+
+  const allowed = [
+    'p { opacity: 0.5; }',
+    'p { opacity: 1 }',
+    'p { font-size: 0.9em; }',
+    'p { font-size: 10px }',
+    'p { text-indent: 2em; }',
+    'p { margin-left: 24pt; text-indent: -17pt; }', // a Word hanging indent, not a hiding trick
+    'p { clip: auto; }',
+    'p { clip-path: none; }',
+    '.clearfix::after { content: ""; display: table; }',
+    "q::before { content: '' }",
+    'p::before { content: none; }',
+    'p::before { content: normal !important; }',
+    '.content:hover { color: red; }',
+    '.display:hover { color: red; }',
+    'p { display: block; visibility: visible; }',
+    '/* display: none; content: "x" */ p { color: red }',
+    '@media (max-width: 40em) { table { display: block; overflow-x: auto; } }',
+  ];
+  it.each(allowed)('accepts %s', (css) => {
+    expect(validateStylesheet(css)).toEqual([]);
+  });
+});

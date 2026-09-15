@@ -6,11 +6,15 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agentBlocks,
+  BASE_CSS,
   buildSrcdoc,
   citation,
+  CONTROLLER_JS,
+  conversionReport,
   inlineResources,
   mimeFor,
   outlineTree,
+  parseSourceExt,
   toDataUri,
 } from '../src/prepare.js';
 
@@ -102,5 +106,102 @@ describe('outline tree and citations (T4.4)', () => {
     expect(citation('urn:uuid:a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', 'tbl-spesa-2025')).toBe(
       'wdf:urn:uuid:a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d#tbl-spesa-2025',
     );
+  });
+});
+
+describe('Plain view and typed-data mark (plan §10.70)', () => {
+  const enc = new TextEncoder();
+  const html =
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>T</title><link rel="stylesheet" href="content/styles.css"></head><body><article><h1 id="h-t">T</h1></article></body></html>';
+  const files = new Map<string, Uint8Array>([
+    ['content/styles.css', enc.encode('p { color: red }')],
+    [
+      'ext/fonts/fonts.css',
+      enc.encode('@font-face { font-family: X; src: url("ext/fonts/x.woff2"); }'),
+    ],
+    ['ext/fonts/x.woff2', new Uint8Array([1, 2, 3])],
+  ]);
+
+  it('buildSrcdoc drops the author stylesheet and the fonts sheet when plain', () => {
+    const styled = buildSrcdoc(html, files, 'n');
+    expect(styled).toContain('p { color: red }');
+    expect(styled).toContain('font-family: X');
+    const plain = buildSrcdoc(html, files, 'n', { plain: true });
+    expect(plain).not.toContain('p { color: red }');
+    expect(plain).not.toContain('font-family: X');
+    expect(plain).not.toContain('<link');
+    // Base styles and the controller stay: the view is still a WDF frame.
+    expect(plain).toContain('.wdf-selected');
+    expect(plain).toContain('wdf-click');
+  });
+
+  it('the frame controller marks bound tables only on the wdf-datasets message', () => {
+    expect(CONTROLLER_JS).toContain("d.type === 'wdf-datasets'");
+    expect(CONTROLLER_JS).toContain("classList.toggle('wdf-datasets-ok'");
+    expect(BASE_CSS).toContain('html.wdf-datasets-ok table[data-wdf-dataset] > caption::after');
+  });
+});
+
+describe('conversion report (ext-source 0.6)', () => {
+  const enc = new TextEncoder();
+  const report = {
+    report: '0.1',
+    tool: '@wdf-dev/import',
+    toolVersion: '0.1.0',
+    sourceDigest: 'ab'.repeat(32),
+    entries: [
+      { kind: 'loss', message: 'dropped <button>', count: 3 },
+      { kind: 'change', message: 'promoted styled paragraph', count: 1 },
+      { kind: 'info', message: 'imported image', count: 2 },
+      { kind: 'weird', message: 'unknown kind reads as info', count: 0 },
+    ],
+  };
+  const files = new Map<string, Uint8Array>([
+    [
+      'ext/source/source.json',
+      enc.encode(
+        JSON.stringify({
+          source: '0.6',
+          kind: 'fetched-html',
+          main: 'ext/source/a.html',
+          mainName: 'a.html',
+          encoding: 'utf-8',
+          resources: {},
+          report: 'ext/source/report.json',
+        }),
+      ),
+    ],
+    ['ext/source/a.html', enc.encode('<p>a</p>')],
+    ['ext/source/report.json', enc.encode(JSON.stringify(report))],
+  ]);
+
+  it('parseSourceExt exposes the report path when the file exists', () => {
+    const ext = parseSourceExt(files);
+    expect(ext?.report).toBe('ext/source/report.json');
+    const dangling = new Map(files);
+    dangling.delete('ext/source/report.json');
+    expect(parseSourceExt(dangling)?.report).toBeUndefined();
+  });
+
+  it('conversionReport reads entries, totals and tolerates odd values', () => {
+    const ext = parseSourceExt(files);
+    if (ext === undefined) throw new Error('no ext');
+    const view = conversionReport(files, ext);
+    expect(view?.tool).toBe('@wdf-dev/import');
+    expect(view?.losses).toBe(3);
+    expect(view?.changes).toBe(1);
+    expect(view?.entries.at(-1)).toEqual({
+      kind: 'info',
+      message: 'unknown kind reads as info',
+      count: 1,
+    });
+  });
+
+  it('a malformed report is simply absent', () => {
+    const broken = new Map(files);
+    broken.set('ext/source/report.json', enc.encode('{ not json'));
+    const ext = parseSourceExt(broken);
+    if (ext === undefined) throw new Error('no ext');
+    expect(conversionReport(broken, ext)).toBeUndefined();
   });
 });
