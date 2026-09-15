@@ -189,11 +189,20 @@
                 <path d="M12 7.4v5.4M9.4 10.2 12 12.8l2.6-2.6"></path>
               </svg>
               <div>
-                <p class="install__title">Install as a desktop app</p>
-                <p class="install__body">
-                  Chrome/Edge, install icon in the address bar. Then <code>.wdf</code> files open
-                  with a double click — offline, like any reader.
+                <p class="install__title">Install the Reader as an app</p>
+                <p class="install__body" id="install-body">
+                  Then <code>.wdf</code> files open with a double click — offline, like any document
+                  reader. Chrome and Edge; on other browsers, drag files here.
                 </p>
+                <p class="install__body" id="install-done" hidden>
+                  Installed. Next time you double-click a <code>.wdf</code>, the system asks once
+                  whether to open it with WDF Reader — say yes, and that is the last time it asks.
+                </p>
+                <div class="btnrow">
+                  <button id="install-home" class="btn btn--primary" type="button" hidden>
+                    Install the Reader
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -289,6 +298,19 @@
                 ></path>
               </svg>
               <span>PDF</span>
+            </button>
+            <button
+              id="install-app"
+              class="tool tool--install"
+              hidden
+              title="Install the WDF Reader as an app: .wdf files then open with a double click, offline"
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2.5" y="4" width="19" height="12.5" rx="1.8"></rect>
+                <path d="M8.5 20h7M12 16.5V20"></path>
+                <path d="M12 7.4v5.4M9.4 10.2 12 12.8l2.6-2.6"></path>
+              </svg>
+              <span>Install</span>
             </button>
           </nav>
         </div>

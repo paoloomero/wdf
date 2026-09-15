@@ -73,4 +73,18 @@ describe('WDF Reader PWA (T8.1)', () => {
     expect(main).toContain('launchQueue');
     expect(main).toContain("navigator.serviceWorker.register('sw.js')");
   });
+
+  it('ships the install prompt buttons hidden until the browser offers install (plan §10.69)', () => {
+    const shell = readFileSync(join(viewerSrc, 'shell.html'), 'utf8');
+    const main = readFileSync(join(viewerSrc, 'main.ts'), 'utf8');
+    for (const id of ['install-home', 'install-app']) {
+      const tag = new RegExp(`<button[^>]*id="${id}"[^>]*>`).exec(shell)?.[0];
+      expect(tag, id).toBeDefined();
+      expect(tag).toContain('hidden');
+      expect(main).toContain(`'${id}'`);
+    }
+    expect(main).toContain("addEventListener('beforeinstallprompt'");
+    expect(main).toContain("addEventListener('appinstalled'");
+    expect(shell).toContain('id="install-done"');
+  });
 });

@@ -20,7 +20,9 @@ public URL works the same, over HTTPS).
 ## 2. Install the Reader
 
 1. Open `http://localhost:8642/viewer.html` in Chrome or Edge.
-2. Click the **install icon** in the address bar (or ⋮ → _Cast, save and
+2. Click **Install the Reader** on the Reader's home page (shown by Chrome/Edge
+   when the app is installable; plan §10.69), or the **install icon** in the
+   address bar (or ⋮ → _Cast, save and
    share_ → _Install page as app_).
 3. The "WDF Reader" app appears with its icon; it opens in its own window
    and works offline (the shell is cached by a service worker).

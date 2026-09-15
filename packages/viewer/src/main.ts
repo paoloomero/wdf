@@ -846,6 +846,47 @@ function init(): void {
   if (isHttp && 'serviceWorker' in navigator) {
     void navigator.serviceWorker.register('sw.js').catch(() => undefined);
   }
+  // Install prompt (plan §10.69): Chrome/Edge fire `beforeinstallprompt` when
+  // the app is installable. Only then do the Install buttons (home + toolbar)
+  // appear; they go away on install, and never show inside the installed app
+  // or on browsers without the event (nothing to explain there).
+  interface InstallPromptEvent extends Event {
+    prompt(): Promise<void>;
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+  }
+  const installButtons = ['install-home', 'install-app']
+    .map((id) => document.getElementById(id))
+    .filter((el): el is HTMLButtonElement => el instanceof HTMLButtonElement);
+  const runningAsApp =
+    matchMedia('(display-mode: standalone)').matches ||
+    (navigator as { standalone?: boolean }).standalone === true;
+  const showInstall = (on: boolean): void => {
+    for (const button of installButtons) button.hidden = !on;
+  };
+  let installPrompt: InstallPromptEvent | null = null;
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    installPrompt = event as InstallPromptEvent;
+    if (!runningAsApp) showInstall(true);
+  });
+  for (const button of installButtons) {
+    button.addEventListener('click', () => {
+      const pending = installPrompt;
+      if (pending === null) return;
+      installPrompt = null;
+      showInstall(false);
+      void pending
+        .prompt()
+        .then(() => pending.userChoice)
+        .catch(() => undefined);
+    });
+  }
+  window.addEventListener('appinstalled', () => {
+    installPrompt = null;
+    showInstall(false);
+    document.getElementById('install-body')?.setAttribute('hidden', '');
+    document.getElementById('install-done')?.removeAttribute('hidden');
+  });
   interface LaunchParamsLike {
     files?: FileSystemHandle[];
   }

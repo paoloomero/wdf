@@ -415,6 +415,12 @@ code {
   font: 400 12.5px / 1.6 var(--font-mono);
   color: rgba(16, 18, 21, 0.55);
 }
+.install .btnrow {
+  margin-top: 12px;
+}
+.install .btnrow:has(> [hidden]) {
+  display: none;
+}
 @container (max-width: 600px) {
   .mode--create {
     grid-column: span 1;
@@ -668,6 +674,15 @@ code {
   cursor: default;
   background: transparent;
   color: var(--ink-3);
+}
+/* Install prompt (plan §10.69): present only while the browser reports the
+   app as installable; the signal fill marks it as the one-time action. */
+.tool--install {
+  background: var(--signal);
+  color: var(--ink);
+}
+.tool--install:hover {
+  background: var(--signal-hover);
 }
 /* Print frame: rendered (printable) but invisible — display:none frames
    cannot print reliably. */
