@@ -132,9 +132,40 @@ export function collectIds(blocks: MEl[]): Set<string> {
   return ids;
 }
 
-/** Unwraps internal links whose fragment target does not exist (§6.3.2). */
+/**
+ * The anchor GitHub-style renderers derive from a heading's text: lowercase,
+ * punctuation removed, each space a hyphen. Tables of contents in Markdown
+ * sources link to these, not to the ids assigned at import.
+ */
+function githubAnchor(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\p{M} _-]/gu, '')
+    .replace(/ /g, '-');
+}
+
+/**
+ * Repairs internal links (§6.3.2): a fragment naming a heading by its
+ * GitHub-style anchor is retargeted to that heading's id; any other fragment
+ * without a target is unwrapped.
+ */
 export function fixDanglingFragments(blocks: MEl[], report: string[]): void {
   const ids = collectIds(blocks);
+  const anchors = new Map<string, string>();
+  const collectAnchors = (node: MEl): void => {
+    const id = node.attrs['id'];
+    if (HEADINGS.has(node.tag) && id !== undefined) {
+      const base = githubAnchor(textOf(node));
+      let anchor = base;
+      for (let n = 1; anchors.has(anchor); n += 1) anchor = `${base}-${String(n)}`;
+      if (base !== '') anchors.set(anchor, id);
+    }
+    for (const child of node.children) {
+      if (isEl(child)) collectAnchors(child);
+    }
+  };
+  for (const block of blocks) collectAnchors(block);
   const walk = (node: MEl): void => {
     node.children = node.children.flatMap((child): MNode[] => {
       if (!isEl(child)) return [child];
@@ -146,6 +177,12 @@ export function fixDanglingFragments(blocks: MEl[], report: string[]): void {
         href.startsWith('#') &&
         !ids.has(href.slice(1))
       ) {
+        const target = anchors.get(href.slice(1));
+        if (target !== undefined) {
+          child.attrs['href'] = `#${target}`;
+          report.push(`retargeted link "${href}" to heading id "${target}"`);
+          return [child];
+        }
         report.push(`unwrapped link to missing fragment "${href}"`);
         return child.children;
       }

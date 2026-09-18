@@ -585,8 +585,8 @@ anchors).
   order (numbering always starts at 1), followed by one space. Nested list
   lines are indented by the width of the parent item's marker plus one
   space.
-- **7.5.6 Definition lists.** Each `dt` → a paragraph `**` + inline content
-  - `**`; each `dd` → a paragraph. All emitted as consecutive blocks.
+- **7.5.6 Definition lists.** Each `dt` → a paragraph made of `**`, the inline
+  content, and `**`; each `dd` → a paragraph. All emitted as consecutive blocks.
 - **7.5.7 Figures.** First line: the `img` per §7.4.2. If a `figcaption` is
   present, a second line with its inline content. Anchors on the last line.
 - **7.5.8 Code blocks.** `pre` → a fenced code block. The fence is a run of

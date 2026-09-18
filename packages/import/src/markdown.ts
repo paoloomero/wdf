@@ -9,6 +9,8 @@ import { el, type MEl, type MNode } from './ast.js';
  */
 
 const HREF_OK = /^(https?:\/\/[^\s<>]+|mailto:[^\s<>]+|#.+)$/;
+/** Stands for a hard line break inside the text handed to parseInline. */
+const HARD_BREAK = '\u0001';
 
 // ---------------------------------------------------------------------------
 // Inline parsing
@@ -87,25 +89,35 @@ function parseInline(text: string, report: string[]): MNode[] {
       continue;
     }
 
-    buf += text[i] ?? '';
+    if (text[i] === HARD_BREAK) {
+      flush();
+      out.push(el('br'));
+      i += 1;
+      continue;
+    }
+
+    buf += text[i] === '\n' ? ' ' : (text[i] ?? '');
     i += 1;
   }
   flush();
   return out;
 }
 
-/** Paragraph text: lines ending with two spaces or a backslash hard-break. */
+/**
+ * Paragraph text: lines ending with two spaces or a backslash hard-break.
+ * The lines are parsed as ONE inline run, so emphasis, code and links may
+ * span a line break (CommonMark); a soft break renders as a space.
+ */
 function paragraphInline(lines: string[], report: string[]): MNode[] {
-  const out: MNode[] = [];
-  lines.forEach((line, index) => {
-    const hard = /( {2}|\\)$/.test(line);
-    const cleaned = line.replace(/( {2}|\\)$/, '');
-    out.push(...parseInline(cleaned, report));
-    if (index < lines.length - 1) {
-      out.push(hard ? el('br') : ' ');
-    }
-  });
-  return out;
+  const text = lines
+    .map((line, index) => {
+      const hard = /( {2}|\\)$/.test(line);
+      const cleaned = line.replace(/( {2}|\\)$/, '');
+      if (index === lines.length - 1) return cleaned;
+      return cleaned + (hard ? HARD_BREAK : '\n');
+    })
+    .join('');
+  return parseInline(text, report);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +143,12 @@ export function importMarkdown(md: string): { blocks: MEl[]; report: string[] } 
   let i = 0;
 
   const isBlank = (line: string | undefined): boolean => line === undefined || line.trim() === '';
+  /** A line that starts a heading, fence, blockquote or thematic break. */
+  const opensBlock = (line: string): boolean =>
+    /^(#{1,6})\s/.test(line) ||
+    /^```/.test(line) ||
+    line.startsWith('>') ||
+    /^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line);
 
   while (i < lines.length) {
     const line = lines[i] ?? '';
@@ -193,31 +211,47 @@ export function importMarkdown(md: string): { blocks: MEl[]; report: string[] } 
     if (item !== null) {
       const ordered = /\d/.test((item[1] ?? '')[0] ?? '');
       const listTag = ordered ? 'ol' : 'ul';
-      const items: MEl[] = [];
+      // Raw lines per item; a non-blank line that opens no other block is a
+      // continuation of the item above it (CommonMark lazy continuation).
+      interface RawItem {
+        lines: string[];
+        nestedTag: 'ul' | 'ol';
+        nested: string[][];
+      }
+      const raw: RawItem[] = [];
       while (i < lines.length) {
         const current = lines[i] ?? '';
         const top = ITEM_RE.exec(current);
         const nested = NESTED_RE.exec(current);
+        const last = raw[raw.length - 1];
         if (top !== null && !NESTED_RE.test(current)) {
-          items.push(el('li', {}, parseInline(top[2] ?? '', report)));
-          i += 1;
-        } else if (nested !== null && items.length > 0) {
-          const parent = items[items.length - 1] as MEl;
-          const nestedOrdered = /\d/.test((nested[1] ?? '')[0] ?? '');
-          const nestedTag = nestedOrdered ? 'ol' : 'ul';
-          let list = parent.children.find(
-            (c): c is MEl => typeof c !== 'string' && (c.tag === 'ul' || c.tag === 'ol'),
-          );
-          if (list === undefined) {
-            list = el(nestedTag);
-            parent.children.push(list);
+          raw.push({ lines: [top[2] ?? ''], nestedTag: 'ul', nested: [] });
+        } else if (nested !== null && last !== undefined) {
+          if (last.nested.length === 0) {
+            last.nestedTag = /\d/.test((nested[1] ?? '')[0] ?? '') ? 'ol' : 'ul';
           }
-          list.children.push(el('li', {}, parseInline(nested[2] ?? '', report)));
-          i += 1;
+          last.nested.push([nested[2] ?? '']);
+        } else if (last !== undefined && !isBlank(current) && !opensBlock(current)) {
+          const target = last.nested[last.nested.length - 1] ?? last.lines;
+          target.push(current.trim());
         } else {
           break;
         }
+        i += 1;
       }
+      const items = raw.map((item) => {
+        const children = paragraphInline(item.lines, report);
+        if (item.nested.length > 0) {
+          children.push(
+            el(
+              item.nestedTag,
+              {},
+              item.nested.map((n) => el('li', {}, paragraphInline(n, report))),
+            ),
+          );
+        }
+        return el('li', {}, children);
+      });
       blocks.push(el(listTag, {}, items));
       continue;
     }
