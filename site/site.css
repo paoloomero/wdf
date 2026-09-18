@@ -595,6 +595,83 @@ pre.cmd .c {
   max-width: 24ch;
 }
 
+/* spec page: imported WDF content inside the article frame (plan §10.72) */
+.article--spec .band__in {
+  padding-top: clamp(28px, 4vw, 48px);
+}
+.article--spec .spec__formats {
+  margin-top: 8px;
+  font: 500 13px var(--font-mono);
+  color: var(--ink-60);
+}
+.article--spec h1 {
+  margin: 28px 0 0;
+  font: 600 clamp(30px, 4.4vw, 52px) / 1.02 var(--font-sans);
+  letter-spacing: -0.04em;
+}
+.article--spec h2 {
+  margin: clamp(34px, 5vw, 56px) 0 0;
+  padding-top: clamp(20px, 3vw, 30px);
+  max-width: none;
+  border-top: 1px solid var(--ink);
+}
+.article--spec h3 {
+  margin: 30px 0 0;
+  font: 600 clamp(19px, 1.9vw, 23px) / 1.2 var(--font-sans);
+  letter-spacing: -0.02em;
+}
+.article--spec section,
+.article--spec section + section {
+  margin-top: 0;
+  padding: 0;
+  border-top: 0;
+}
+.article--spec ol {
+  margin: 18px 0 0;
+  padding-left: 1.6em;
+}
+.article--spec li {
+  padding: 5px 0 5px 22px;
+  border-top: 0;
+}
+.article--spec li::before {
+  top: 15px;
+  width: 6px;
+  height: 6px;
+}
+.article--spec ol > li {
+  padding-left: 0;
+}
+.article--spec ol > li::before {
+  content: none;
+}
+.article--spec code {
+  font: 0.9em var(--font-mono);
+}
+.article--spec pre {
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  border: 1px solid var(--ink-rule);
+  font: 13px / 1.5 var(--font-mono);
+}
+.article--spec pre code {
+  font: inherit;
+}
+.article--spec blockquote {
+  margin: 22px 0 0;
+  padding-left: 18px;
+  border-left: 3px solid var(--signal);
+}
+.article--spec table {
+  display: block;
+  margin-top: 18px;
+  overflow-x: auto;
+}
+.article--spec hr {
+  display: none;
+}
+
 @media (min-width: 1000px) {
   .why {
     grid-template-columns: repeat(4, 1fr);

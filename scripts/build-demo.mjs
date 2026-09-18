@@ -3,7 +3,16 @@
 // comparison .pdf. Run with: pnpm demo
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -66,5 +75,73 @@ cpSync(join(root, 'spec/wdf-core-0.1.md'), join(site, 'wdf-core-0.1.md'));
 for (const doc of ['llm-extraction-comparison.md', 'mcp-demo.md']) {
   if (existsSync(join(root, 'docs', doc))) cpSync(join(root, 'docs', doc), join(site, doc));
 }
+
+// Spec as an indexable page (plan §10.72): the Markdown spec goes through our
+// own importer, and the package's content/index.html is set into the site
+// frame (topbar and footer taken from manifesto.html). Fixed date = the
+// spec's own date, so the build stays deterministic.
+const origin = 'https://wdf.dev/';
+const specWdf = join(site, 'spec.wdf');
+run([
+  cli,
+  'import',
+  join(root, 'spec/wdf-core-0.1.md'),
+  '-o',
+  specWdf,
+  '--date',
+  '2026-07-18T00:00:00Z',
+]);
+run([cli, 'validate', specWdf]);
+const specDir = mkdtempSync(join(tmpdir(), 'wdf-spec-'));
+run([cli, 'unpack', specWdf, specDir]);
+const specDoc = readFileSync(join(specDir, 'content/index.html'), 'utf8');
+rmSync(specDir, { recursive: true, force: true });
+const specBody = specDoc.slice(
+  specDoc.indexOf('<article>') + '<article>'.length,
+  specDoc.lastIndexOf('</article>'),
+);
+const specTitle = 'WDF Core 0.1 — Web Document Format Core Specification';
+const specDescription =
+  'The WDF Core 0.1 specification: container, WDF-HTML profile, canonical AI-layer extraction, integrity and the standalone distribution profile.';
+const frame = readFileSync(join(root, 'site/manifesto.html'), 'utf8');
+const specPage =
+  frame
+    .slice(0, frame.indexOf('<main'))
+    .replace(/<title>[^<]*<\/title>/, `<title>${specTitle}</title>`)
+    .replace(/(<meta\s+name="description"\s+content=")[^"]*"/, `$1${specDescription}"`)
+    .replace(/(<meta\s+property="og:title"\s+content=")[^"]*"/, `$1${specTitle}"`)
+    .replace(/(<meta\s+property="og:description"\s+content=")[^"]*"/, `$1${specDescription}"`)
+    .replaceAll(`${origin}manifesto.html`, `${origin}spec.html`)
+    .replace(' aria-current="page"', '')
+    .replace('<a href="spec.html">Spec</a>', '<a href="spec.html" aria-current="page">Spec</a>') +
+  `<main class="article article--spec">
+      <div class="band">
+        <div class="band__in">
+          <p class="eyebrow">Specification</p>
+          <p class="spec__formats">
+            This page is the spec imported as a WDF document:
+            <a href="viewer.html?doc=spec.wdf">open it in the Reader</a> ·
+            <a href="spec.wdf" download>spec.wdf</a> ·
+            <a href="wdf-core-0.1.md">Markdown source</a>
+          </p>
+${specBody}
+        </div>
+      </div>
+    ` +
+  frame.slice(frame.indexOf('</main>'));
+writeFileSync(join(site, 'spec.html'), specPage);
+
+// Crawler entry points (plan §10.72). No lastmod: the build stays time-independent.
+const pages = ['', 'manifesto.html', 'spec.html', 'extension-privacy.html'];
+writeFileSync(
+  join(site, 'robots.txt'),
+  `User-agent: *\nAllow: /\n\nSitemap: ${origin}sitemap.xml\n`,
+);
+writeFileSync(
+  join(site, 'sitemap.xml'),
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    pages.map((page) => `  <url><loc>${origin}${page}</loc></url>\n`).join('') +
+    `</urlset>\n`,
+);
 
 console.log(`demo site assembled in _site/`);
