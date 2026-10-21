@@ -123,7 +123,7 @@ export async function cmdPack(
       const manifest = JSON.parse(
         dec.decode(source.get('manifest.json') ?? new Uint8Array()),
       ) as WdfManifest;
-      const output = opts.output ?? `${base}.html`;
+      const output = opts.output ?? `${base}.wdf.html`;
       writeFileSync(output, makeStandalone(bytes, manifest.title));
       ctx.log(`wrote ${output} (standalone, ${String(bytes.length)} bytes embedded)`);
       if (!hasViewerTemplate()) {
@@ -411,7 +411,7 @@ export async function cmdImport(
     // distribution file (spec §9) next to the package.
     if (opts.standalone === true) {
       const html = makeStandalone(result.wdfBytes, result.title);
-      const htmlPath = output.replace(/\.wdf$/i, '') + '.html';
+      const htmlPath = output.replace(/\.wdf$/i, '') + '.wdf.html';
       writeFileSync(htmlPath, html);
       ctx.log(`wrote ${htmlPath} (standalone, ${String(result.wdfBytes.length)} bytes embedded)`);
     }

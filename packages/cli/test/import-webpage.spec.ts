@@ -174,12 +174,12 @@ describe('import --standalone (T15.1, plan §10.28)', () => {
       run,
     );
     expect(code, run.logs.join('\n')).toBe(0);
-    const html = readFileSync(join(work, 'page.html'), 'utf8');
+    const html = readFileSync(join(work, 'page.wdf.html'), 'utf8');
     expect(html).toContain('application/wdf+zip');
     expect(run.logs.some((l) => l.includes('standalone'))).toBe(true);
     // Without the flag, no HTML appears (unchanged behavior).
     const wdf2 = join(work, 'plain.wdf');
     await cmdImport(join(fixturesDir, 'saved-page-css.html'), { output: wdf2 }, capture());
-    expect(() => readFileSync(join(work, 'plain.html'))).toThrow();
+    expect(() => readFileSync(join(work, 'plain.wdf.html'))).toThrow();
   });
 });
