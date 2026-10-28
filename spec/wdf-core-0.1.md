@@ -3,6 +3,9 @@
 **Status:** Editor's Draft · **Version:** 0.1.0-draft · **Date:** 2026-07-18
 **Editor:** Paolo Omero (infoFACTORY)
 **License:** CC-BY 4.0 (planned)
+**Provenance:** this draft was written with generative AI (Claude, through
+Claude Code) under the editor's direction. It is pre-existing AI-generated
+content; see [`GENAI.md`](https://github.com/paoloomero/wdf/blob/main/GENAI.md).
 
 This document defines WDF Core 0.1, a portable document format built as a
 constrained profile of existing web technologies. A WDF document is a ZIP

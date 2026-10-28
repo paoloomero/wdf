@@ -12,6 +12,7 @@ Open, web-native, AI-ready document format. Monorepo: pnpm workspaces, TypeScrip
 - No new runtime dependencies without discussion. Current budget: fflate, ajv, parse5, commander.
 - The viewer and the standalone template each build to ONE self-contained HTML file. The Reader DEPLOYMENT may add same-origin lazy assets (e.g. pdfjs.js/pdfjs-worker.js, precached by the service worker) — never third-party, and never referenced by the standalone. No external requests at runtime, ever (amended 25 Aug 2026, plan §10.57).
 - Every violation reported by the validator must cite the spec section it enforces.
+- GenAI provenance is public (`GENAI.md`): every commit with generated content keeps its `Co-Authored-By:` model trailer. Never write code, tests or text for a part `GENAI.md` lists as human-written or grant-funded under rules that exclude GenAI — there, review read-only.
 
 ## Commands
 

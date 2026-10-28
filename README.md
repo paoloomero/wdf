@@ -103,6 +103,15 @@ See `docs/reader-install.md` for the installable-Reader walkthrough and
 `CLAUDE.md` for the engineering ground rules (determinism, whitelist thinking,
 dependency budget).
 
+## Use of generative AI
+
+WDF is developed with extensive use of generative AI: essentially all code,
+tests, specification text and documentation in this repository were written by
+Claude (Anthropic) through Claude Code, under the maintainer's direction. Every
+such commit names the model in a `Co-Authored-By:` trailer. See
+[`GENAI.md`](GENAI.md) for what was generated, how to tell, and the rules for
+contributions.
+
 ## License
 
 - Code: [Apache-2.0](LICENSE) — maximum embeddability for a reference
