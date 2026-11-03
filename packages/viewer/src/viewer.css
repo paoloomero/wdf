@@ -822,10 +822,15 @@ code {
   flex: 1;
   min-width: 0;
   display: flex;
-  /* One visible view at a time, except the Original view's report bar,
-     which takes a full-width line above the original (wrap + 100% basis). */
-  flex-wrap: wrap;
-  align-content: stretch;
+  /* One visible view at a time, stacked under the Original view's report
+     bar. A column, not a wrapping row: wrapped flex lines size to their
+     content, so the views grew past the window and Agent/PDF could not
+     scroll (plan §10.77). Each view gets the remaining height, bounded. */
+  flex-direction: column;
+}
+#content > * {
+  flex: 1 1 0;
+  min-height: 0;
 }
 #human,
 #original {
@@ -844,6 +849,7 @@ code {
   gap: 18px;
   flex-wrap: wrap;
   padding: 24px;
+  overflow: auto;
   background: var(--chrome-2);
   font-family: var(--font-sans);
 }
@@ -922,6 +928,7 @@ code {
 }
 #original-pdf-pages {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 1.25rem 0;
 }
@@ -1129,9 +1136,11 @@ code {
 
 /* Conversion report (ext-source 0.6): a collapsible bar above the Original view. */
 #original-report {
-  flex: 0 0 100%;
+  flex: none;
   min-width: 0;
-  align-self: flex-start;
+  /* An opened report scrolls inside the bar, the original keeps the rest. */
+  max-height: 40%;
+  overflow: auto;
   margin: 0;
   padding: 0.35rem 0.9rem;
   font: 500 12.5px/1.5 var(--font-mono, ui-monospace, monospace);
