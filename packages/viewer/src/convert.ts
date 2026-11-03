@@ -116,6 +116,8 @@ export interface ConvertOptions {
 export interface Converted extends ImportedDocument {
   /** Suggested output file name, `<input base name>.wdf`. */
   fileName: string;
+  /** Name of the dropped PDF attached as the author's rendition, if any. */
+  visualName?: string;
 }
 
 /**
@@ -162,17 +164,32 @@ export async function convertFiles(
     sourceEncoding,
   };
   if (isDocx) input.bytes = bytes;
-  // WP21 (ext-source 0.5): a dropped PDF sharing the document's basename is
-  // taken as the author's visual rendition. It rides inside the source
-  // extension, so it attaches only together with the source.
-  if (opts.withSource === true) {
+  // WP21 (ext-source 0.5): a dropped PDF is taken as the author's visual
+  // rendition — the only one whatever its name, or among several the one
+  // sharing the document's basename (plan §10.78: a name is no content check,
+  // it only disambiguates). It rides inside the source extension, so it
+  // attaches only together with the source.
+  const pdfs = [...files.keys()].filter((p) => /\.pdf$/i.test(p)).sort();
+  let visualName: string | undefined;
+  if (pdfs.length > 0 && opts.withSource !== true) {
+    report.push(
+      `PDF not attached: the author's PDF travels with the original source (include the source to attach it)`,
+    );
+  } else if (pdfs.length > 0) {
     const dir = mainPath.split('/').slice(0, -1).join('/');
     const pdfPath = `${dir === '' ? '' : `${dir}/`}${baseName}.pdf`.toLowerCase();
-    const candidate = [...files.keys()].find((p) => p.toLowerCase() === pdfPath);
+    const candidate = pdfs.length === 1 ? pdfs[0] : pdfs.find((p) => p.toLowerCase() === pdfPath);
     const pdfBytes = candidate === undefined ? undefined : files.get(candidate);
-    if (candidate !== undefined && pdfBytes !== undefined && looksLikePdf(pdfBytes)) {
+    if (candidate === undefined) {
+      report.push(
+        `PDF not attached: ${String(pdfs.length)} PDF files dropped and none is named ${baseName}.pdf`,
+      );
+    } else if (pdfBytes === undefined || !looksLikePdf(pdfBytes)) {
+      report.push(`PDF not attached: ${candidate} is not a PDF (missing %PDF- signature)`);
+    } else {
+      visualName = candidate.split('/').pop() ?? candidate;
       input.visualBytes = pdfBytes;
-      input.visualName = candidate.split('/').pop() ?? candidate;
+      input.visualName = visualName;
     }
   }
   const result = await importDocument(
@@ -186,5 +203,11 @@ export async function convertFiles(
     },
     report,
   );
-  return result === undefined ? undefined : { ...result, fileName: `${baseName}.wdf` };
+  return result === undefined
+    ? undefined
+    : {
+        ...result,
+        fileName: `${baseName}.wdf`,
+        ...(visualName !== undefined && { visualName }),
+      };
 }

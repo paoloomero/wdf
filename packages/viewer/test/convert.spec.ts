@@ -202,5 +202,60 @@ describe('author PDF rendition on drop (ext-source 0.5, WP21)', () => {
     expect(result).toBeDefined();
     const pkg = readPackage(result?.wdfBytes ?? new Uint8Array());
     expect(pkg.manifest.extensions ?? []).toEqual([]);
+    expect(result?.visualName).toBeUndefined();
+    expect(result?.report.some((r) => r.startsWith('PDF not attached'))).toBe(true);
+  });
+
+  // Plan §10.78: a name is no content check, it only disambiguates.
+  function visualOf(wdf: Uint8Array | undefined): string | undefined {
+    const pkg = readPackage(wdf ?? new Uint8Array());
+    const raw = pkg.files.get('ext/source/source.json');
+    if (raw === undefined) return undefined;
+    return (JSON.parse(new TextDecoder().decode(raw)) as { visual?: { name: string } }).visual
+      ?.name;
+  }
+
+  it('the only dropped PDF attaches whatever its name, byte-identical to the CLI', async () => {
+    const files = await docxDrop();
+    files.delete('delibera.pdf');
+    files.set('Delibera stampa.pdf', PDF);
+    const result = await convertFiles(files, { withSource: true, date: DATE });
+    expect(result?.visualName).toBe('Delibera stampa.pdf');
+    expect(visualOf(result?.wdfBytes)).toBe('Delibera stampa.pdf');
+
+    const dir = mkdtempSync(join(tmpdir(), 'wdf-visual-any-'));
+    const docxPath = join(dir, 'delibera.docx');
+    const pdfPath = join(dir, 'Delibera stampa.pdf');
+    writeFileSync(docxPath, files.get('delibera.docx') ?? new Uint8Array());
+    writeFileSync(pdfPath, PDF);
+    const out = join(dir, 'out.wdf');
+    expect(
+      await cmdImport(
+        docxPath,
+        { output: out, date: DATE, withSource: true, withPdf: pdfPath },
+        silent(),
+      ),
+    ).toBe(0);
+    expect(new Uint8Array(result?.wdfBytes ?? [])).toEqual(new Uint8Array(readFileSync(out)));
+  });
+
+  it('among several PDFs the same-basename one attaches', async () => {
+    const files = await docxDrop();
+    files.set('allegato.pdf', PDF);
+    const result = await convertFiles(files, { withSource: true, date: DATE });
+    expect(result?.visualName).toBe('delibera.pdf');
+  });
+
+  it('several PDFs and none named like the document: nothing attaches, the report says so', async () => {
+    const files = await docxDrop();
+    files.delete('delibera.pdf');
+    files.set('a.pdf', PDF);
+    files.set('b.pdf', PDF);
+    const result = await convertFiles(files, { withSource: true, date: DATE });
+    expect(result?.visualName).toBeUndefined();
+    expect(visualOf(result?.wdfBytes)).toBeUndefined();
+    expect(result?.report).toContain(
+      'PDF not attached: 2 PDF files dropped and none is named delibera.pdf',
+    );
   });
 });

@@ -192,6 +192,14 @@ async function runConvert(): Promise<void> {
   convertedBytes = result.wdfBytes;
   convertedName = result.fileName;
   $('convert-title').textContent = `${result.title} → ${result.fileName}`;
+  // The author answers for the PDF (plan §10.78): nothing compares it with
+  // the document, so say so where it is attached, not only in Original.
+  const visual = $('convert-visual');
+  visual.hidden = result.visualName === undefined;
+  visual.textContent =
+    result.visualName === undefined
+      ? ''
+      : `The PDF ${result.visualName} is attached as-is and is not compared with the document — make sure it is the print of this one.`;
   const list = $('convert-report');
   list.textContent = '';
   for (const line of aggregateReport(result.report)) {
