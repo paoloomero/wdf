@@ -54,6 +54,12 @@ export {
 } from './table.js';
 export { readPackage, writePackage, checkPackageStructure, type WdfPackage } from './package.js';
 export {
+  bytesToBase64,
+  fillStandalone,
+  STANDALONE_PACKAGE,
+  STANDALONE_TITLE,
+} from './standalone.js';
+export {
   validatePackage,
   STATUS_TEXT,
   INTEGRITY_NOT_AUTHENTICITY,

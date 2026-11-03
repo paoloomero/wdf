@@ -181,5 +181,10 @@ renderer **bundled with the application** — never loaded from the network
 at runtime; the no-network rule of the document view applies unchanged. A
 **lean consumer** (e.g. the standalone distribution file) SHOULD offer the
 rendition for download alongside the source, and MAY point the user to an
-installable rich viewer. A consumer MUST NOT fetch renderer code from a
-remote origin to display the rendition.
+installable rich viewer. A lean consumer MAY instead display the rendition
+with the platform's own PDF viewer (e.g. a frame on a local object URL of
+the package bytes, where the platform reports one): no renderer code is
+shipped or fetched, and the bytes are the package's. Whichever way the
+rendition is displayed, the consumer SHOULD keep both the source and the
+rendition available for download next to it. A consumer MUST NOT fetch
+renderer code from a remote origin to display the rendition.

@@ -1,18 +1,19 @@
 import {
-  INTEGRITY_NOT_AUTHENTICITY,
   parseCaptureExt,
   readPackage,
-  STATUS_TEXT,
+  STANDALONE_PACKAGE,
   validatePackage,
   WdfError,
+  type ValidationResult,
   type WdfCapture,
   type WdfOutline,
   type WdfPackage,
 } from '@wdf-dev/core';
 
-import { aggregateReport } from '@wdf-dev/import';
+import { reportEntries } from '@wdf-dev/import';
 
-import { convertFiles } from './convert.js';
+import { convertFiles, pickMainFile, toStandalone } from './convert.js';
+import { initLang, lang, msg, onLangChange } from './i18n.js';
 import {
   agentBlocks,
   binarySourceDetails,
@@ -67,14 +68,16 @@ let statusText = '';
 let statusTimer: ReturnType<typeof setTimeout> | undefined;
 function setStatus(text: string): void {
   statusText = text;
-  $('status-left').textContent = text;
+  // A flash in progress keeps the bar; the new text shows when it ends.
+  if (statusTimer === undefined) $('status-left').textContent = text;
 }
-function statusFlash(message: string): void {
+function statusFlash(message: string, ms = 3500): void {
   $('status-left').textContent = message;
   if (statusTimer !== undefined) clearTimeout(statusTimer);
   statusTimer = setTimeout(() => {
+    statusTimer = undefined;
     $('status-left').textContent = statusText;
-  }, 3500);
+  }, ms);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,37 +92,108 @@ function resolveCitation(raw: string): boolean {
   const id = uri !== null ? (uri[2] ?? '') : (/^#?([A-Za-z][\w:.-]*)$/.exec(text)?.[1] ?? '');
   if (id === '') return false;
   if (uri !== null && uri[1] !== loaded.pkg.manifest.id) {
-    statusFlash('this citation refers to a different document');
+    statusFlash(msg().otherDocument);
     return true;
   }
   if (!loaded.outline.some((n) => n.id === id)) {
     if (uri === null) return false; // plain text: fall through to the filter
-    statusFlash(`anchor "${id}" not found in this document`);
+    statusFlash(msg().anchorMissing(id));
     return true;
   }
   select(id, 'outline');
-  statusFlash(`jumped to ${id}`);
+  statusFlash(msg().jumped(id));
   return true;
 }
 
 // ---------------------------------------------------------------------------
-// Opening packages
+// Home: two zones, Read and Convert (plan §10.80, handoff "wdf_home_v2").
+// Each card is its own drop target; files are routed by type whichever card
+// receives them, and a card that got the "wrong" files says what happened
+// instead of refusing. State lives in data-state, styled by viewer.css.
 
-function showDropError(message: string): void {
-  const box = $('drop-error');
-  box.textContent = message;
-  box.hidden = false;
+type Zone = 'read' | 'convert';
+type ZoneState = 'idle' | 'over' | 'working' | 'error' | 'notice';
+
+function zoneEl(zone: Zone): HTMLElement {
+  return $(zone === 'read' ? 'zone-read' : 'zone-convert');
+}
+
+function zoneText(zone: Zone, cls: string, text: string): void {
+  const node = zoneEl(zone).querySelector(`.${cls}`);
+  if (node !== null) node.textContent = text;
+}
+
+interface ZoneText {
+  working?: string;
+  notice?: string;
+  title?: string;
+  body?: string;
+}
+// Each card's texts as a function of the language (plan §10.81), so a
+// language change re-renders a notice or an error already on screen.
+const zoneTexts: Record<Zone, () => ZoneText> = { read: () => ({}), convert: () => ({}) };
+
+/** Sets a card's state; texts go in after it, so live regions announce them. */
+function setZone(zone: Zone, state: ZoneState, make: () => ZoneText = () => ({})): void {
+  const el = zoneEl(zone);
+  el.dataset['state'] = state;
+  if (state === 'working') el.setAttribute('aria-busy', 'true');
+  else el.removeAttribute('aria-busy');
+  zoneTexts[zone] = make;
+  paintZone(zone);
+}
+
+function paintZone(zone: Zone): void {
+  const state = zoneEl(zone).dataset['state'];
+  const text = zoneTexts[zone]();
+  zoneText(zone, 'js-working-name', text.working ?? '');
+  zoneText(zone, 'js-notice', state === 'notice' ? (text.notice ?? '') : '');
+  zoneText(zone, 'js-error-title', state === 'error' ? (text.title ?? '') : '');
+  zoneText(zone, 'js-error-body', state === 'error' ? (text.body ?? '') : '');
+}
+
+function baseName(path: string): string {
+  return path.split('/').pop() ?? path;
+}
+
+/** "a.png, b.txt and 3 more" — the names a card could not use. */
+function nameList(files: ReadonlyMap<string, Uint8Array>): string {
+  const names = [...files.keys()].map(baseName);
+  if (names.length <= 3) return names.join(', ');
+  return msg().andMore(names.slice(0, 3).join(', '), names.length - 3);
+}
+
+/** What a convertible set is, in the words of the wrong-zone notice. */
+function describeDocument(mainPath: string): string {
+  if (/\.docx$/i.test(mainPath)) return msg().aWordFile;
+  if (/\.(md|markdown)$/i.test(mainPath)) return msg().aMarkdownFile;
+  if (/\.html?$/i.test(mainPath)) return msg().aWebPage;
+  return msg().notAWdf;
+}
+
+/** Lets the browser paint a state before a long synchronous stretch. A hidden
+ *  page never runs animation frames, so a timer bounds the wait. */
+function nextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, 100);
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        clearTimeout(timer);
+        resolve();
+      }, 0);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
-// In-browser converter (T7.6, plan §10.24): an HTML export dropped on the
-// Reader converts to .wdf fully client-side — no upload, no network requests.
+// In-browser converter (T7.6, plan §10.24): the dropped files convert to .wdf
+// fully client-side — no upload, no network requests.
 
 // The last dropped file set, kept so toggling options re-runs the conversion.
 let droppedSet: Map<string, Uint8Array> | undefined;
-let convertedBytes: Uint8Array | undefined;
-let convertedName = 'document.wdf';
-let downloadUrl: string | undefined;
+let droppedZone: Zone = 'convert';
+let droppedNotice: (() => string) | undefined;
+let converted: { bytes: Uint8Array; title: string; fileName: string } | undefined;
 
 function entryOf(item: DataTransferItem): FileSystemEntry | null {
   return typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null;
@@ -159,71 +233,212 @@ async function fileListToMap(files: Iterable<File>): Promise<Map<string, Uint8Ar
   return out;
 }
 
-/** A dropped .wdf opens as before; anything else goes to the converter. */
-async function handleDropped(files: Map<string, Uint8Array>): Promise<void> {
+/** Routes a file set by type: a .wdf opens, anything else converts. */
+async function handleDropped(files: Map<string, Uint8Array>, zone: Zone): Promise<void> {
+  setZone(zone === 'read' ? 'convert' : 'read', 'idle');
   const wdf = [...files.keys()].sort().find((p) => /\.wdf$/i.test(p));
   if (wdf !== undefined) {
     const bytes = files.get(wdf);
-    if (bytes !== undefined) openBytes(bytes, wdf.split('/').pop() ?? wdf);
+    if (bytes === undefined) return;
+    const name = baseName(wdf);
+    setZone(zone, 'working', () => ({ working: name }));
+    await nextPaint();
+    if (!openBytes(bytes, name, zone)) return;
+    // The document now covers the home: the wrong-zone line also goes to
+    // the document's status bar, where it can be seen.
+    if (zone === 'convert') {
+      setZone(zone, 'notice', () => ({ notice: msg().alreadyWdf }));
+      statusFlash(msg().alreadyWdf, 6000);
+    } else {
+      setZone(zone, 'idle');
+    }
+    return;
+  }
+  const main = pickMainFile(files);
+  if (main === undefined) {
+    $('convert-panel').hidden = true;
+    setZone(zone, 'error', () => ({
+      title: zone === 'read' ? msg().notWdf : msg().nothingToConvert,
+      body: files.size === 0 ? msg().noFiles : msg().unusable(nameList(files)),
+    }));
     return;
   }
   droppedSet = files;
-  await runConvert();
+  droppedZone = zone;
+  droppedNotice = zone === 'read' ? () => msg().converting(describeDocument(main)) : undefined;
+  await runConvert(true);
 }
 
-async function runConvert(): Promise<void> {
+async function runConvert(fresh = false): Promise<void> {
   if (droppedSet === undefined) return;
-  $('drop-error').hidden = true;
+  const files = droppedSet;
+  const zone = droppedZone;
+  const main = pickMainFile(files) ?? '';
+  const panel = $('convert-panel');
+  const download = $('convert-download') as HTMLButtonElement;
+  $('convert-download-error').hidden = true;
+  setZone(zone, 'working', () => ({ working: baseName(main) }));
+  download.disabled = true;
+  await nextPaint();
   const withSource = ($('convert-source') as HTMLInputElement).checked;
   let result;
   try {
-    result = await convertFiles(droppedSet, withSource ? { withSource: true } : {});
+    result = await convertFiles(files, withSource ? { withSource: true } : {});
   } catch (e) {
-    $('convert-panel').hidden = true;
-    showDropError(String(e));
+    panel.hidden = true;
+    const detail = e instanceof Error ? e.message : String(e);
+    setZone(zone, 'error', () => ({ title: msg().convertFailed, body: detail }));
     return;
+  } finally {
+    download.disabled = false;
   }
   if (result === undefined) {
-    $('convert-panel').hidden = true;
-    showDropError('no representable content found in the input');
+    panel.hidden = true;
+    setZone(zone, 'error', () => ({
+      title: msg().nothingToConvert,
+      body: msg().noContent(baseName(main)),
+    }));
     return;
   }
-
-  convertedBytes = result.wdfBytes;
-  convertedName = result.fileName;
-  $('convert-title').textContent = `${result.title} → ${result.fileName}`;
-  // The author answers for the PDF (plan §10.78): nothing compares it with
-  // the document, so say so where it is attached, not only in Original.
-  const visual = $('convert-visual');
-  visual.hidden = result.visualName === undefined;
-  visual.textContent =
-    result.visualName === undefined
-      ? ''
-      : `The PDF ${result.visualName} is attached as-is and is not compared with the document — make sure it is the print of this one.`;
-  const list = $('convert-report');
-  list.textContent = '';
-  for (const line of aggregateReport(result.report)) {
-    const li = document.createElement('li');
-    li.textContent = line;
-    list.append(li);
+  if (droppedNotice === undefined) setZone(zone, 'idle');
+  else {
+    const notice = droppedNotice;
+    setZone(zone, 'notice', () => ({ notice: notice() }));
   }
-  if (downloadUrl !== undefined) URL.revokeObjectURL(downloadUrl);
-  downloadUrl = URL.createObjectURL(
-    new Blob([result.wdfBytes.slice().buffer], { type: 'application/wdf+zip' }),
+
+  converted = { bytes: result.wdfBytes, title: result.title, fileName: result.fileName };
+  const base = result.fileName.replace(/\.wdf$/i, '');
+  $('convert-doc-title').textContent = result.title;
+  $('convert-base').textContent = base;
+  $('convert-from').textContent = baseName(main);
+  $('convert-name-html').textContent = `${base}.wdf.html`;
+  $('convert-name-wdf').textContent = result.fileName;
+  // The author answers for the PDF (plan §10.78): nothing compares it with
+  // the document, so the panel says so before anyone downloads.
+  panel.classList.toggle('has-pdf', result.visualName !== undefined);
+  panel.classList.toggle(
+    'pdf-dropped',
+    [...files.keys()].some((p) => /\.pdf$/i.test(p)),
   );
-  const download = $('convert-download') as HTMLAnchorElement;
-  download.href = downloadUrl;
-  download.download = result.fileName;
-  $('convert-panel').hidden = false;
+  for (const node of panel.querySelectorAll('.js-pdf-name')) {
+    node.textContent = result.visualName ?? '';
+  }
+  renderConvertReport(result.report);
+  panel.hidden = false;
+  if (fresh) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function openBytes(bytes: Uint8Array, name: string): void {
+// Conversion report: what was dropped or changed first, in ink, then the
+// plain notes (the importer's own classification, ext-source 0.6). The notes
+// themselves stay in English (plan §10.81); tags and headings translate.
+let shownReport: readonly string[] = [];
+
+function renderConvertReport(report: readonly string[]): void {
+  shownReport = report;
+  const m = msg();
+  const entries = reportEntries(report);
+  const changes = entries.filter((e) => e.kind !== 'info');
+  const info = entries.filter((e) => e.kind === 'info');
+  const fill = (listId: string, items: typeof entries): void => {
+    const list = $(listId);
+    list.textContent = '';
+    for (const e of items) {
+      const li = document.createElement('li');
+      li.className = e.kind === 'info' ? 'note' : 'note note--change';
+      const tag = document.createElement('span');
+      tag.className = e.kind === 'info' ? 'tag tag--line' : 'tag tag--ink';
+      tag.textContent = m.noteTag[e.kind];
+      const text = document.createElement('span');
+      text.textContent = e.count > 1 ? `${e.message} (×${String(e.count)})` : e.message;
+      li.append(tag, text);
+      list.append(li);
+    }
+    list.hidden = items.length === 0;
+  };
+  fill('convert-notes', changes);
+  fill('convert-info', info);
+  const head = (id: string, label: string, n: number): void => {
+    $(id).textContent = `${label} · ${String(n)}`;
+    $(id).hidden = n === 0;
+  };
+  head('convert-changes-head', m.changesHead, changes.length);
+  head('convert-info-head', m.notesHead, info.length);
+  $('convert-count-changes').textContent = changes.length === 0 ? '' : m.nChanged(changes.length);
+  $('convert-count-notes').textContent = info.length === 0 ? '' : m.nNotes(info.length);
+  $('convert-report').hidden = entries.length === 0;
+}
+
+function saveFile(data: BlobPart, type: string, name: string): void {
+  const url = URL.createObjectURL(new Blob([data], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 60_000);
+}
+
+// The .wdf.html template (plan §10.80) is a same-origin lazy asset of the
+// Reader deployment, precached by the SW — fetched on the first download in
+// that format, never from a third party. The standalone never calls this.
+let standaloneTemplate: Promise<string> | undefined;
+
+function loadStandaloneTemplate(): Promise<string> {
+  standaloneTemplate ??= fetch('standalone-template.html')
+    .then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${String(r.status)}`);
+      return r.text();
+    })
+    .then((text) => {
+      if (!text.includes(STANDALONE_PACKAGE)) throw new Error('not a standalone template');
+      return text;
+    })
+    .catch((e: unknown) => {
+      standaloneTemplate = undefined; // a later click may succeed (e.g. back online)
+      throw e;
+    });
+  return standaloneTemplate;
+}
+
+async function downloadConverted(): Promise<void> {
+  if (converted === undefined) return;
+  const error = $('convert-download-error');
+  error.hidden = true;
+  const format = document.querySelector<HTMLInputElement>(
+    'input[name="convert-format"]:checked',
+  )?.value;
+  if (format !== 'wdf.html') {
+    saveFile(converted.bytes.slice().buffer, 'application/wdf+zip', converted.fileName);
+    return;
+  }
+  const button = $('convert-download') as HTMLButtonElement;
+  button.disabled = true;
+  try {
+    const html = toStandalone(await loadStandaloneTemplate(), {
+      title: converted.title,
+      wdfBytes: converted.bytes,
+    });
+    saveFile(html, 'text/html', converted.fileName.replace(/\.wdf$/i, '.wdf.html'));
+  } catch {
+    error.textContent = msg().noTemplate;
+    error.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+/** Opens a package in the app view; false (and an error in `zone`) if unreadable. */
+function openBytes(bytes: Uint8Array, name: string, zone: Zone = 'read'): boolean {
+  const fail = (detail: string): false => {
+    setZone(zone, 'error', () => ({ title: msg().openFailed, body: `${name}: ${detail}` }));
+    return false;
+  };
   let pkg: WdfPackage;
   try {
     pkg = readPackage(bytes);
   } catch (e) {
-    showDropError(e instanceof WdfError ? e.message : String(e));
-    return;
+    return fail(e instanceof WdfError ? e.message : String(e));
   }
   try {
     const markdown = dec.decode(pkg.files.get('ai/content.md') ?? new Uint8Array());
@@ -238,8 +453,7 @@ function openBytes(bytes: Uint8Array, name: string): void {
       captureExt: parseCaptureExt(pkg.files),
     };
   } catch (e) {
-    showDropError(`unreadable AI layer: ${String(e)}`);
-    return;
+    return fail(msg().unreadableAi(String(e)));
   }
 
   $('drop-screen').hidden = true;
@@ -249,9 +463,7 @@ function openBytes(bytes: Uint8Array, name: string): void {
   $('doc-title').title = name;
   // WP18: a live-page capture declares its nature next to the badge
   // (docs/ext-capture.md §6); the full provenance is in the badge details.
-  const note = $('capture-note');
-  note.hidden = loaded.captureExt === undefined;
-  note.textContent = loaded.captureExt === undefined ? '' : captureNote(loaded.captureExt);
+  paintCaptureNote(loaded);
 
   renderHuman(loaded);
   renderAgent(loaded);
@@ -260,11 +472,13 @@ function openBytes(bytes: Uint8Array, name: string): void {
   ($('outline-search') as HTMLInputElement).value = '';
   setView('human');
   datasetsOk = false;
-  setBadgeState('wait', 'checking…');
+  shownVerdict = undefined;
+  setBadgeState('wait', msg().checking);
   // A URL fragment names the anchor to open at (resolved when the Human
   // frame is ready) — the human-consumable end of a citation link.
   pendingAnchor = /^#([A-Za-z][\w:.-]*)$/.exec(location.hash)?.[1];
   void verify(loaded);
+  return true;
 }
 
 function renderHuman(doc: Loaded): void {
@@ -277,7 +491,7 @@ function setPlain(on: boolean): void {
   plain = on;
   $('plain-toggle').classList.toggle('active', on);
   if (loaded !== undefined) renderHuman(loaded);
-  statusFlash(on ? 'Plain view: author stylesheet off (§6.7.4)' : 'Author stylesheet on');
+  statusFlash(on ? msg().plainOn : msg().plainOff);
 }
 
 // The Original view's conversion report (ext-source 0.6, review F04): what
@@ -291,15 +505,18 @@ function renderReport(doc: Loaded): void {
     doc.sourceExt === undefined ? undefined : conversionReport(doc.pkg.files, doc.sourceExt);
   reportAvailable = report !== undefined;
   if (report === undefined) return;
-  const parts = [`${String(report.entries.length)} note(s)`];
-  if (report.losses > 0) parts.push(`${String(report.losses)} dropped`);
-  if (report.changes > 0) parts.push(`${String(report.changes)} transformed`);
-  $('original-report-summary').textContent =
-    `Original included as-is, not compared with the canonical content · conversion report: ${parts.join(', ')}${report.toolVersion === '' ? '' : ` (${report.tool} ${report.toolVersion})`}`;
+  const m = msg();
+  const parts = [m.reportNotes(report.entries.length)];
+  if (report.losses > 0) parts.push(m.reportDropped(report.losses));
+  if (report.changes > 0) parts.push(m.reportTransformed(report.changes));
+  $('original-report-summary').textContent = m.reportSummary(
+    parts.join(', '),
+    report.toolVersion === '' ? '' : ` (${report.tool} ${report.toolVersion})`,
+  );
   for (const e of report.entries) {
     const li = document.createElement('li');
     li.className = `report__${e.kind}`;
-    li.textContent = `${e.kind}: ${e.message}${e.count > 1 ? ` (×${String(e.count)})` : ''}`;
+    li.textContent = `${m.reportKind[e.kind]}: ${e.message}${e.count > 1 ? ` (×${String(e.count)})` : ''}`;
     list.append(li);
   }
 }
@@ -348,10 +565,35 @@ let visualFileName = '';
 // In-app rendering of the author's PDF rendition (WP21 T21.2): the Reader
 // lazy-loads the PDF.js wrapper (a same-origin asset precached by the SW)
 // the first time the Original view needs it. The standalone never loads
-// it — its Original view stays the download card. On any failure the card
-// is the fallback; no code is ever fetched from a third-party origin.
-let visualPdf: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+// it; it shows the PDF in the browser's own viewer instead, where there is
+// one (plan §10.82: no code shipped or fetched, the bytes are the
+// package's). The Reader falls back to it too if PDF.js fails. With
+// neither, the download cards are the view. No code is ever fetched from a
+// third-party origin.
+let visualPdf: 'idle' | 'loading' | 'ready' | 'native' | 'failed' = 'idle';
 let pdfGen = 0;
+let visualPages: { size: string; count?: number } | undefined;
+
+function paintPdfMeta(): void {
+  if (visualPages === undefined) return;
+  const { size, count } = visualPages;
+  $('original-pdf-meta').textContent =
+    count === undefined ? size : `${size} · ${msg().pages(count)}`;
+}
+
+// The two files above the PDF on view (plan §10.82): the PDF and the original.
+function paintPdfLinks(pdfName: string): void {
+  const pdf = $('original-pdf-download') as HTMLAnchorElement;
+  const source = $('original-source-download') as HTMLAnchorElement;
+  const sourceLink = $('original-binary-download') as HTMLAnchorElement;
+  pdf.href = visualUrl ?? '';
+  pdf.download = pdfName;
+  pdf.textContent = pdfName;
+  source.href = sourceLink.href;
+  source.download = sourceLink.download;
+  source.textContent = sourceLink.download;
+  source.hidden = sourceLink.download === '';
+}
 
 async function ensureVisualPdf(doc: Loaded): Promise<void> {
   if (visualPdf !== 'idle') return;
@@ -359,34 +601,47 @@ async function ensureVisualPdf(doc: Loaded): Promise<void> {
   const details = ext === undefined ? undefined : visualSourceDetails(doc.pkg.files, ext);
   const bytes = ext?.visual === undefined ? undefined : doc.pkg.files.get(ext.visual.path);
   const standalone = document.getElementById('wdf-package') !== null;
-  if (ext === undefined || details === undefined || bytes === undefined || standalone) {
+  if (ext === undefined || details === undefined || bytes === undefined) {
     visualPdf = 'failed';
     return;
   }
-  visualPdf = 'loading';
   const gen = pdfGen;
-  try {
-    // dist/pdfjs.js is a separately built asset (build.mjs) external to this
-    // bundle — the literal specifier stays for esbuild, TS cannot resolve it.
-    // @ts-expect-error TS2307 — no source module behind the runtime asset
-    const mod = (await import('./pdfjs.js')) as typeof import('./pdfview.js');
-    const pages = $('original-pdf-pages');
-    pages.textContent = '';
-    const count = await mod.renderPdfInto(pages, bytes, $('content').clientWidth);
-    if (gen !== pdfGen) return; // another document took over meanwhile
-    if (count === 0) throw new Error('empty PDF');
-    $('original-pdf-name').textContent = details.fileName;
-    $('original-pdf-meta').textContent =
-      `${details.sizeLabel} · ${String(count)} page${count === 1 ? '' : 's'}`;
-    const link = $('original-pdf-download') as HTMLAnchorElement;
-    if (visualUrl !== undefined) link.href = visualUrl;
-    link.download = details.fileName;
-    visualPdf = 'ready';
-  } catch {
-    if (gen !== pdfGen) return;
-    visualPdf = 'failed';
+  if (!standalone) {
+    visualPdf = 'loading';
+    try {
+      // dist/pdfjs.js is a separately built asset (build.mjs) external to this
+      // bundle — the literal specifier stays for esbuild, TS cannot resolve it.
+      // @ts-expect-error TS2307 — no source module behind the runtime asset
+      const mod = (await import('./pdfjs.js')) as typeof import('./pdfview.js');
+      const pages = $('original-pdf-pages');
+      pages.textContent = '';
+      const count = await mod.renderPdfInto(pages, bytes, $('content').clientWidth);
+      if (gen !== pdfGen) return; // another document took over meanwhile
+      if (count === 0) throw new Error('empty PDF');
+      visualPages = { size: details.sizeLabel, count };
+      visualPdf = 'ready';
+    } catch {
+      if (gen !== pdfGen) return;
+    }
   }
+  if (visualPdf !== 'ready') {
+    // navigator.pdfViewerEnabled: Chrome/Edge, Firefox, desktop Safari.
+    const native = navigator.pdfViewerEnabled && visualUrl !== undefined;
+    if (native) {
+      ($('original-pdf-native') as HTMLIFrameElement).src = visualUrl ?? '';
+      visualPages = { size: details.sizeLabel };
+    }
+    visualPdf = native ? 'native' : 'failed';
+  }
+  paintPdfMeta();
+  paintPdfLinks(details.fileName);
   if (currentView === 'original') setView('original');
+}
+
+function paintPdfTitle(): void {
+  $('pdf-export').title = visualAvailable
+    ? msg().downloadAuthorPdf(visualFileName)
+    : msg().exportPdf;
 }
 
 // The author's PDF rendition (ext-source 0.5, WP21): the lean card offers
@@ -400,18 +655,17 @@ function renderVisual(doc: Loaded): void {
   const ext = doc.sourceExt;
   const details = ext === undefined ? undefined : visualSourceDetails(doc.pkg.files, ext);
   const bytes = ext?.visual === undefined ? undefined : doc.pkg.files.get(ext.visual.path);
-  const pdfButton = $('pdf-export') as HTMLButtonElement;
   if (ext === undefined || details === undefined || bytes === undefined) {
     card.hidden = true;
     visualAvailable = false;
     visualFileName = '';
-    pdfButton.title = 'Export the document as PDF (browser print)';
+    paintPdfTitle();
     return;
   }
   card.hidden = false;
   visualAvailable = true;
   visualFileName = details.fileName;
-  pdfButton.title = `Download the PDF saved by the author (${details.fileName})`;
+  paintPdfTitle();
   $('original-visual-name').textContent = details.fileName;
   $('original-visual-meta').textContent = `${details.mediaType} · ${details.sizeLabel}`;
   const link = $('original-visual-download') as HTMLAnchorElement;
@@ -434,7 +688,9 @@ function renderOriginal(doc: Loaded): void {
   // A new document resets the rendition rendering (WP21 T21.2).
   pdfGen++;
   visualPdf = 'idle';
+  visualPages = undefined;
   $('original-pdf-pages').textContent = '';
+  $('original-pdf-native').removeAttribute('src');
   renderVisual(doc);
   renderReport(doc);
   if (doc.sourceExt === undefined) {
@@ -542,7 +798,8 @@ function renderOutline(doc: Loaded): void {
       const cite = document.createElement('button');
       cite.className = 'ol-cite';
       cite.innerHTML = LINK_SVG;
-      cite.title = `Copy citation for ${node.id}`;
+      cite.title = msg().copyCitationFor(node.id);
+      cite.dataset['cite'] = node.id;
       cite.addEventListener('click', () => {
         void copyCitation(node.id, cite);
       });
@@ -557,7 +814,7 @@ function renderOutline(doc: Loaded): void {
   nav.append(render(outlineTree(doc.outline)));
   const count = doc.outline.length;
   $('anchor-count').textContent = String(count);
-  setStatus(`${String(count)} anchors`);
+  setStatus(msg().anchors(count));
   $('status-right').textContent = `wdf ${doc.pkg.manifest.wdf}`;
 }
 
@@ -575,7 +832,30 @@ function setBadgeState(state: 'wait' | 'ok' | 'bad' | 'warn', text: string): voi
   $('details-head-label').textContent = text;
 }
 
+// The last verdict, kept so a language change repaints it (plan §10.81)
+// without validating again.
+let shownVerdict:
+  { doc: Loaded; result: ValidationResult } | { doc: Loaded; error: string } | undefined;
+
 async function verify(doc: Loaded): Promise<void> {
+  let verdict: NonNullable<typeof shownVerdict>;
+  try {
+    // One pipeline, one verdict, shared with the CLI and MCP (spec §8.2
+    // errata 2026-09-15, plan §10.70). Green only for `verified`; a digest
+    // mismatch is the only case called tampering.
+    verdict = { doc, result: await validatePackage(doc.pkg) };
+  } catch (e) {
+    verdict = { doc, error: String(e) };
+  }
+  if (loaded !== doc) return; // another document took over meanwhile
+  shownVerdict = verdict;
+  paintVerdict();
+}
+
+function paintVerdict(): void {
+  if (shownVerdict === undefined) return;
+  const { doc } = shownVerdict;
+  const m = msg();
   const list = $('details-list');
   list.textContent = '';
   const add = (text: string, cls: string): void => {
@@ -584,71 +864,65 @@ async function verify(doc: Loaded): Promise<void> {
     li.textContent = text;
     list.append(li);
   };
-
-  try {
-    // One pipeline, one verdict, shared with the CLI and MCP (spec §8.2
-    // errata 2026-09-15, plan §10.70). Green only for `verified`; a digest
-    // mismatch is the only case called tampering.
-    const result = await validatePackage(doc.pkg);
-    const text = STATUS_TEXT[result.status];
-    const state: 'ok' | 'bad' | 'warn' = result.verified
-      ? 'ok'
-      : result.status === 'unsupported-version' || result.status === 'not-verifiable'
-        ? 'warn'
-        : 'bad';
-    setBadgeState(state, text.label);
-    add(`${text.label}: ${text.detail}`, result.verified ? 'ok' : 'bad');
-    add(
-      result.integrity
-        ? 'Integrity: every file matches its SHA-256 digest (§8.2)'
-        : 'Integrity: FAILED (§8.2)',
-      result.integrity ? 'ok' : 'bad',
-    );
-    add(
-      result.determinism
-        ? 'Determinism: the AI layer is the canonical extraction of the content (§7.1)'
-        : 'Determinism: FAILED (§7.1)',
-      result.determinism ? 'ok' : 'bad',
-    );
-    add(
-      result.conformance
-        ? 'Conformance: WDF-HTML profile, datasets and extensions (§5–§6, §10)'
-        : 'Conformance: FAILED (§5–§6, §10)',
-      result.conformance ? 'ok' : 'bad',
-    );
-    for (const v of result.violations) {
-      add(
-        `[${v.spec}] ${v.severity === 'warning' ? 'warning: ' : ''}${v.path} — ${v.message}`,
-        v.severity === 'warning' ? '' : 'bad',
-      );
-    }
-    if (doc.captureExt !== undefined) {
-      for (const line of captureDetails(doc.captureExt)) add(line, '');
-    }
-    add(INTEGRITY_NOT_AUTHENTICITY, '');
-
-    // Status bar (design "app shell 4A"): anchors · content hash · verdict —
-    // the same verdict as the badge, never a second opinion.
-    try {
-      const hashes = JSON.parse(
-        dec.decode(doc.pkg.files.get('integrity/hashes.json') ?? new Uint8Array()),
-      ) as { files?: Record<string, string> };
-      const entryHash = hashes.files?.[doc.pkg.manifest.entry];
-      const short =
-        entryHash === undefined ? '' : ` · sha-256 ${entryHash.slice(0, 4)}…${entryHash.slice(-4)}`;
-      const verdict = result.verified ? 'verified locally' : text.label.toUpperCase();
-      setStatus(`${String(doc.outline.length)} anchors${short} · ${verdict}`);
-    } catch {
-      /* status bar is informational — never block on it */
-    }
-    // Bound tables (§6.5) are marked as typed data only on a verified package.
-    datasetsOk = result.verified;
-    postToHuman({ type: 'wdf-datasets', ok: datasetsOk });
-  } catch (e) {
-    setBadgeState('warn', STATUS_TEXT['not-verifiable'].label);
-    add(`Verification failed to run: ${String(e)}`, 'bad');
+  if ('error' in shownVerdict) {
+    setBadgeState('warn', m.status['not-verifiable'].label);
+    add(m.verificationCrashed(shownVerdict.error), 'bad');
     datasetsOk = false;
+    return;
   }
+  const { result } = shownVerdict;
+  const text = m.status[result.status];
+  const state: 'ok' | 'bad' | 'warn' = result.verified
+    ? 'ok'
+    : result.status === 'unsupported-version' || result.status === 'not-verifiable'
+      ? 'warn'
+      : 'bad';
+  setBadgeState(state, text.label);
+  add(`${text.label}: ${text.detail}`, result.verified ? 'ok' : 'bad');
+  add(result.integrity ? m.integrityOk : m.integrityFailed, result.integrity ? 'ok' : 'bad');
+  add(
+    result.determinism ? m.determinismOk : m.determinismFailed,
+    result.determinism ? 'ok' : 'bad',
+  );
+  add(
+    result.conformance ? m.conformanceOk : m.conformanceFailed,
+    result.conformance ? 'ok' : 'bad',
+  );
+  // Validator messages stay in English: they cite the spec (plan §10.81).
+  for (const v of result.violations) {
+    add(
+      `[${v.spec}] ${v.severity === 'warning' ? m.warning : ''}${v.path} — ${v.message}`,
+      v.severity === 'warning' ? '' : 'bad',
+    );
+  }
+  if (doc.captureExt !== undefined) {
+    for (const line of captureDetails(doc.captureExt, lang())) add(line, '');
+  }
+  add(m.notAuthenticity, '');
+
+  // Status bar (design "app shell 4A"): anchors · content hash · verdict —
+  // the same verdict as the badge, never a second opinion.
+  try {
+    const hashes = JSON.parse(
+      dec.decode(doc.pkg.files.get('integrity/hashes.json') ?? new Uint8Array()),
+    ) as { files?: Record<string, string> };
+    const entryHash = hashes.files?.[doc.pkg.manifest.entry];
+    const short =
+      entryHash === undefined ? '' : ` · sha-256 ${entryHash.slice(0, 4)}…${entryHash.slice(-4)}`;
+    const verdict = result.verified ? m.verifiedLocally : text.label.toUpperCase();
+    setStatus(`${m.anchors(doc.outline.length)}${short} · ${verdict}`);
+  } catch {
+    /* status bar is informational — never block on it */
+  }
+  // Bound tables (§6.5) are marked as typed data only on a verified package.
+  datasetsOk = result.verified;
+  postToHuman({ type: 'wdf-datasets', ok: datasetsOk });
+}
+
+function paintCaptureNote(doc: Loaded): void {
+  const note = $('capture-note');
+  note.hidden = doc.captureExt === undefined;
+  note.textContent = doc.captureExt === undefined ? '' : captureNote(doc.captureExt, lang());
 }
 
 // ---------------------------------------------------------------------------
@@ -695,7 +969,7 @@ async function copyCitation(id: string, button?: HTMLElement): Promise<void> {
       }, 900);
     }
   } catch {
-    window.prompt('Copy citation:', text);
+    window.prompt(msg().copyCitationPrompt, text);
   }
 }
 
@@ -727,7 +1001,9 @@ function setView(view: 'human' | 'agent' | 'original'): void {
   if (view === 'original' && originalIsBinary && visualPdf === 'idle' && loaded !== undefined) {
     void ensureVisualPdf(loaded);
   }
-  const pdfReady = originalIsBinary && visualPdf === 'ready';
+  const pdfReady = originalIsBinary && (visualPdf === 'ready' || visualPdf === 'native');
+  $('original-pdf-pages').hidden = visualPdf !== 'ready';
+  $('original-pdf-native').hidden = visualPdf !== 'native';
   $('human').hidden = view !== 'human';
   $('agent').hidden = view !== 'agent';
   $('original').hidden = view !== 'original' || originalIsBinary;
@@ -747,10 +1023,34 @@ function setView(view: 'human' | 'agent' | 'original'): void {
   if (view === 'agent' && selectedId !== undefined) select(selectedId, 'outline');
 }
 
-function init(): void {
-  const dropCard = $('drop-card');
-  const fileInput = $('file-input') as HTMLInputElement;
+// A language change (plan §10.81) repaints what the code wrote; the shell's
+// own texts are handled by i18n.ts.
+function repaintTexts(): void {
+  paintZone('read');
+  paintZone('convert');
+  if (!$('convert-panel').hidden) renderConvertReport(shownReport);
+  if ($('convert-download-error').hidden === false)
+    $('convert-download-error').textContent = msg().noTemplate;
+  if (loaded === undefined) return;
+  paintCaptureNote(loaded);
+  paintPdfTitle();
+  paintPdfMeta();
+  renderReport(loaded); // rebuilt hidden: show it again where it belongs
+  $('original-report').hidden = currentView !== 'original' || !reportAvailable;
+  for (const cite of $('outline').querySelectorAll<HTMLElement>('[data-cite]')) {
+    cite.title = msg().copyCitationFor(cite.dataset['cite'] ?? '');
+  }
+  if (shownVerdict === undefined) {
+    setStatus(msg().anchors(loaded.outline.length));
+    setBadgeState('wait', msg().checking);
+  } else {
+    paintVerdict();
+  }
+}
 
+function init(): void {
+  initLang();
+  onLangChange(repaintTexts);
   // Reader-only typography (plan §10.62): IBM Plex loads lazily from the
   // deployment (plex.css + woff2, precached by the SW). The standalone never
   // injects it and falls back to the system stacks — the single-file rule
@@ -762,50 +1062,77 @@ function init(): void {
     document.head.appendChild(plex);
   }
 
-  // Keyboard access for the drop zone (it is a <label>, not a button).
-  const dropZone = document.querySelector<HTMLElement>('.dropzone');
-  dropZone?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      fileInput.click();
-    }
-  });
-
-  fileInput.addEventListener('change', () => {
-    const files = fileInput.files;
-    if (files !== null && files.length > 0) {
-      void fileListToMap(files).then(handleDropped);
-    }
-  });
-  for (const eventName of ['dragover', 'dragenter'] as const) {
-    dropCard.addEventListener(eventName, (e) => {
-      e.preventDefault();
-      dropCard.classList.add('dragover');
+  // No page-wide drop target (plan §10.80): only the two cards take files. A
+  // file dropped anywhere else must not make the browser navigate to it.
+  const isFileDrag = (e: DragEvent): boolean => e.dataTransfer?.types.includes('Files') === true;
+  for (const eventName of ['dragover', 'drop'] as const) {
+    window.addEventListener(eventName, (e) => {
+      if (isFileDrag(e)) e.preventDefault();
     });
   }
-  dropCard.addEventListener('dragleave', () => {
-    dropCard.classList.remove('dragover');
-  });
-  dropCard.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropCard.classList.remove('dragover');
-    const dt = e.dataTransfer;
-    if (dt === null) return;
-    // webkitGetAsEntry must be taken synchronously, before the event ends;
-    // it is the only way to receive dropped folders (Word's _files/.fld).
-    const entries = [...dt.items].map(entryOf).filter((en) => en !== null);
-    if (entries.length > 0) {
-      void (async () => {
-        const map = new Map<string, Uint8Array>();
-        for (const entry of entries) await readEntry(entry, '', map);
-        await handleDropped(map);
-      })();
-    } else {
-      void fileListToMap(dt.files).then(handleDropped);
-    }
-  });
+  for (const zone of ['read', 'convert'] as const) {
+    const el = zoneEl(zone);
+    const input = $(zone === 'read' ? 'file-input-read' : 'file-input') as HTMLInputElement;
+    // The whole card is the mouse target; its "choose" button is the keyboard
+    // target (Enter/Space click it natively) and its click bubbles here.
+    el.addEventListener('click', (e) => {
+      const target = e.target as Element;
+      if (target === input || target.closest('[role="alert"], [role="status"]') !== null) return;
+      if (el.dataset['state'] === 'working') return;
+      input.click();
+    });
+    input.addEventListener('change', () => {
+      const files = input.files;
+      if (files !== null && files.length > 0) {
+        void fileListToMap(files).then((map) => handleDropped(map, zone));
+      }
+      input.value = ''; // choosing the same file again still fires change
+    });
+    // Child elements fire their own enter/leave: count the depth, and give
+    // the card back the state it had (a notice, an error) when the drag leaves.
+    let depth = 0;
+    let rest = 'idle';
+    el.addEventListener('dragenter', (e) => {
+      if (!isFileDrag(e) || el.dataset['state'] === 'working') return;
+      e.preventDefault();
+      if (depth++ === 0) rest = el.dataset['state'] ?? 'idle';
+      el.dataset['state'] = 'over';
+    });
+    el.addEventListener('dragover', (e) => {
+      if (!isFileDrag(e) || el.dataset['state'] === 'working') return;
+      e.preventDefault();
+      if (e.dataTransfer !== null) e.dataTransfer.dropEffect = 'copy';
+    });
+    el.addEventListener('dragleave', () => {
+      if (depth === 0) return;
+      if (--depth === 0 && el.dataset['state'] === 'over') el.dataset['state'] = rest;
+    });
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      depth = 0;
+      if (el.dataset['state'] === 'working') return;
+      el.dataset['state'] = rest;
+      const dt = e.dataTransfer;
+      if (dt === null) return;
+      // webkitGetAsEntry must be taken synchronously, before the event ends;
+      // it is the only way to receive dropped folders (Word's _files/.fld).
+      const entries = [...dt.items].map(entryOf).filter((en) => en !== null);
+      if (entries.length > 0) {
+        void (async () => {
+          const map = new Map<string, Uint8Array>();
+          for (const entry of entries) await readEntry(entry, '', map);
+          await handleDropped(map, zone);
+        })();
+      } else {
+        void fileListToMap(dt.files).then((map) => handleDropped(map, zone));
+      }
+    });
+  }
   $('convert-open').addEventListener('click', () => {
-    if (convertedBytes !== undefined) openBytes(convertedBytes, convertedName);
+    if (converted !== undefined) openBytes(converted.bytes, converted.fileName, 'convert');
+  });
+  $('convert-download').addEventListener('click', () => {
+    void downloadConverted();
   });
   $('convert-source').addEventListener('change', () => {
     void runConvert();
@@ -903,9 +1230,10 @@ function init(): void {
     void navigator.serviceWorker.register('sw.js').catch(() => undefined);
   }
   // Install prompt (plan §10.69): Chrome/Edge fire `beforeinstallprompt` when
-  // the app is installable. Only then do the Install buttons (home + toolbar)
-  // appear; they go away on install, and never show inside the installed app
-  // or on browsers without the event (nothing to explain there).
+  // the app is installable. The toolbar button appears only then. The home
+  // button is always there (plan §10.80): without a pending prompt it says
+  // how to install instead — the event never comes when the Reader is
+  // already installed, nor on browsers that cannot install it.
   interface InstallPromptEvent extends Event {
     prompt(): Promise<void>;
     userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
@@ -916,9 +1244,26 @@ function init(): void {
   const runningAsApp =
     matchMedia('(display-mode: standalone)').matches ||
     (navigator as { standalone?: boolean }).standalone === true;
+  // Home cell: data-install unavailable | available | installed (viewer.css);
+  // the toolbar button simply shows or hides.
+  const installCell = document.getElementById('install-cell');
   const showInstall = (on: boolean): void => {
-    for (const button of installButtons) button.hidden = !on;
+    const toolbar = document.getElementById('install-app');
+    if (toolbar !== null) toolbar.hidden = !on;
+    if (installCell !== null) installCell.dataset['install'] = on ? 'available' : 'unavailable';
   };
+  if (runningAsApp && installCell !== null) installCell.dataset['install'] = 'installed';
+  const canInstall = 'onbeforeinstallprompt' in window;
+  if (canInstall) installCell?.querySelector('.when-unavailable')?.remove();
+  const installHelp = document.getElementById('install-help');
+  const explainInstall = (): void => {
+    if (installHelp === null) return;
+    installHelp.textContent = canInstall ? msg().installHere : msg().installElsewhere;
+    installHelp.hidden = false;
+  };
+  onLangChange(() => {
+    if (installHelp !== null && !installHelp.hidden) explainInstall();
+  });
   let installPrompt: InstallPromptEvent | null = null;
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
@@ -928,7 +1273,11 @@ function init(): void {
   for (const button of installButtons) {
     button.addEventListener('click', () => {
       const pending = installPrompt;
-      if (pending === null) return;
+      if (pending === null) {
+        explainInstall();
+        return;
+      }
+      if (installHelp !== null) installHelp.hidden = true;
       installPrompt = null;
       showInstall(false);
       void pending
@@ -940,8 +1289,7 @@ function init(): void {
   window.addEventListener('appinstalled', () => {
     installPrompt = null;
     showInstall(false);
-    document.getElementById('install-body')?.setAttribute('hidden', '');
-    document.getElementById('install-done')?.removeAttribute('hidden');
+    if (installCell !== null) installCell.dataset['install'] = 'installed';
   });
   interface LaunchParamsLike {
     files?: FileSystemHandle[];
@@ -986,7 +1334,7 @@ function init(): void {
         openBytes(new Uint8Array(buf), doc);
       })
       .catch((e: unknown) => {
-        showDropError(`cannot load ${doc}: ${String(e)}`);
+        setZone('read', 'error', () => ({ title: msg().openFailed, body: `${doc}: ${String(e)}` }));
       });
   }
 }

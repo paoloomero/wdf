@@ -1,4 +1,5 @@
 import { mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -6,7 +7,8 @@ import { readPackage } from '@wdf-dev/core';
 import { describe, expect, it } from 'vitest';
 
 import { cmdImport, type Ctx } from '../../cli/src/commands.js';
-import { convertFiles, mapAssetLoader, pickMainFile } from '../src/convert.js';
+import { hasViewerTemplate } from '../../cli/src/lib/build.js';
+import { convertFiles, mapAssetLoader, pickMainFile, toStandalone } from '../src/convert.js';
 
 // T7.6 acceptance (plan §10.24): the Reader's converter runs the same
 // isomorphic pipeline as the CLI over an in-memory map of the dropped files
@@ -258,4 +260,65 @@ describe('author PDF rendition on drop (ext-source 0.5, WP21)', () => {
       'PDF not attached: 2 PDF files dropped and none is named delibera.pdf',
     );
   });
+});
+
+describe('.wdf.html from the Reader (spec §9, plan §10.80)', () => {
+  it('embeds the package and the escaped title in the template, like every producer', async () => {
+    const files = mapOf(['word-headings-it.html']);
+    const result = await convertFiles(files, { date: DATE });
+    expect(result).toBeDefined();
+    if (result === undefined) return;
+    const template =
+      '<title>__WDF_TITLE__</title><script id="wdf-package">__WDF_PACKAGE_BASE64__</script>';
+    const html = toStandalone(template, result);
+    const b64 = /<script id="wdf-package">([^<]*)<\/script>/.exec(html)?.[1] ?? '';
+    expect(new Uint8Array(Buffer.from(b64, 'base64'))).toEqual(new Uint8Array(result.wdfBytes));
+    expect(html.startsWith(`<title>${result.title.replace(/&/g, '&amp;')}</title>`)).toBe(true);
+  });
+
+  // Needs the built template (dist/standalone.html), which `wdf import
+  // --standalone` reads too; CI builds after testing, so locally only.
+  it.runIf(hasViewerTemplate())(
+    'is byte-identical to wdf import --standalone (docx + PDF, source included)',
+    async () => {
+      const { makeDocx, W_NS } = await import('../../import/test/docx-fixtures.js');
+      const document =
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        `<w:document xmlns:w="${W_NS}"><w:body>` +
+        '<w:p><w:r><w:t>Delibera &amp; allegati.</w:t></w:r></w:p>' +
+        '</w:body></w:document>';
+      const docx = makeDocx({ document });
+      const pdf = new TextEncoder().encode('%PDF-1.4\n1 0 obj\nendobj\n%%EOF\n');
+      const files = new Map([
+        ['delibera.docx', docx],
+        ['stampa.pdf', pdf],
+      ]);
+      const result = await convertFiles(files, { withSource: true, date: DATE });
+      expect(result?.visualName).toBe('stampa.pdf');
+      if (result === undefined) return;
+      const require = createRequire(import.meta.url);
+      const template = readFileSync(require.resolve('@wdf-dev/viewer/standalone.html'), 'utf8');
+
+      const dir = mkdtempSync(join(tmpdir(), 'wdf-standalone-par-'));
+      writeFileSync(join(dir, 'delibera.docx'), docx);
+      writeFileSync(join(dir, 'stampa.pdf'), pdf);
+      const out = join(dir, 'delibera.wdf');
+      expect(
+        await cmdImport(
+          join(dir, 'delibera.docx'),
+          {
+            output: out,
+            date: DATE,
+            withSource: true,
+            withPdf: join(dir, 'stampa.pdf'),
+            standalone: true,
+          },
+          silent(),
+        ),
+      ).toBe(0);
+      expect(toStandalone(template, result)).toBe(
+        readFileSync(join(dir, 'delibera.wdf.html'), 'utf8'),
+      );
+    },
+  );
 });

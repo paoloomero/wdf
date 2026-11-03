@@ -1,3 +1,4 @@
+import { bytesToBase64, fillStandalone } from '@wdf-dev/core';
 import {
   decodeHtml,
   DEFAULT_CAPS,
@@ -210,4 +211,17 @@ export async function convertFiles(
         fileName: `${baseName}.wdf`,
         ...(visualName !== undefined && { visualName }),
       };
+}
+
+/**
+ * The sendable single file (spec §9) for a conversion: the viewer's standalone
+ * template with the package embedded — the same filler as `wdf import
+ * --standalone` and the browser extension (plan §10.80), so the same input
+ * yields the same `.wdf.html` byte for byte.
+ */
+export function toStandalone(
+  template: string,
+  converted: Pick<Converted, 'title' | 'wdfBytes'>,
+): string {
+  return fillStandalone(template, converted.title, bytesToBase64(converted.wdfBytes));
 }

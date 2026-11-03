@@ -30,116 +30,380 @@
             </svg>
             <span class="brand__name">WDF Reader &amp; Converter</span>
           </div>
-          <span class="topbar__meta">v1 · local only</span>
+          <div class="topbar__end">
+            <span class="topbar__meta" data-i18n="home.meta">v1 · local only</span>
+            <div
+              class="lang-switch"
+              role="group"
+              aria-label="Language"
+              data-i18n-aria-label="home.lang"
+            >
+              <button type="button" data-lang="en" lang="en" aria-pressed="true">EN</button
+              ><button type="button" data-lang="it" lang="it" aria-pressed="false">IT</button>
+            </div>
+          </div>
         </header>
 
         <section class="hero">
-          <svg class="hero__icon" viewBox="0 0 64 64" role="img" aria-label="WDF document format">
-            <rect x="0" y="0" width="64" height="64" rx="13" fill="#ffffff"></rect>
-            <path d="M0 13A13 13 0 0 1 13 0h38a13 13 0 0 1 13 13v21H0Z" fill="#101418"></path>
-            <g fill="#ffffff">
-              <rect x="12" y="12" width="7" height="14" rx="3.5"></rect>
-              <rect x="24" y="12" width="7" height="14" rx="3.5"></rect>
-            </g>
-            <g fill="#101418">
-              <rect x="12" y="42" width="40" height="6" rx="3"></rect>
-              <rect x="12" y="52" width="24" height="6" rx="3"></rect>
-            </g>
-          </svg>
-          <h1 class="hero__title">Read it. Convert it.</h1>
-          <p class="hero__lede">
-            <strong>Web Document Format</strong>: what the human reads and what an AI agent reads
-            are the same thing — verifiably.
+          <h1 class="hero__title" data-i18n="home.title">Read it.<br />Convert it.</h1>
+          <p class="hero__lede" data-i18n="home.lede">
+            <strong>Web Document Format</strong>: in a single shareable file: (1) accessible
+            <b>HTML</b>, (2) a <b>Markdown</b> version for AI agents, and (3) a <b>PDF</b> for
+            reading and printing. What humans read and what AI agents read are the same thing —
+            verifiably.
           </p>
         </section>
 
-        <!-- Drop zone: the whole band is the click target for the file input -->
-        <label class="dropzone" tabindex="0" aria-label="Drop files here or click to choose">
-          <div>
-            <p class="dropzone__title">Drop files here</p>
-            <p class="dropzone__action">or click to choose</p>
-          </div>
-          <p class="dropzone__note">
-            <svg class="icon icon--lock" viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="4.5" y="10.5" width="15" height="10" rx="2.5"></rect>
-              <path d="M8.2 10.5V7.6a3.8 3.8 0 0 1 7.6 0v2.9"></path>
-            </svg>
-            <span>Everything happens in your browser — no upload, no network requests.</span>
-          </p>
-          <p id="drop-error" class="drop-error" hidden></p>
-          <input class="visually-hidden" id="file-input" type="file" multiple />
-        </label>
+        <!-- Two zones (plan §10.80, handoff "wdf_home_v2"): each card is its own
+             drop target and mouse target; the "choose" button is the keyboard
+             target. State lives in data-state: idle | over | working | error |
+             notice. Files are routed by type whichever card receives them. -->
+        <div class="zones">
+          <section
+            class="zone zone--read"
+            id="zone-read"
+            data-zone="read"
+            data-state="idle"
+            aria-labelledby="read-zone-title"
+          >
+            <div class="zone__inner">
+              <p class="eyebrow zone__eyebrow" data-i18n="read.eyebrow">Read</p>
+              <h2 class="zone__title" id="read-zone-title" data-i18n="read.title">Open a WDF</h2>
+              <ul class="chips" aria-label="Accepted files" data-i18n-aria-label="read.accepted">
+                <li class="chip"><code>.wdf</code></li>
+              </ul>
 
-        <div id="convert-panel" hidden>
-          <h2 id="convert-title"></h2>
-          <p class="convert-privacy">
-            Converted entirely in your browser — the document never left your machine.
-          </p>
-          <p id="convert-visual" class="convert-privacy" hidden></p>
-          <div id="convert-actions">
-            <button id="convert-open" class="btn btn--primary">Open in Reader</button>
-            <a id="convert-download" class="btn">Download .wdf</a>
-          </div>
-          <label class="convert-option">
-            <input type="checkbox" id="convert-source" checked />
-            Include the original source (adds the Original view)
-          </label>
-          <details id="convert-notes">
-            <summary>Conversion report</summary>
-            <ul id="convert-report"></ul>
-          </details>
+              <p class="zone__action when-idle">
+                <span class="t-drop" data-i18n="read.drop">Drop it here, or </span
+                ><button class="choose" type="button">
+                  <span class="t-drop" data-i18n="read.choose">choose a file</span
+                  ><span class="t-tap" data-i18n="read.tap">Choose a .wdf</span>
+                </button>
+              </p>
+              <p class="zone__action zone__action--over when-over" data-i18n="read.over">
+                Release to open
+              </p>
+              <div class="zone__working when-working">
+                <p class="zone__action">
+                  <span data-i18n="read.working">Opening</span>
+                  <code class="js-working-name"></code>…
+                </p>
+                <p class="zone__meta" data-i18n="read.meta">Reading the package.</p>
+                <span class="bar" aria-hidden="true"></span>
+              </div>
+
+              <div role="status" aria-live="polite">
+                <p class="notice">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 4v8.5h12.5"></path>
+                    <path d="M14 8.8l3.7 3.7-3.7 3.7"></path>
+                  </svg>
+                  <span class="js-notice"></span>
+                </p>
+              </div>
+              <div role="alert">
+                <div class="alert" id="read-error">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="8.6"></circle>
+                    <path d="M12 7.6v5.4"></path>
+                    <path d="M12 16.2v.2" stroke-width="2.4"></path>
+                  </svg>
+                  <p class="alert__title js-error-title"></p>
+                  <p class="alert__body js-error-body"></p>
+                </div>
+              </div>
+
+              <p class="zone__privacy">
+                <span class="sq" aria-hidden="true"></span
+                ><span data-i18n="privacy"
+                  >Everything happens in your browser — no upload, no network requests.</span
+                >
+              </p>
+            </div>
+            <input
+              class="visually-hidden"
+              id="file-input-read"
+              type="file"
+              accept=".wdf"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+          </section>
+
+          <section
+            class="zone zone--convert"
+            id="zone-convert"
+            data-zone="convert"
+            data-state="idle"
+            aria-labelledby="convert-zone-title"
+          >
+            <div class="zone__inner">
+              <p class="eyebrow zone__eyebrow" data-i18n="convert.eyebrow">Convert</p>
+              <h2 class="zone__title" id="convert-zone-title" data-i18n="convert.title">
+                Make a WDF
+              </h2>
+              <ol class="ways" aria-label="Four ways in" data-i18n-aria-label="convert.ways">
+                <li class="way">
+                  <span class="way__num">1</span>
+                  <div>
+                    <p class="way__formula">
+                      <code>.docx</code><span aria-hidden="true">→</span
+                      ><code class="tok--out">.wdf</code>
+                    </p>
+                    <p class="way__desc" data-i18n="convert.way1">A Word file becomes a WDF.</p>
+                  </div>
+                </li>
+                <li class="way">
+                  <span class="way__num">2</span>
+                  <div>
+                    <p class="way__formula">
+                      <code>.docx</code>+<code>.pdf</code><span aria-hidden="true">→</span
+                      ><code class="tok--out">.wdf</code>
+                    </p>
+                    <p class="way__desc" data-i18n="convert.way2">
+                      The PDF saved from Word travels inside. The WDF also shows the original PDF in
+                      the reader.
+                    </p>
+                  </div>
+                </li>
+                <li class="way">
+                  <span class="way__num">3</span>
+                  <div>
+                    <p class="way__formula">
+                      <code>.html</code>+<span class="way__plain" data-i18n="convert.images"
+                        >images folder</span
+                      ><span aria-hidden="true">→</span><code class="tok--out">.wdf</code>
+                    </p>
+                    <p class="way__desc" data-i18n="convert.way3">
+                      Word’s “Save as web page” output.
+                    </p>
+                  </div>
+                </li>
+                <li class="way">
+                  <span class="way__num">4</span>
+                  <div>
+                    <p class="way__formula">
+                      <code>.md</code><span aria-hidden="true">→</span
+                      ><code class="tok--out">.wdf</code>
+                    </p>
+                    <p class="way__desc" data-i18n="convert.way4">A Markdown file.</p>
+                  </div>
+                </li>
+              </ol>
+
+              <p class="zone__action when-idle">
+                <span class="t-drop" data-i18n="convert.drop">Drop files or a folder here, or </span
+                ><button class="choose" type="button">
+                  <span class="t-drop" data-i18n="convert.choose">choose files</span
+                  ><span class="t-tap" data-i18n="convert.tap">Choose files to convert</span>
+                </button>
+              </p>
+              <p class="zone__action zone__action--over when-over" data-i18n="convert.over">
+                Release to convert
+              </p>
+              <div class="zone__working when-working">
+                <p class="zone__action">
+                  <span data-i18n="convert.working">Converting</span>
+                  <code class="js-working-name"></code>…
+                </p>
+                <p class="zone__meta" data-i18n="convert.meta">
+                  Large Word files can take a few seconds.
+                </p>
+                <span class="bar" aria-hidden="true"></span>
+              </div>
+
+              <div role="status" aria-live="polite">
+                <p class="notice">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 4v8.5h12.5"></path>
+                    <path d="M14 8.8l3.7 3.7-3.7 3.7"></path>
+                  </svg>
+                  <span class="js-notice"></span>
+                </p>
+              </div>
+              <div role="alert">
+                <div class="alert" id="drop-error">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="8.6"></circle>
+                    <path d="M12 7.6v5.4"></path>
+                    <path d="M12 16.2v.2" stroke-width="2.4"></path>
+                  </svg>
+                  <p class="alert__title js-error-title"></p>
+                  <p class="alert__body js-error-body"></p>
+                </div>
+              </div>
+
+              <p class="zone__privacy">
+                <span class="sq" aria-hidden="true"></span
+                ><span data-i18n="privacy"
+                  >Everything happens in your browser — no upload, no network requests.</span
+                >
+              </p>
+            </div>
+            <input
+              class="visually-hidden"
+              id="file-input"
+              type="file"
+              multiple
+              accept=".docx,.pdf,.html,.htm,.md,.markdown,.wdf,image/*"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+          </section>
         </div>
 
-        <div class="modes">
-          <section class="mode mode--read">
-            <h2 class="eyebrow">Read</h2>
-            <p class="mode__lead"><code>.wdf</code><br />opens verified</p>
-            <p class="mode__body">
-              with the Human, Agent and Original views — the same document, three readings.
+        <!-- Result of a conversion. .has-pdf: a PDF is attached (notice, file
+             line, .wdf.html limitation); .pdf-dropped: a PDF was among the
+             files. The format radios drive the download label via :has(). -->
+        <section class="result" id="convert-panel" aria-labelledby="convert-title" hidden>
+          <div class="result__head">
+            <p class="eyebrow" data-i18n="result.eyebrow">Converted</p>
+            <h2 class="result__title" id="convert-title">
+              <span id="convert-doc-title"></span>
+              <span class="result__arrow" aria-hidden="true">→</span>
+              <code id="convert-base"></code>
+            </h2>
+            <p class="result__from">
+              <span data-i18n="result.from">from</span> <code id="convert-from"></code
+              ><span class="pdf-only"> + <code class="js-pdf-name"></code></span>
             </p>
-          </section>
+          </div>
 
-          <section class="mode mode--create">
-            <h2 class="eyebrow">Create — three ways in</h2>
-            <ol class="ways">
-              <li class="way">
-                <span class="way__num">1</span>
-                <div class="way__body">
-                  <p class="way__formula"><code>.docx</code>→<code class="tok--out">.wdf</code></p>
-                  <p class="way__desc">A Word file becomes a WDF.</p>
-                </div>
-              </li>
-              <li class="way">
-                <span class="way__num">2</span>
-                <div class="way__body">
-                  <p class="way__formula">
-                    <code>.docx</code>+<code>.pdf</code>→<code class="tok--out">.wdf</code>
-                  </p>
-                  <p class="way__desc">
-                    The PDF saved from Word travels inside. The WDF also shows the original PDF in
-                    the reader.
-                  </p>
-                </div>
-              </li>
-              <li class="way">
-                <span class="way__num">3</span>
-                <div class="way__body">
-                  <p class="way__formula">
-                    <code>.html</code>+<span class="way__plain">images folder</span>→<code
-                      class="tok--out"
-                      >.wdf</code
-                    >
-                  </p>
-                  <p class="way__desc">Word’s “Save as web page” output.</p>
-                </div>
-              </li>
-            </ol>
-          </section>
-        </div>
+          <div class="pdfnote" role="note">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.4 3.5h7.2L18.2 8v12.5H6.4z"></path>
+              <path d="M13.4 3.6V8h4.6"></path>
+              <path d="M9 16.6v-4.4h1.6a1.3 1.3 0 0 1 0 2.6H9"></path>
+              <path d="M13.4 16.6v-4.4h1.2a1.4 1.4 0 0 1 1.4 1.5v1.4a1.4 1.4 0 0 1-1.4 1.5z"></path>
+            </svg>
+            <span class="tag tag--ink" data-i18n="result.pdfTag">PDF not checked</span>
+            <p class="pdfnote__text">
+              <span data-i18n="result.pdfA">The PDF</span> <code class="js-pdf-name"></code>
+              <span data-i18n="result.pdfB"
+                >is attached as-is and is not compared with the document — make sure it is the print
+                of this one.</span
+              >
+            </p>
+          </div>
+
+          <fieldset class="formats">
+            <legend class="eyebrow formats__legend" data-i18n="result.formats">
+              Format to download
+            </legend>
+            <div class="formats__grid">
+              <label class="format">
+                <input type="radio" name="convert-format" value="wdf.html" checked /><span
+                  class="box box--radio"
+                  aria-hidden="true"
+                ></span>
+                <span class="format__name"
+                  >.wdf.html
+                  <span class="tag tag--line" data-i18n="result.recommended"
+                    >Recommended</span
+                  ></span
+                >
+                <span class="format__lead" data-i18n="result.htmlLead">Send it to anyone.</span>
+                <span class="format__desc" data-i18n="result.htmlDesc"
+                  >Opens in any browser, with the reader built in. One file, works offline.</span
+                >
+                <span class="format__limit">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="8.6"></circle>
+                    <path d="M12 11v5.4"></path>
+                    <path d="M12 7.8v.2" stroke-width="2.4"></path>
+                  </svg>
+                  <span data-i18n="result.htmlLimit"
+                    >In the .wdf.html the PDF is offered as a download; the installed Reader shows
+                    it as pages.</span
+                  >
+                </span>
+              </label>
+              <label class="format">
+                <input type="radio" name="convert-format" value="wdf" /><span
+                  class="box box--radio"
+                  aria-hidden="true"
+                ></span>
+                <span class="format__name">.wdf</span>
+                <span class="format__lead" data-i18n="result.wdfLead"
+                  >For the WDF Reader and AI agents.</span
+                >
+                <span class="format__desc" data-i18n="result.wdfDesc"
+                  >The package format: smaller, opens in the installed Reader, readable by agents
+                  through MCP.</span
+                >
+              </label>
+            </div>
+          </fieldset>
+
+          <label class="option">
+            <input type="checkbox" id="convert-source" checked /><span
+              class="box box--check"
+              aria-hidden="true"
+            ></span>
+            <span
+              ><span class="option__label" data-i18n="result.source"
+                >Include the original source</span
+              >
+              <span class="option__hint" data-i18n="result.sourceHint"
+                >(adds the Original view<span class="pdf-dropped-only"> and carries the PDF</span
+                >)</span
+              ></span
+            >
+          </label>
+
+          <div class="actions">
+            <button class="btn btn--primary" type="button" id="convert-download">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3.5v11.5M7.2 10.4 12 15.2l4.8-4.8"></path>
+                <path d="M4.5 19.5h15"></path>
+              </svg>
+              <span
+                ><span data-i18n="result.download">Download</span>
+                <code class="fmt-html" id="convert-name-html"></code
+                ><code class="fmt-wdf" id="convert-name-wdf"></code
+              ></span>
+            </button>
+            <button class="btn" type="button" id="convert-open">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 2.8h8.2L19 7.6v13.6H6z"></path>
+                <path d="M14 2.9v4.9h4.9"></path>
+                <path d="M8.8 12.4h7.4M8.8 15.4h7.4"></path>
+              </svg>
+              <span data-i18n="result.open">Open in Reader</span>
+            </button>
+          </div>
+          <div role="alert">
+            <p class="result__error" id="convert-download-error" hidden></p>
+          </div>
+
+          <details class="report" id="convert-report">
+            <summary class="report__summary">
+              <svg class="icon report__chev" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 5l7 7-7 7"></path>
+              </svg>
+              <span data-i18n="result.report">Conversion report</span>
+              <span class="report__counts"
+                ><span class="tag tag--ink" id="convert-count-changes"></span
+                ><span class="tag tag--line" id="convert-count-notes"></span
+              ></span>
+            </summary>
+            <div
+              class="report__body"
+              tabindex="0"
+              aria-label="Conversion report notes"
+              data-i18n-aria-label="result.reportNotes"
+            >
+              <p class="eyebrow report__group" id="convert-changes-head"></p>
+              <ul class="notes" id="convert-notes"></ul>
+              <p class="eyebrow report__group" id="convert-info-head"></p>
+              <ul class="notes" id="convert-info"></ul>
+            </div>
+          </details>
+        </section>
 
         <footer class="foot">
           <section class="foot__cell">
-            <p class="foot__text">
+            <p class="foot__text" data-i18n="foot.extension">
               Saving web pages? Get the <strong class="mark">browser extension</strong> — one click
               turns any page into a WDF.
             </p>
@@ -150,13 +414,7 @@
                 target="_blank"
                 rel="noopener"
               >
-                <svg
-                  class="icon"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                  fill="currentColor"
-                  stroke="none"
-                >
+                <svg class="icon icon--fill" viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     fill-rule="evenodd"
                     clip-rule="evenodd"
@@ -165,45 +423,59 @@
                 </svg>
                 <span>Chrome</span>
               </a>
-              <span class="btn" aria-disabled="true">
-                <svg
-                  class="icon"
-                  viewBox="0 0 1000 1000"
-                  aria-hidden="true"
-                  fill="currentColor"
-                  stroke="none"
-                >
+              <a
+                class="btn"
+                href="https://addons.mozilla.org/firefox/addon/wdf-save-as-wdf/"
+                target="_blank"
+                rel="noopener"
+              >
+                <svg class="icon icon--fill" viewBox="0 0 1000 1000" aria-hidden="true">
                   <path
                     d="M504.048 987.288c-215.78 0 -386.89 -126.3 -465.782 -306.357 -87.697 -200.147 -17.683 -521.252 138.959 -662.986l-6.097 156.546c8.164 -9.882 67.73 -12.561 77.453 .105 31.885 -61.772 136.332 -108.113 220.25 -109.595 -31.945 26.522 -105.735 124.029 -99.119 174.06 40.665 12.516 103.146 13.079 135.984 15.301 9.958 5.477 8.399 39.996 -11.841 67.826 -26.407 36.313 -97.068 49.037 -97.068 49.037l8.255 105.653 -77.525 -37.466c-25.128 63.237 35.209 119.914 97.917 109.186 68.926 -11.793 93.463 -56.786 141.913 -53.975 48.451 2.812 67.447 29.354 61.052 54.574 -7.578 29.891 -59.923 25.082 -59.923 25.082 -43.82 69.865 -102.32 100.261 -197.361 92.19 144.26 119.076 338.109 10.923 387.239 -86.49 49.13 -97.413 6.431 -241.501 -43.041 -282.588 58.224 24.922 98.508 50.963 119.421 107.063 11.498 -124.9 -46.205 -266.608 -148.991 -349.612 193.178 56.003 311.039 205.701 314.342 444.666 3.304 238.964 -211.469 487.779 -496.037 487.779z"
                   ></path>
                 </svg>
                 <span>Firefox</span>
-              </span>
+              </a>
             </div>
           </section>
 
           <section class="foot__cell" id="install-hint">
-            <div class="install">
+            <!-- data-install: unavailable (no browser prompt) | available | installed -->
+            <div class="install" id="install-cell" data-install="unavailable">
               <svg class="icon icon--lg" viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="2.5" y="4" width="19" height="12.5" rx="1.8"></rect>
                 <path d="M8.5 20h7M12 16.5V20"></path>
                 <path d="M12 7.4v5.4M9.4 10.2 12 12.8l2.6-2.6"></path>
               </svg>
-              <div>
-                <p class="install__title">Install the Reader as an app</p>
+              <div class="install__text">
+                <p class="install__title" data-i18n="foot.installTitle">
+                  Install the <strong class="mark">Reader as an app</strong>
+                </p>
                 <p class="install__body" id="install-body">
-                  Then <code>.wdf</code> files open with a double click — offline, like any document
-                  reader. Chrome and Edge; on other browsers, drag files here.
+                  <span class="when-unavailable" data-i18n="foot.installWhere"
+                    >Available in Chrome and Edge. </span
+                  ><span data-i18n="foot.installBody"
+                    >Then <code>.wdf</code> files open with a double click — offline, like any
+                    reader.</span
+                  >
                 </p>
-                <p class="install__body" id="install-done" hidden>
-                  Installed. Next time you double-click a <code>.wdf</code>, the system asks once
-                  whether to open it with WDF Reader — say yes, and that is the last time it asks.
+                <p class="install__done" id="install-done" role="status">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 12.5l5 5 11-11"></path>
+                  </svg>
+                  <span data-i18n="foot.installDone"
+                    >Installed. The first time you double-click a <code>.wdf</code>, the system asks
+                    once whether to open it with WDF Reader — say yes.</span
+                  >
                 </p>
-                <div class="btnrow">
-                  <button id="install-home" class="btn btn--primary" type="button" hidden>
-                    Install the Reader
-                  </button>
-                </div>
+                <button class="btn" type="button" id="install-home">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3.5v11.5M7.2 10.4 12 15.2l4.8-4.8"></path>
+                    <path d="M4.5 19.5h15"></path>
+                  </svg>
+                  <span data-i18n="install">Install</span>
+                </button>
+                <p class="install__help" id="install-help" role="status" hidden></p>
               </div>
             </div>
           </section>
@@ -219,6 +491,8 @@
             class="iconbtn"
             title="Toggle anchors panel"
             aria-label="Toggle anchors panel"
+            data-i18n-title="app.sidebar"
+            data-i18n-aria-label="app.sidebar"
           >
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
               <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"></rect>
@@ -239,65 +513,91 @@
             </g>
           </svg>
           <h1 id="doc-title" class="doc-title"></h1>
-          <button id="badge" class="chipv chipv--wait" title="Verification details">
+          <button
+            id="badge"
+            class="chipv chipv--wait"
+            title="Verification details"
+            data-i18n-title="app.badge"
+          >
             <span id="badge-icon" aria-hidden="true">…</span>
             <span id="badge-label">checking…</span>
           </button>
           <span id="capture-note" hidden></span>
         </div>
         <div class="toolbar__right">
-          <nav id="view-toggle" class="segmented" role="tablist" aria-label="Reading mode">
-            <button id="view-human" class="seg active" title="Human view — the rendered document">
+          <nav
+            id="view-toggle"
+            class="segmented"
+            role="tablist"
+            aria-label="Reading mode"
+            data-i18n-aria-label="app.modes"
+          >
+            <button
+              id="view-human"
+              class="seg active"
+              title="Human view — the rendered document"
+              data-i18n-title="app.humanTitle"
+            >
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="8" r="3.4"></circle>
                 <path d="M5.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"></path>
               </svg>
-              <span class="seg__label">Human</span>
+              <span class="seg__label" data-i18n="app.human">Human</span>
             </button>
             <button
               id="view-agent"
               class="seg"
               title="Agent view — the canonical machine-readable derivation"
+              data-i18n-title="app.agentTitle"
             >
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 3.2v2.6"></path>
                 <rect x="4.6" y="5.8" width="14.8" height="11.4" rx="2.6"></rect>
                 <path d="M9 10.6v2.2M15 10.6v2.2M8.4 20.6h7.2"></path>
               </svg>
-              <span class="seg__label">Agent</span>
+              <span class="seg__label" data-i18n="app.agent">Agent</span>
             </button>
             <button
               id="view-original"
               class="seg"
               hidden
               title="The embedded original source (extension: source)"
+              data-i18n-title="app.originalTitle"
+              data-i18n="app.original"
             >
               Original
             </button>
           </nav>
           <span class="sep"></span>
-          <nav id="doc-actions" class="tools" aria-label="Document actions">
+          <nav
+            id="doc-actions"
+            class="tools"
+            aria-label="Document actions"
+            data-i18n-aria-label="app.actions"
+          >
             <button
               id="paged-toggle"
               class="tool"
               title="Paper view: paginated A4 preview with repeating header/footer (the exported PDF is the reference layout)"
+              data-i18n-title="app.paperTitle"
             >
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M6.5 3.5h11v5.6h-11z"></path>
                 <path d="M6.5 14.9h11v5.6h-11z"></path>
                 <path d="M3 12h3.2M9.4 12h1.8M14.4 12h1.8M19.2 12H21"></path>
               </svg>
-              <span>Paper</span>
+              <span data-i18n="app.paper">Paper</span>
             </button>
             <button
               id="plain-toggle"
               class="tool"
               title="Plain view: render without the author's stylesheet (spec §6.7.4) — what the semantic HTML carries by itself"
+              data-i18n-title="app.plainTitle"
             >
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M5 5.5h14M5 10h14M5 14.5h9M5 19h6"></path>
               </svg>
-              <span>Plain</span>
+              <span data-i18n="app.plain">Plain</span>
             </button>
             <button id="pdf-export" class="tool" title="Print / export as PDF (browser print, A4)">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -315,15 +615,26 @@
               class="tool tool--install"
               hidden
               title="Install the WDF Reader as an app: .wdf files then open with a double click, offline"
+              data-i18n-title="app.installTitle"
             >
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="2.5" y="4" width="19" height="12.5" rx="1.8"></rect>
                 <path d="M8.5 20h7M12 16.5V20"></path>
                 <path d="M12 7.4v5.4M9.4 10.2 12 12.8l2.6-2.6"></path>
               </svg>
-              <span>Install</span>
+              <span data-i18n="install">Install</span>
             </button>
           </nav>
+          <span class="sep sep--lang"></span>
+          <div
+            class="lang-switch"
+            role="group"
+            aria-label="Language"
+            data-i18n-aria-label="home.lang"
+          >
+            <button type="button" data-lang="en" lang="en" aria-pressed="true">EN</button
+            ><button type="button" data-lang="it" lang="it" aria-pressed="false">IT</button>
+          </div>
         </div>
       </header>
 
@@ -332,6 +643,7 @@
         class="popover"
         role="dialog"
         aria-label="Verification details"
+        data-i18n-aria-label="app.badge"
         hidden
       >
         <div class="popover__head" id="details-head">
@@ -339,7 +651,7 @@
         </div>
         <div class="popover__body">
           <ul id="details-list"></ul>
-          <button id="details-close">Close</button>
+          <button id="details-close" data-i18n="app.close">Close</button>
         </div>
       </div>
 
@@ -356,57 +668,104 @@
                 id="outline-search"
                 placeholder="Search anchors"
                 aria-label="Search anchors"
+                data-i18n-placeholder="app.search"
+                data-i18n-aria-label="app.search"
               />
             </label>
           </div>
           <div class="sidebar__head">
-            <span class="eyebrow">Anchors</span>
+            <span class="eyebrow" data-i18n="app.anchors">Anchors</span>
             <span class="count" id="anchor-count"></span>
           </div>
-          <nav id="outline" class="anchors" aria-label="Document outline"></nav>
+          <nav
+            id="outline"
+            class="anchors"
+            aria-label="Document outline"
+            data-i18n-aria-label="app.outline"
+          ></nav>
         </aside>
         <main id="content">
-          <iframe id="human" sandbox="allow-scripts" title="Document"></iframe>
+          <iframe
+            id="human"
+            sandbox="allow-scripts"
+            title="Document"
+            data-i18n-title="app.document"
+          ></iframe>
           <div id="agent" hidden></div>
           <details id="original-report" class="report" hidden>
             <summary id="original-report-summary"></summary>
             <ul id="original-report-list"></ul>
           </details>
-          <iframe id="original" sandbox="" title="Original source" hidden></iframe>
+          <iframe
+            id="original"
+            sandbox=""
+            title="Original source"
+            data-i18n-title="app.originalFrame"
+            hidden
+          ></iframe>
           <div id="original-binary" hidden>
             <div class="binary-card">
               <p id="original-binary-name"></p>
               <p id="original-binary-meta"></p>
-              <p>
+              <p data-i18n="app.binary">
                 The embedded original is a binary file — nothing to render. Download it to open it
                 in its native application (the bytes come from the package; no network involved).
               </p>
-              <a id="original-binary-download" class="button">Download original</a>
+              <a id="original-binary-download" class="button" data-i18n="app.downloadOriginal"
+                >Download original</a
+              >
             </div>
             <div id="original-visual" class="binary-card" hidden>
               <p id="original-visual-name"></p>
               <p id="original-visual-meta"></p>
-              <p>
+              <p data-i18n="app.visual">
                 The author also saved a PDF rendition of this document — the page image frozen by
                 the original application (ext-source 0.5). It is included as-is: the package proves
                 its bytes are unchanged, not that it matches the canonical content.
               </p>
-              <a id="original-visual-download" class="button">Download PDF</a>
-              <p id="original-visual-hint" hidden>
+              <a id="original-visual-download" class="button" data-i18n="app.downloadPdf"
+                >Download PDF</a
+              >
+              <p id="original-visual-hint" data-i18n="app.visualHint" hidden>
                 For an identical page view of the PDF rendition, open this document in the
                 installable WDF Reader (https://wdf.dev).
               </p>
             </div>
           </div>
+          <!-- The author's PDF on view (plan §10.82): PDF.js pages in the Reader,
+               the browser's own PDF viewer in the standalone; both files to
+               download above it. -->
           <div id="original-pdf" hidden>
             <div id="original-pdf-bar">
-              <span id="original-pdf-name"></span>
+              <span id="original-pdf-name" data-i18n="app.pdfLabel">PDF saved by the author</span>
               <span id="original-pdf-meta"></span>
-              <a id="original-pdf-download">Download PDF</a>
+              <span class="original-pdf-links">
+                <a
+                  id="original-pdf-download"
+                  title="Download PDF"
+                  data-i18n-title="app.downloadPdf"
+                ></a>
+                <a
+                  id="original-source-download"
+                  title="Download original"
+                  data-i18n-title="app.downloadOriginal"
+                ></a>
+              </span>
             </div>
             <div id="original-pdf-pages"></div>
+            <iframe
+              id="original-pdf-native"
+              title="PDF saved by the author"
+              data-i18n-title="app.pdfLabel"
+              hidden
+            ></iframe>
           </div>
-          <iframe id="print-frame" sandbox="allow-same-origin allow-modals" title="Print"></iframe>
+          <iframe
+            id="print-frame"
+            sandbox="allow-same-origin allow-modals"
+            title="Print"
+            data-i18n-title="app.print"
+          ></iframe>
         </main>
       </div>
 
@@ -417,7 +776,7 @@
 
       <div id="chip" hidden>
         <code id="chip-id"></code>
-        <button id="chip-copy">Copy citation</button>
+        <button id="chip-copy" data-i18n="app.copyCitation">Copy citation</button>
       </div>
     </div>
 

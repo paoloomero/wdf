@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
+import { fillStandalone } from '@wdf-dev/core';
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -28,11 +30,7 @@ function loadViewerTemplate(): string | undefined {
 export function makeStandalone(wdfBytes: Uint8Array, title: string): string {
   const b64 = Buffer.from(wdfBytes).toString('base64');
   const template = loadViewerTemplate();
-  if (template !== undefined) {
-    return template
-      .replaceAll('__WDF_TITLE__', () => escapeHtml(title))
-      .replace('__WDF_PACKAGE_BASE64__', () => b64);
-  }
+  if (template !== undefined) return fillStandalone(template, title, b64);
   return `<!doctype html>
 <html lang="en">
   <head>

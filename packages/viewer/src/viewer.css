@@ -34,11 +34,21 @@ code {
   font-size: 0.92em;
 }
 
-/* Entry page (home redesign, plan §10.62 — design handoff "WDF Page 2c").
-   Tokens and layout ported from the approved reference; the .page element is
-   a container query container, so the bands reflow on their own width. */
+/* Entry page (home redesign, plan §10.62; Read and Convert separated, plan
+   §10.80 — design handoff "wdf_home_v2"). Identity of "WDF Page 2c": Plex
+   Sans/Mono, ink on paper, signal yellow, radius 0. The .page element is a
+   container query container, so everything reflows on its own width. Every
+   rule is scoped to #drop-screen: the home shares generic class names
+   (.report, .btn, .icon, .tag) with the app shell below. State lives in
+   attributes, written by main.ts:
+     .zone[data-state]      idle | over | working | error | notice
+     #convert-panel[hidden] conversion result shown / not
+     .result.has-pdf        a PDF is attached; .pdf-dropped: a PDF was dropped
+     .install[data-install] unavailable | available | installed
+   The format choice drives the download label through :has(), no script. */
 :root {
   --ink: #101215;
+  --ink-80: rgba(16, 18, 21, 0.8);
   --ink-70: rgba(16, 18, 21, 0.7);
   --ink-60: rgba(16, 18, 21, 0.6);
   --ink-50: rgba(16, 18, 21, 0.5);
@@ -54,6 +64,15 @@ code {
 }
 
 #drop-screen {
+  /* Home-only token values (handoff v2): numerals pass AA on paper, a
+     slightly stronger secondary ink; the app shell keeps the :root ones. */
+  --ink-60: rgba(16, 18, 21, 0.62);
+  --ink-wash: rgba(16, 18, 21, 0.055);
+  --white: #ffffff;
+  --signal-over: oklch(0.77 0.17 92);
+  --signal-ink: oklch(0.5 0.11 88);
+  --ink-hover: #2b2f36;
+  --focus: 3px solid var(--ink);
   min-height: 100%;
   background: var(--paper);
   color: var(--ink);
@@ -61,9 +80,22 @@ code {
   text-wrap: pretty;
   -webkit-font-smoothing: antialiased;
 }
+#drop-screen a {
+  color: var(--ink);
+  text-decoration: none;
+}
 #drop-screen code {
   font-family: var(--font-mono);
   font-size: inherit;
+}
+#drop-screen button,
+#drop-screen input {
+  font: inherit;
+  color: inherit;
+}
+#drop-screen :focus-visible {
+  outline: var(--focus);
+  outline-offset: 3px;
 }
 .visually-hidden {
   position: absolute;
@@ -76,29 +108,55 @@ code {
   white-space: nowrap;
   border: 0;
 }
-.page {
+#drop-screen .page {
   container-type: inline-size;
   width: 100%;
   min-height: 100%;
 }
-.page .icon {
+#drop-screen .icon {
   width: 18px;
   height: 18px;
   flex: none;
-}
-.icon--lock,
-.icon--lg {
   fill: none;
-  stroke: var(--ink);
+  stroke: currentColor;
   stroke-width: 1.8;
 }
-.icon--lock {
-  margin-top: 2px;
+#drop-screen .icon--lg {
+  width: 30px;
+  height: 30px;
+  stroke-width: 1.5;
 }
-.icon--lg {
-  width: 34px;
-  height: 34px;
-  stroke-width: 1.6;
+/* Brand marks are filled shapes, not strokes. */
+#drop-screen .icon--fill {
+  fill: currentColor;
+  stroke: none;
+}
+#drop-screen .eyebrow {
+  margin: 0;
+  font: 600 11px/1 var(--font-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-60);
+}
+#drop-screen .tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 6px;
+  font: 600 10px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+#drop-screen .tag--ink {
+  background: var(--ink);
+  color: var(--white);
+}
+#drop-screen .tag--line {
+  border: 1px solid var(--ink-rule);
+  color: var(--ink-70);
+}
+#drop-screen .tag:empty {
+  display: none;
 }
 
 /* top bar */
@@ -131,303 +189,833 @@ code {
   color: var(--ink-60);
 }
 
-/* hero */
-.hero {
-  padding: clamp(28px, 4.8cqw, 52px) var(--pad-x) clamp(28px, 4.4cqw, 48px);
-  border-bottom: var(--rule);
+/* Language switch (plan §10.81): EN | IT, in the home bar and the toolbar. */
+.topbar__end {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
-.hero__icon {
-  display: block;
-  width: clamp(40px, 5.9cqw, 64px);
-  height: clamp(40px, 5.9cqw, 64px);
-  margin-bottom: clamp(16px, 2.4cqw, 26px);
+.lang-switch {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  overflow: hidden;
 }
-.hero__title {
+.lang-switch button {
+  min-width: 30px;
+  padding: 3px 7px;
+  background: transparent;
+  border: 0;
+  font: 500 11px/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  color: inherit;
+  cursor: pointer;
+}
+.lang-switch button + button {
+  border-left: 1px solid currentColor;
+}
+.lang-switch button[aria-pressed='true'] {
+  background: var(--signal, #e6c000);
+  color: var(--ink, #101418);
+  font-weight: 600;
+}
+.lang-switch button:focus-visible {
+  outline: 2px solid var(--focus, currentColor);
+  outline-offset: -2px;
+}
+#app .lang-switch {
+  color: var(--ink-3);
+  border-color: var(--line-c);
+}
+#app .lang-switch button + button {
+  border-left-color: var(--line-c);
+}
+
+/* hero: title left, lede right */
+#drop-screen .hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 20px clamp(24px, 4cqw, 48px);
+  padding: clamp(26px, 3.6cqw, 40px) var(--pad-x) clamp(22px, 2.8cqw, 32px);
+}
+#drop-screen .hero__title {
   margin: 0;
-  max-width: 13ch;
-  font: 600 clamp(34px, 8.6cqw, 92px) / 0.94 var(--font-sans);
+  font: 600 clamp(38px, 6.6cqw, 72px) / 0.92 var(--font-sans);
   letter-spacing: -0.045em;
 }
-.hero__lede {
-  margin: clamp(16px, 2.6cqw, 28px) 0 0;
-  max-width: 60ch;
-  font: 400 clamp(15px, 1.7cqw, 18px) / 1.55 var(--font-sans);
-  color: rgba(16, 18, 21, 0.66);
+#drop-screen .hero__lede {
+  margin: 0;
+  max-width: 44ch;
+  font: 400 clamp(15px, 1.75cqw, 19px) / 1.5 var(--font-sans);
+  color: var(--ink-80);
 }
-.hero__lede strong {
+#drop-screen .hero__lede strong {
   font-weight: 600;
   color: var(--ink);
 }
 
-/* drop zone — the whole yellow band is the target; the page-level dragover
-   (set on #drop-card by main.ts) arms it too, so dropping anywhere works */
-.dropzone {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: clamp(20px, 3.7cqw, 40px);
-  flex-wrap: wrap;
-  padding: clamp(28px, 4.8cqw, 52px) var(--pad-x);
-  background: var(--signal);
+/* zones: two framed cards, each its own drop target */
+#drop-screen .zones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(16px, 2.4cqw, 28px);
+  padding: 0 var(--pad-x) clamp(28px, 3.6cqw, 40px);
   border-bottom: var(--rule);
+}
+#drop-screen .zone {
+  position: relative;
+  min-width: 0;
   cursor: pointer;
-  transition: background 180ms ease;
+  transition: background 150ms ease;
 }
-.dropzone:hover,
-.dropzone:focus-visible,
-.page.dragover .dropzone {
+/* Read: yellow, single dashed frame (yellow means reading) */
+#drop-screen .zone--read {
+  background: var(--signal);
+  border: 2px dashed var(--ink);
+}
+#drop-screen .zone--read:hover {
   background: var(--signal-hover);
-  outline: none;
 }
-.page.dragover .dropzone {
-  box-shadow: inset 0 0 0 3px var(--ink);
+#drop-screen .zone--read .zone__inner {
+  padding: clamp(24px, 3.2cqw, 40px) clamp(22px, 3.2cqw, 40px);
 }
-.dropzone__title {
-  margin: 0;
-  font: 600 clamp(26px, 4.1cqw, 44px) / 1.05 var(--font-sans);
+/* Convert: near-white, solid ink frame around a dashed one (ink = making a WDF) */
+#drop-screen .zone--convert {
+  background: #f9f9f7;
+  border: 4px solid var(--ink);
+  padding: 6px;
+}
+#drop-screen .zone--convert:hover {
+  background: var(--white);
+}
+#drop-screen .zone--convert .zone__inner {
+  border: 2px dashed var(--ink);
+  padding: clamp(18px, 2.6cqw, 34px) clamp(16px, 2.6cqw, 34px);
+  height: 100%;
+}
+#drop-screen .zone__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#drop-screen .zone__eyebrow {
+  color: inherit;
+  font-weight: 500;
+  font-size: 12px;
+}
+#drop-screen .zone__title {
+  margin: -4px 0 4px;
+  font: 600 clamp(28px, 3.9cqw, 44px) / 1.02 var(--font-sans);
   letter-spacing: -0.035em;
 }
-.dropzone__action {
-  margin: 9px 0 0;
-  font: 600 clamp(13px, 1.4cqw, 15px) var(--font-mono);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-.dropzone__note {
-  margin: 0;
-  max-width: 32ch;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font: 400 clamp(12px, 1.25cqw, 13px) / 1.6 var(--font-mono);
-  color: rgba(16, 18, 21, 0.72);
-}
-.drop-error {
-  flex-basis: 100%;
-  margin: 0;
-  font: 500 clamp(12px, 1.3cqw, 13.5px) / 1.6 var(--font-mono);
-  color: #7a1400;
-  white-space: pre-wrap;
-}
-
-/* converter result (T7.6) as its own band */
-#convert-panel {
-  padding: clamp(22px, 2.9cqw, 32px) var(--pad-x);
-  border-bottom: var(--rule);
-}
-#convert-panel h2 {
-  margin: 0 0 4px;
-  font: 600 clamp(18px, 2.2cqw, 24px) / 1.2 var(--font-sans);
-  letter-spacing: -0.03em;
-  overflow-wrap: anywhere;
-}
-.convert-privacy {
-  margin: 0 0 14px;
-  font: 400 clamp(12px, 1.25cqw, 13px) / 1.6 var(--font-mono);
-  color: var(--ink-60);
-}
-#convert-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.convert-option {
-  display: block;
-  margin-top: 14px;
-  font: 400 13.5px var(--font-sans);
-  color: var(--ink-70);
-  cursor: pointer;
-}
-#convert-notes summary {
-  font: 400 12.5px var(--font-mono);
-  color: var(--ink-50);
-  cursor: pointer;
-  margin-top: 12px;
-}
-#convert-report {
-  margin: 8px 0 0;
-  padding-left: 1.1rem;
-  font: 400 12.5px / 1.6 var(--font-mono);
-  color: var(--ink-60);
-  max-height: 11rem;
-  overflow: auto;
-}
-#convert-report li {
-  margin: 0.15rem 0;
-}
-
-/* read / create */
-.modes {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  border-bottom: var(--rule);
-}
-.mode {
-  padding: clamp(22px, 2.9cqw, 32px) var(--pad-x);
-}
-.mode--read {
-  border-bottom: var(--rule);
-}
-.mode--create {
-  grid-column: span 2;
-}
-.eyebrow {
-  margin: 0;
-  font: 600 11px var(--font-mono);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-50);
-}
-.mode__lead {
-  margin: 18px 0 0;
-  font: 600 clamp(20px, 2.4cqw, 26px) / 1.15 var(--font-sans);
-  letter-spacing: -0.03em;
-}
-.mode__lead code {
-  font: 600 clamp(17px, 2cqw, 22px) var(--font-mono);
-}
-.mode__body {
-  margin: 12px 0 0;
-  max-width: 36ch;
-  font: 400 clamp(13.5px, 1.35cqw, 14.5px) / 1.6 var(--font-sans);
-  color: var(--ink-60);
-}
-.ways {
+#drop-screen .chips {
   list-style: none;
-  margin: 6px 0 0;
+  margin: 0;
   padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#drop-screen .chip {
+  padding: 6px 10px;
+  border: 1.5px solid var(--ink);
+  font: 400 clamp(13px, 1.5cqw, 16px) / 1.2 var(--font-mono);
+  white-space: nowrap;
+}
+
+/* Convert: the 2c "ways in" recipes */
+#drop-screen .ways {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#drop-screen .way {
   display: grid;
-  grid-template-columns: clamp(28px, 3.4cqw, 44px) 1fr;
+  grid-template-columns: clamp(28px, 3.4cqw, 44px) minmax(0, 1fr);
   gap: 0 clamp(12px, 1.7cqw, 18px);
 }
-.way {
-  display: grid;
-  grid-template-columns: subgrid;
-  grid-column: span 2;
-}
-.way__num {
-  padding-top: 18px;
-  font: 600 clamp(18px, 2cqw, 22px) var(--font-sans);
+#drop-screen .way__num {
+  padding-top: 14px;
+  font: 600 clamp(18px, 2cqw, 22px) / 1.2 var(--font-sans);
   color: var(--signal-ink);
 }
-.way__body {
-  padding: 18px 0;
+#drop-screen .way > div {
+  padding: 14px 0;
   border-bottom: 1px solid var(--ink-rule);
 }
-.way:last-child .way__body {
+#drop-screen .way:last-child > div {
   border-bottom: 0;
 }
-.way__formula {
+#drop-screen .way__formula {
   margin: 0;
   display: flex;
   align-items: center;
   gap: 9px;
   flex-wrap: wrap;
-  font: 500 clamp(13.5px, 1.4cqw, 15px) var(--font-mono);
+  font: 500 clamp(13.5px, 1.4cqw, 15px) / 1.4 var(--font-mono);
 }
-.way__plain {
+#drop-screen .way__plain {
   font-family: var(--font-sans);
   font-weight: 400;
   color: var(--ink-60);
 }
-.tok--out {
+#drop-screen .tok--out {
   background: var(--ink);
-  color: #fff;
+  color: var(--white);
   padding: 2px 7px;
 }
-.way__desc {
-  margin: 7px 0 0;
+#drop-screen .way__desc {
+  margin: 6px 0 0;
   font: 400 clamp(13px, 1.3cqw, 14px) / 1.5 var(--font-sans);
   color: var(--ink-60);
 }
-.way__desc strong {
+
+#drop-screen .zone__action {
+  margin: 6px 0 0;
+  font: 400 clamp(15px, 1.6cqw, 17px) / 1.45 var(--font-sans);
+}
+#drop-screen .zone__action code {
+  font: 500 0.92em var(--font-mono);
+  overflow-wrap: anywhere;
+}
+#drop-screen .zone__action--over {
   font-weight: 600;
+}
+#drop-screen .choose {
+  padding: 0;
+  background: none;
+  border: 0;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+#drop-screen .choose:focus-visible {
+  outline-offset: 4px;
+}
+#drop-screen .t-tap {
+  display: none;
+}
+#drop-screen .zone__privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding-top: 20px;
+  border-top: 1.5px dashed var(--ink);
+  font: 400 clamp(12.5px, 1.35cqw, 14.5px) / 1.55 var(--font-mono);
+  max-width: 48ch;
+}
+#drop-screen .sq {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  margin-top: 0.35em;
+  background: var(--ink);
+}
+
+/* state-dependent content */
+#drop-screen .when-over,
+#drop-screen .when-working,
+#drop-screen .zone[data-state='over'] .when-idle,
+#drop-screen .zone[data-state='working'] .when-idle {
+  display: none;
+}
+#drop-screen .zone[data-state='over'] .when-over,
+#drop-screen .zone[data-state='working'] .when-working {
+  display: block;
+}
+
+/* over: only the card under the pointer changes; frames go solid */
+#drop-screen .zone--read[data-state='over'] {
+  background: var(--signal-over);
+  border-style: solid;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+#drop-screen .zone--convert[data-state='over'] {
+  background: var(--ink);
+  color: var(--white);
+}
+#drop-screen .zone--convert[data-state='over'] .zone__inner {
+  border-style: solid;
+  border-color: var(--white);
+}
+#drop-screen .zone--convert[data-state='over'] .way__num,
+#drop-screen .zone--convert[data-state='over'] .way__plain,
+#drop-screen .zone--convert[data-state='over'] .way__desc {
+  color: var(--white);
+}
+#drop-screen .zone--convert[data-state='over'] .tok--out {
+  background: var(--white);
   color: var(--ink);
+}
+#drop-screen .zone--convert[data-state='over'] .way > div {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+#drop-screen .zone--convert[data-state='over'] .zone__privacy {
+  border-top-color: var(--white);
+}
+#drop-screen .zone--convert[data-state='over'] .sq {
+  background: var(--white);
+}
+
+/* working */
+#drop-screen .zone[data-state='working'] {
+  cursor: progress;
+}
+#drop-screen .zone__meta {
+  margin: 4px 0 12px;
+  font: 400 12.5px/1.4 var(--font-mono);
+  color: var(--ink-70);
+}
+#drop-screen .bar {
+  display: block;
+  position: relative;
+  height: 4px;
+  background: var(--ink-rule);
+  overflow: hidden;
+}
+#drop-screen .bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 34%;
+  background: var(--ink);
+  animation: wdf-bar 1.3s ease-in-out infinite;
+}
+@keyframes wdf-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #drop-screen .bar::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+/* error: in the card that received the files */
+#drop-screen .alert {
+  display: none;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  padding: 14px 16px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  cursor: auto;
+}
+#drop-screen .zone[data-state='error'] .alert {
+  display: grid;
+}
+#drop-screen .alert .icon {
+  grid-row: span 2;
+  margin-top: 1px;
+}
+#drop-screen .alert__title {
+  margin: 0;
+  font: 600 15px/1.35 var(--font-sans);
+}
+#drop-screen .alert__body {
+  margin: 0;
+  font: 400 13.5px/1.5 var(--font-sans);
+  color: var(--ink-70);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* wrong-zone notice: the file was handled anyway, one calm line says how */
+#drop-screen .notice {
+  display: none;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--ink-wash);
+  font: 500 14px/1.45 var(--font-sans);
+  cursor: auto;
+}
+#drop-screen .zone[data-state='notice'] .notice {
+  display: flex;
+}
+#drop-screen .notice .icon {
+  margin-top: 1px;
+}
+
+/* result of a conversion */
+#drop-screen .result {
+  display: grid;
+  gap: clamp(18px, 2.2cqw, 24px);
+  padding: clamp(24px, 3.4cqw, 38px) var(--pad-x);
+  border-bottom: var(--rule);
+}
+#drop-screen .result__head {
+  display: grid;
+  gap: 10px;
+}
+#drop-screen .result__title {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  font: 600 clamp(22px, 2.8cqw, 30px) / 1.15 var(--font-sans);
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+#drop-screen .result__arrow {
+  font-weight: 400;
+  color: var(--ink-60);
+}
+#drop-screen .result__title code {
+  font: 500 0.66em var(--font-mono);
+  letter-spacing: 0;
+}
+#drop-screen .result__from {
+  margin: 0;
+  font: 400 12.5px/1.5 var(--font-mono);
+  color: var(--ink-60);
+  overflow-wrap: anywhere;
+}
+#drop-screen .result__from code {
+  color: var(--ink);
+}
+#drop-screen .pdf-only,
+#drop-screen .pdf-dropped-only {
+  display: none;
+}
+#drop-screen .result.has-pdf .pdf-only,
+#drop-screen .result.pdf-dropped .pdf-dropped-only {
+  display: revert;
+}
+#drop-screen .result__error {
+  margin: 0;
+  font: 500 13.5px/1.5 var(--font-sans);
+}
+
+/* PDF responsibility notice: calm, but the heaviest thing on the panel */
+#drop-screen .pdfnote {
+  display: none;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 14px;
+  padding: 16px 18px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+}
+#drop-screen .result.has-pdf .pdfnote {
+  display: grid;
+}
+#drop-screen .pdfnote .icon {
+  width: 26px;
+  height: 26px;
+  stroke-width: 1.5;
+  grid-row: span 2;
+}
+#drop-screen .pdfnote .tag {
+  justify-self: start;
+}
+#drop-screen .pdfnote__text {
+  margin: 0;
+  max-width: 70ch;
+  font: 500 clamp(15px, 1.6cqw, 16.5px) / 1.5 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+#drop-screen .pdfnote__text code {
+  font-weight: 600;
+}
+
+/* format choice: two equal radio cards, .wdf.html preselected */
+#drop-screen .formats {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+#drop-screen .formats__legend {
+  padding: 0;
+  margin-bottom: 10px;
+}
+#drop-screen .formats__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+#drop-screen .format {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 6px 12px;
+  align-content: start;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--ink-rule);
+  cursor: pointer;
+}
+#drop-screen .format:hover {
+  border-color: var(--ink);
+}
+#drop-screen .format:has(input:checked) {
+  background: var(--white);
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+#drop-screen .format:has(input:focus-visible) {
+  outline: var(--focus);
+  outline-offset: 3px;
+}
+/* The native input stays focusable but invisible; the mark is drawn on the
+   sibling .box (Firefox renders no ::before on <input>). */
+#drop-screen .format input,
+#drop-screen .option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+#drop-screen .box {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border: 1.5px solid var(--ink);
+  background: var(--white);
+  display: grid;
+  place-content: center;
+}
+#drop-screen .box--radio::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: var(--ink);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+#drop-screen input:checked + .box--radio::before {
+  transform: scale(1);
+}
+#drop-screen .box--check::before {
+  content: '';
+  width: 11px;
+  height: 6px;
+  border-left: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transition: transform 120ms ease;
+}
+#drop-screen input:checked + .box--check::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+#drop-screen .option:has(input:focus-visible) .box {
+  outline: var(--focus);
+  outline-offset: 3px;
+}
+#drop-screen .format__name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font: 600 16px/1.3 var(--font-mono);
+}
+#drop-screen .format__lead,
+#drop-screen .format__desc,
+#drop-screen .format__limit {
+  grid-column: 2;
+}
+#drop-screen .format__lead {
+  font: 600 15px/1.35 var(--font-sans);
+}
+#drop-screen .format__desc {
+  font: 400 13.5px/1.5 var(--font-sans);
+  color: var(--ink-70);
+}
+#drop-screen .format__limit {
+  display: none;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ink-rule);
+  font: 500 13px/1.5 var(--font-sans);
+}
+#drop-screen .format__limit .icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+#drop-screen .result.has-pdf .format:has(input[value='wdf.html']:checked) .format__limit {
+  display: flex;
+}
+
+#drop-screen .option {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  font: 400 14.5px/1.45 var(--font-sans);
+}
+#drop-screen .option .box {
+  margin-top: 1px;
+}
+#drop-screen .option__label {
+  font-weight: 500;
+}
+#drop-screen .option__hint {
+  color: var(--ink-60);
+}
+
+/* actions: one download button that follows the choice */
+#drop-screen .actions,
+#drop-screen .btnrow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+#drop-screen .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  font: 600 14px/1.25 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+#drop-screen .btn:hover {
+  background: var(--signal);
+}
+#drop-screen .btn--primary {
+  background: var(--ink);
+  color: var(--white);
+}
+#drop-screen .btn--primary:hover {
+  background: var(--ink-hover);
+  color: var(--white);
+}
+#drop-screen .btn--primary code {
+  font: 500 13px/1.25 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+#drop-screen .btn:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+#drop-screen .btnrow .icon {
+  width: 20px;
+  height: 20px;
+}
+#drop-screen .fmt-wdf,
+#drop-screen .result:has(input[value='wdf']:checked) .fmt-html {
+  display: none;
+}
+#drop-screen .result:has(input[value='wdf']:checked) .fmt-wdf {
+  display: revert;
+}
+
+/* conversion report: dropped/changed first, counts visible while collapsed */
+#drop-screen .report {
+  border-top: var(--rule);
+}
+#drop-screen .report__summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 0;
+  list-style: none;
+  cursor: pointer;
+  font: 600 14.5px/1.3 var(--font-sans);
+}
+#drop-screen .report__summary::-webkit-details-marker {
+  display: none;
+}
+#drop-screen .report__chev {
+  width: 14px;
+  height: 14px;
+  transition: transform 150ms ease;
+}
+#drop-screen .report[open] .report__chev {
+  transform: rotate(90deg);
+}
+#drop-screen .report__counts {
+  display: flex;
+  gap: 8px;
+  font-weight: 400;
+}
+#drop-screen .report__body {
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid var(--ink-rule);
+  background: var(--white);
+}
+#drop-screen .report__group {
+  position: sticky;
+  top: 0;
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--white);
+  border-bottom: 1px solid var(--ink-rule);
+}
+#drop-screen .notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#drop-screen .note {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--ink-rule);
+  font: 400 13.5px/1.5 var(--font-sans);
+  color: var(--ink-70);
+  overflow-wrap: anywhere;
+}
+#drop-screen .notes:last-child .note:last-child {
+  border-bottom: 0;
+}
+#drop-screen .note .tag {
+  justify-self: start;
+}
+#drop-screen .note--change {
+  color: var(--ink);
+  font-weight: 500;
 }
 
 /* footer */
-.foot {
+#drop-screen .foot {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.foot__cell {
+#drop-screen .foot__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
   padding: clamp(22px, 2.7cqw, 30px) var(--pad-x) clamp(26px, 3.3cqw, 36px);
 }
-.foot__cell:first-child {
-  border-bottom: 1px solid var(--ink-rule);
+#drop-screen .foot__cell:first-child {
+  border-right: var(--rule);
 }
-.foot__text {
+#drop-screen .foot__text {
   margin: 0;
-  max-width: 38ch;
+  max-width: 40ch;
   font: 400 clamp(15px, 1.6cqw, 17px) / 1.5 var(--font-sans);
 }
-.mark {
+#drop-screen .mark {
   font-weight: 600;
   background: var(--signal);
   padding: 0 4px;
 }
-.btnrow {
-  margin-top: 18px;
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 16px;
-  border: 1px solid var(--ink);
-  background: var(--paper);
-  color: var(--ink);
-  font: 600 13.5px var(--font-sans);
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-.btn:hover {
-  background: var(--signal);
-}
-.btn--primary {
-  background: var(--ink);
-  color: #fff;
-}
-.btn--primary:hover {
-  background: var(--ink);
-  color: #fff;
-  opacity: 0.85;
-}
-.btn .icon {
-  width: 20px;
-  height: 20px;
-}
-.install {
+#drop-screen .install {
   display: flex;
   gap: 14px;
   align-items: flex-start;
 }
-.install__title {
+#drop-screen .install__text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+#drop-screen .install__title {
   margin: 0;
-  font: 600 15px var(--font-sans);
+  font: 600 15px/1.35 var(--font-sans);
 }
-.install__body {
-  margin: 8px 0 0;
-  font: 400 12.5px / 1.6 var(--font-mono);
-  color: rgba(16, 18, 21, 0.55);
+#drop-screen .install__body {
+  margin: 0;
+  max-width: 46ch;
+  font: 400 12.5px/1.6 var(--font-mono);
+  color: var(--ink-70);
 }
-.install .btnrow {
-  margin-top: 12px;
+#drop-screen .install__done {
+  display: none;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  max-width: 46ch;
+  font: 500 13.5px/1.5 var(--font-sans);
 }
-.install .btnrow:has(> [hidden]) {
+#drop-screen .install .btn {
+  margin-top: 6px;
+}
+#drop-screen .install__help {
+  margin: 0;
+  max-width: 46ch;
+  font: 500 13.5px/1.5 var(--font-sans);
+}
+#drop-screen .install[data-install='installed'] #install-home,
+#drop-screen .install[data-install='installed'] #install-body,
+#drop-screen .when-unavailable {
   display: none;
 }
-@container (max-width: 600px) {
-  .mode--create {
-    grid-column: span 1;
+#drop-screen .install[data-install='installed'] .install__done {
+  display: flex;
+}
+#drop-screen .install[data-install='unavailable'] .when-unavailable {
+  display: inline;
+}
+
+/* reflow: stacked below 48rem */
+@container (max-width: 48rem) {
+  #drop-screen .zones,
+  #drop-screen .hero,
+  #drop-screen .formats__grid,
+  #drop-screen .foot {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .btn {
+  #drop-screen .foot__cell:first-child {
+    border-right: 0;
+    border-bottom: var(--rule);
+  }
+}
+/* phones: drag and drop barely exists — the zones become two large choose buttons */
+@container (max-width: 34rem) {
+  #drop-screen .t-drop {
+    display: none;
+  }
+  #drop-screen .t-tap {
+    display: inline;
+  }
+  #drop-screen .choose {
+    display: block;
+    width: 100%;
+    padding: 15px 16px;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    text-decoration: none;
+    text-align: center;
+    font-size: 16px;
+  }
+  #drop-screen .zone--read .choose {
+    background: var(--ink);
+    color: var(--white);
+  }
+  #drop-screen .note {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  #drop-screen .btn {
     flex: 1 1 auto;
     justify-content: center;
+  }
+  #drop-screen .actions .btn {
+    width: 100%;
   }
 }
 
@@ -902,6 +1490,7 @@ code {
 }
 #original-pdf-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   padding: 0.45rem 1rem;
@@ -920,11 +1509,34 @@ code {
   flex: 1;
   white-space: nowrap;
 }
+.original-pdf-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
 #original-pdf-bar a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   color: #8ab0ff;
   text-decoration: none;
   font-weight: 600;
   white-space: nowrap;
+}
+#original-pdf-bar a:hover {
+  text-decoration: underline;
+}
+/* A download arrow before each file name. */
+#original-pdf-bar a::before {
+  content: '↓';
+  font-weight: 400;
+}
+#original-pdf-native {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #fff;
 }
 #original-pdf-pages {
   flex: 1;
@@ -1131,6 +1743,14 @@ code {
   }
   #capture-note {
     display: none;
+  }
+  /* The switch shrinks to one button: the language to switch to. */
+  #app .sep--lang,
+  #app .lang-switch button[aria-pressed='true'] {
+    display: none;
+  }
+  #app .lang-switch button + button {
+    border-left: 0;
   }
 }
 

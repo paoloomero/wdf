@@ -10,13 +10,15 @@ const SHELL = [
   // installed Reader renders it fully offline; same-origin only.
   'pdfjs.js',
   'pdfjs-worker.js',
-  // Reader typography (plan §10.62): IBM Plex, lazy-injected by main.ts.
+  // Reader typography (plan §10.62, §10.80): IBM Plex, lazy-injected by main.ts.
   'plex.css',
-  'plex/ibm-plex-sans-latin-400-normal.woff2',
-  'plex/ibm-plex-sans-latin-600-normal.woff2',
-  'plex/ibm-plex-mono-latin-400-normal.woff2',
-  'plex/ibm-plex-mono-latin-500-normal.woff2',
-  'plex/ibm-plex-mono-latin-600-normal.woff2',
+  'plex/IBMPlexSans-Variable.woff2',
+  'plex/IBMPlexMono-400.woff2',
+  'plex/IBMPlexMono-500.woff2',
+  'plex/IBMPlexMono-600.woff2',
+  // Converter (plan §10.80): the template a .wdf.html download is filled
+  // into, so the installed Reader produces it offline too.
+  'standalone-template.html',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

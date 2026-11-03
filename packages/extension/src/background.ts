@@ -3,7 +3,7 @@
 // package, downloaded as a standalone HTML (the T15.1 sendable default;
 // the .wdf option arrives with the popup UX, T18.5). Fully client-side:
 // the pipeline uses parse5, no DOM needed (§10.31 "Architettura").
-import type { WdfCapture } from '@wdf-dev/core';
+import { fillStandalone, type WdfCapture } from '@wdf-dev/core';
 import {
   aggregateReport,
   geometryExclusions,
@@ -28,7 +28,6 @@ import {
   type StartRequest,
   type StatusMessage,
 } from './protocol.js';
-import { fillStandalone } from './standalone.js';
 import { ext } from './compat.js';
 import { prepareGdocsExport } from './gdocs.js';
 

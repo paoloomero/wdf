@@ -1,7 +1,7 @@
 // Builds the single-file viewer (CLAUDE.md: ONE self-contained HTML file,
 // no external requests at runtime) and the standalone template used by
 // `wdf pack --standalone` (spec §9, plan T4.5).
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -72,28 +72,28 @@ await build({
   legalComments: 'none',
 });
 
-// Reader-only typography (home redesign, plan §10.62): IBM Plex, self-hosted
-// as lazy deployment assets — same model as PDF.js. main.ts injects plex.css
-// only in app mode; the standalone falls back to the system font stacks, so
-// viewer.html and every .wdf.html stay single self-contained files.
+// Reader-only typography (home redesign, plan §10.62; fonts from the
+// "wdf_home_v2" handoff, plan §10.80): IBM Plex, self-hosted as lazy
+// deployment assets — same model as PDF.js. main.ts injects plex.css only in
+// app mode; the standalone falls back to the system font stacks, so
+// viewer.html and every .wdf.html stay single self-contained files. Plex Sans
+// is one variable file covering 400–600; Plex Mono ships three static weights.
 const PLEX = [
-  ['ibm-plex-sans', '400'],
-  ['ibm-plex-sans', '600'],
-  ['ibm-plex-mono', '400'],
-  ['ibm-plex-mono', '500'],
-  ['ibm-plex-mono', '600'],
+  ['IBM Plex Sans', '400 600', 'IBMPlexSans-Variable.woff2'],
+  ['IBM Plex Mono', '400', 'IBMPlexMono-400.woff2'],
+  ['IBM Plex Mono', '500', 'IBMPlexMono-500.woff2'],
+  ['IBM Plex Mono', '600', 'IBMPlexMono-600.woff2'],
 ];
+rmSync(join(here, 'dist/plex'), { recursive: true, force: true });
 mkdirSync(join(here, 'dist/plex'), { recursive: true });
 const faces = [];
-for (const [family, weight] of PLEX) {
-  const file = `${family}-latin-${weight}-normal.woff2`;
-  const src = join(here, `node_modules/@fontsource/${family}/files/${file}`);
-  writeFileSync(join(here, 'dist/plex', file), readFileSync(src));
-  const name = family === 'ibm-plex-sans' ? 'IBM Plex Sans' : 'IBM Plex Mono';
+for (const [name, weight, file] of PLEX) {
+  copyFileSync(join(here, 'fonts', file), join(here, 'dist/plex', file));
   faces.push(
     `@font-face { font-family: "${name}"; font-style: normal; font-weight: ${weight}; font-display: swap; src: url("plex/${file}") format("woff2"); }`,
   );
 }
+copyFileSync(join(here, 'fonts/LICENSE-IBMPlex.txt'), join(here, 'dist/plex/LICENSE-IBMPlex.txt'));
 writeFileSync(join(here, 'dist/plex.css'), `${faces.join('\n')}\n`);
 
 console.log(

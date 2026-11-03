@@ -55,6 +55,20 @@ describe('WDF Reader PWA (T8.1)', () => {
     expect(sw).toContain("'pdfjs-worker.js'");
   });
 
+  // Plan §10.80: the converter's .wdf.html template and the Plex files are
+  // Reader-deployment assets too — offline once installed.
+  it('service worker precaches the standalone template and every Plex file', () => {
+    const sw = readFileSync(join(siteDir, 'sw.js'), 'utf8');
+    expect(sw).toContain("'standalone-template.html'");
+    const build = readFileSync(join(root, 'packages/viewer/build.mjs'), 'utf8');
+    const fonts = [...build.matchAll(/'(IBMPlex[\w-]+\.woff2)'/g)].map((m) => m[1]);
+    expect(fonts.length).toBe(4);
+    for (const file of fonts) {
+      expect(sw).toContain(`'plex/${String(file)}'`);
+      expect(existsSync(join(root, 'packages/viewer/fonts', String(file))), file).toBe(true);
+    }
+  });
+
   it('PDF.js stays out of the main bundle and out of the npm package', () => {
     const build = readFileSync(join(root, 'packages/viewer/build.mjs'), 'utf8');
     expect(build).toContain("external: ['./pdfjs.js']");
@@ -64,6 +78,25 @@ describe('WDF Reader PWA (T8.1)', () => {
     };
     expect(pkg.files.some((f) => f.includes('pdfjs'))).toBe(false);
     expect(Object.keys(pkg.dependencies)).not.toContain('pdfjs-dist');
+  });
+
+  // Plan §10.82: the standalone shows the author's PDF in the browser's own
+  // viewer — no renderer shipped or fetched — and never imports PDF.js.
+  it('the standalone shows the PDF natively, never with PDF.js', () => {
+    const shell = readFileSync(join(viewerSrc, 'shell.html'), 'utf8');
+    const main = readFileSync(join(viewerSrc, 'main.ts'), 'utf8');
+    const frame = /<iframe[^>]*id="original-pdf-native"[^>]*>/.exec(shell)?.[0] ?? '';
+    expect(frame).toContain('hidden');
+    expect(frame).not.toContain('src=');
+    expect(main).toContain('navigator.pdfViewerEnabled');
+    // The PDF.js import sits behind the standalone gate.
+    const gate = main.indexOf('if (!standalone) {');
+    const load = main.indexOf("await import('./pdfjs.js')");
+    expect(gate).toBeGreaterThan(-1);
+    expect(load).toBeGreaterThan(gate);
+    for (const id of ['original-pdf-download', 'original-source-download']) {
+      expect(shell).toContain(`id="${id}"`);
+    }
   });
 
   it('viewer shell links the manifest; main.ts consumes launched files', () => {
@@ -80,9 +113,15 @@ describe('WDF Reader PWA (T8.1)', () => {
     for (const id of ['install-home', 'install-app']) {
       const tag = new RegExp(`<button[^>]*id="${id}"[^>]*>`).exec(shell)?.[0];
       expect(tag, id).toBeDefined();
-      expect(tag).toContain('hidden');
       expect(main).toContain(`'${id}'`);
     }
+    // Toolbar: the hidden attribute. Home (plan §10.80): the cell's
+    // data-install state, which starts at "unavailable"; its button is always
+    // shown and explains how to install when there is no prompt.
+    expect(/<button[^>]*id="install-app"[^>]*>/.exec(shell)?.[0]).toContain('hidden');
+    expect(/<button[^>]*id="install-home"[^>]*>/.exec(shell)?.[0]).not.toContain('hidden');
+    expect(shell).toContain('id="install-cell" data-install="unavailable"');
+    expect(shell).toContain('id="install-help"');
     expect(main).toContain("addEventListener('beforeinstallprompt'");
     expect(main).toContain("addEventListener('appinstalled'");
     expect(shell).toContain('id="install-done"');

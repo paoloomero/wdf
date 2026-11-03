@@ -9,6 +9,8 @@ import { describe, expect, it } from 'vitest';
 // but a digest mismatch.
 
 const mainTs = readFileSync(join(resolve(import.meta.dirname, '../src'), 'main.ts'), 'utf8');
+// Texts live in i18n.ts (plan §10.81); English verdicts are core's own.
+const i18nTs = readFileSync(join(resolve(import.meta.dirname, '../src'), 'i18n.ts'), 'utf8');
 
 describe('Reader verification UI', () => {
   it('consumes the single validation pipeline', () => {
@@ -18,17 +20,23 @@ describe('Reader verification UI', () => {
   });
 
   it('labels come from the shared status vocabulary and never say "Tampered"', () => {
-    expect(mainTs).toContain('STATUS_TEXT[result.status]');
-    expect(mainTs).not.toContain("'Tampered'");
-    expect(mainTs).not.toContain("'Profile errors'");
+    expect(mainTs).toContain('m.status[result.status]');
+    expect(i18nTs).toContain('status: STATUS_TEXT,');
+    for (const src of [mainTs, i18nTs]) {
+      expect(src).not.toContain("'Tampered'");
+      expect(src).not.toContain("'Profile errors'");
+      expect(src).not.toMatch(/'Manomess/);
+    }
   });
 
   it('shows that integrity is not authenticity (§8.3, §11.4)', () => {
-    expect(mainTs).toContain('add(INTEGRITY_NOT_AUTHENTICITY');
+    expect(mainTs).toContain('add(m.notAuthenticity');
+    expect(i18nTs).toContain('notAuthenticity: INTEGRITY_NOT_AUTHENTICITY');
+    expect(i18nTs).toContain('Integrità non è autenticità');
   });
 
   it('status bar verdict is derived from the same result as the badge', () => {
-    expect(mainTs).toContain("result.verified ? 'verified locally' : text.label.toUpperCase()");
+    expect(mainTs).toContain('result.verified ? m.verifiedLocally : text.label.toUpperCase()');
   });
 });
 
@@ -49,7 +57,10 @@ describe('Plain view, typed-data mark and conversion report (plan §10.70)', () 
 
   it('the Original view carries the conversion report and says the original is not compared', () => {
     expect(shell).toContain('id="original-report"');
-    expect(mainTs).toContain('Original included as-is, not compared with the canonical content');
+    expect(i18nTs).toContain('Original included as-is, not compared with the canonical content');
+    expect(i18nTs).toContain(
+      'Originale incluso così com’è, non confrontato con il contenuto canonico',
+    );
     expect(shell).toContain('not that it matches the canonical content');
   });
 });

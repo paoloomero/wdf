@@ -5,6 +5,8 @@ import {
   type WdfOutlineNode,
 } from '@wdf-dev/core';
 
+import { MESSAGES, type Lang } from './i18n.js';
+
 /** Pure helpers of the viewer — kept DOM-free so they are unit-testable. */
 
 const MIME: Record<string, string> = {
@@ -711,19 +713,20 @@ export function parseSourceExt(files: ReadonlyMap<string, Uint8Array>): SourceEx
 // provenance in the verification details (§6 of the extension spec).
 
 /** The one-line nature note shown next to the verification badge. */
-export function captureNote(c: WdfCapture): string {
-  return `captured from live page on ${c.capturedAt}`;
+export function captureNote(c: WdfCapture, lang: Lang = 'en'): string {
+  return MESSAGES[lang].capturedOn(c.capturedAt);
 }
 
 /** The verification-panel lines for capture provenance. */
-export function captureDetails(c: WdfCapture): string[] {
+export function captureDetails(c: WdfCapture, lang: Lang = 'en'): string[] {
+  const m = MESSAGES[lang];
   const dpr = c.viewport.devicePixelRatio;
   return [
-    `Capture: ${c.mode === 'article' ? 'extracted article' : 'full page'} from a live, rendered page — integrity is not authenticity (§11.4)`,
-    `Captured URL: ${c.url}`,
-    `Captured at: ${c.capturedAt}`,
-    `User agent: ${c.userAgent}`,
-    `Viewport: ${String(c.viewport.width)}×${String(c.viewport.height)}${dpr === undefined ? '' : ` @${String(dpr)}x`}`,
+    m.capture(c.mode === 'article'),
+    `${m.capturedUrl}: ${c.url}`,
+    `${m.capturedAt}: ${c.capturedAt}`,
+    `${m.userAgent}: ${c.userAgent}`,
+    `${m.viewport}: ${String(c.viewport.width)}×${String(c.viewport.height)}${dpr === undefined ? '' : ` @${String(dpr)}x`}`,
   ];
 }
 

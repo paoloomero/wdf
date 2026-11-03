@@ -47,6 +47,10 @@ cpSync(join(root, 'packages/viewer/dist/pdfjs-worker.js'), join(site, 'pdfjs-wor
 // mode only; the standalone falls back to system fonts.
 cpSync(join(root, 'packages/viewer/dist/plex.css'), join(site, 'plex.css'));
 cpSync(join(root, 'packages/viewer/dist/plex'), join(site, 'plex'), { recursive: true });
+// Reader-only (plan §10.80): the standalone template, fetched by the
+// converter the first time someone downloads a .wdf.html. A distinct name, so
+// nobody mistakes the unfilled template for a document.
+cpSync(join(root, 'packages/viewer/dist/standalone.html'), join(site, 'standalone-template.html'));
 cpSync(join(root, 'site/index.html'), join(site, 'index.html'));
 cpSync(join(root, 'site/manifesto.html'), join(site, 'manifesto.html'));
 // Feature illustrations (brand/illustrations, web-sized in site/illustrations).
@@ -66,6 +70,7 @@ const viewerHash = createHash('sha256')
   .update(readFileSync(join(site, 'pdfjs.js')))
   .update(readFileSync(join(site, 'pdfjs-worker.js')))
   .update(readFileSync(join(site, 'plex.css')))
+  .update(readFileSync(join(site, 'standalone-template.html')))
   .digest('hex')
   .slice(0, 8);
 const sw = readFileSync(join(root, 'site/sw.js'), 'utf8');

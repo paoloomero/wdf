@@ -13,3 +13,7 @@ packages/cli/fonts/LICENSE-<family>.txt:
 - Arimo — Copyright 2020 The Arimo Project Authors
 - Tinos — Copyright 2026 The Tinos Project Authors
 - Cousine — Copyright 2026 The Cousine Project Authors
+
+The WDF Reader deployment also serves IBM Plex Sans and IBM Plex Mono
+(packages/viewer/fonts/) — Copyright 2017, 2019 IBM Corp., SIL Open Font
+License 1.1, full text in packages/viewer/fonts/LICENSE-IBMPlex.txt.
