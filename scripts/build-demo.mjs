@@ -56,6 +56,8 @@ cpSync(join(root, 'site/manifesto.html'), join(site, 'manifesto.html'));
 // Feature illustrations (brand/illustrations, web-sized in site/illustrations).
 cpSync(join(root, 'site/illustrations'), join(site, 'illustrations'), { recursive: true });
 cpSync(join(root, 'site/extension-privacy.html'), join(site, 'extension-privacy.html'));
+// Italian pages (plan §10.83): static copies under it/, assets referenced as ../.
+cpSync(join(root, 'site/it'), join(site, 'it'), { recursive: true });
 cpSync(join(root, 'site/site.css'), join(site, 'site.css'));
 cpSync(join(root, 'site/favicon.ico'), join(site, 'favicon.ico'));
 // PWA shell (plan T8.1): manifest with .wdf file_handlers, offline worker, icons.
@@ -117,6 +119,11 @@ const specPage =
     .replace(/(<meta\s+property="og:title"\s+content=")[^"]*"/, `$1${specTitle}"`)
     .replace(/(<meta\s+property="og:description"\s+content=")[^"]*"/, `$1${specDescription}"`)
     .replaceAll(`${origin}manifesto.html`, `${origin}spec.html`)
+    // The spec is English only (plan §10.83): no hreflang pair, and the
+    // language switch leads to the Italian home.
+    .replace(/\s*<link rel="alternate" hreflang="[^"]*" href="[^"]*" \/>/g, '')
+    .replace('<a href="manifesto.html" hreflang="en"', '<a href="spec.html" hreflang="en"')
+    .replace('<a href="it/manifesto.html" hreflang="it"', '<a href="it/" hreflang="it"')
     .replace(' aria-current="page"', '')
     .replace('<a href="spec.html">Spec</a>', '<a href="spec.html" aria-current="page">Spec</a>') +
   `<main class="article article--spec">
@@ -137,15 +144,27 @@ ${specBody}
 writeFileSync(join(site, 'spec.html'), specPage);
 
 // Crawler entry points (plan §10.72). No lastmod: the build stays time-independent.
+// Pages with an Italian version (plan §10.83) list both, with hreflang pairs.
+const translated = ['', 'manifesto.html', 'extension-privacy.html'];
 const pages = ['', 'manifesto.html', 'spec.html', 'extension-privacy.html'];
+const alternates = (page) =>
+  translated.includes(page)
+    ? `<xhtml:link rel="alternate" hreflang="en" href="${origin}${page}"/>` +
+      `<xhtml:link rel="alternate" hreflang="it" href="${origin}it/${page}"/>`
+    : '';
 writeFileSync(
   join(site, 'robots.txt'),
   `User-agent: *\nAllow: /\n\nSitemap: ${origin}sitemap.xml\n`,
 );
 writeFileSync(
   join(site, 'sitemap.xml'),
-  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    pages.map((page) => `  <url><loc>${origin}${page}</loc></url>\n`).join('') +
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n` +
+    [...pages, ...translated.map((page) => `it/${page}`)]
+      .map(
+        (page) =>
+          `  <url><loc>${origin}${page}</loc>${alternates(page.replace(/^it\//, ''))}</url>\n`,
+      )
+      .join('') +
     `</urlset>\n`,
 );
 

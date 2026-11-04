@@ -162,6 +162,33 @@ h3 {
 .nav a[aria-current='page'] {
   border-bottom-color: var(--ink);
 }
+/* Language switch (plan §10.83): EN | IT, each to the same page in the other language. */
+.topbar__end {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 2vw, 26px);
+  flex-wrap: wrap;
+}
+.langs {
+  display: inline-flex;
+  border: var(--rule);
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.langs a {
+  padding: 4px 7px;
+  text-decoration: none;
+}
+.langs a + a {
+  border-left: var(--rule);
+}
+.langs a:hover {
+  background: var(--plate);
+}
+.langs a[aria-current='true'] {
+  background: var(--signal);
+  font-weight: 600;
+}
 
 /* hero */
 .hero .band__in {

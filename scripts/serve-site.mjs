@@ -29,7 +29,8 @@ const types = {
 createServer(async (req, res) => {
   try {
     const path = normalize(decodeURIComponent((req.url ?? '/').split('?')[0])).replace(/^\/+/, '');
-    const file = join(root, path === '' ? 'index.html' : path);
+    // A folder serves its index.html, as on GitHub Pages (it/ → it/index.html).
+    const file = join(root, path === '' || path.endsWith('/') ? `${path}index.html` : path);
     if (!file.startsWith(root)) throw new Error('forbidden');
     const data = await readFile(file);
     res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream' });

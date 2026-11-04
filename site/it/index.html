@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WDF — Web Document Format</title>
+    <meta
+      name="description"
+      content="Web Document Format (.wdf): un formato documentale aperto, nativo del web, pensato per l’accessibilità — leggibile su qualsiasi schermo, comprensibile alle macchine, verificabile per costruzione. Ciò che leggi è ciò che legge l’AI."
+    />
+    <link rel="canonical" href="https://wdf.dev/it/" />
+    <link rel="alternate" hreflang="en" href="https://wdf.dev/" />
+    <link rel="alternate" hreflang="it" href="https://wdf.dev/it/" />
+    <link rel="alternate" hreflang="x-default" href="https://wdf.dev/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WDF" />
+    <meta property="og:locale" content="it_IT" />
+    <meta property="og:title" content="WDF — Web Document Format" />
+    <meta
+      property="og:description"
+      content="Ciò che leggi è ciò che legge l’AI: un formato documentale aperto e nativo del web — leggibile su qualsiasi schermo, comprensibile alle macchine, verificabile per costruzione."
+    />
+    <meta property="og:url" content="https://wdf.dev/it/" />
+    <meta property="og:image" content="https://wdf.dev/icons/icon-512.png" />
+    <link rel="icon" href="../icons/wdf-favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../icons/wdf-favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../icons/wdf-favicon-180.png" />
+    <link rel="stylesheet" href="../plex.css" />
+    <link rel="stylesheet" href="../site.css" />
+    <meta name="theme-color" content="#f2f2ef" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar__in">
+        <a class="brand" href="./" aria-label="WDF, pagina iniziale">
+          <svg class="brand__icon" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="0" y="0" width="64" height="64" rx="13" fill="#ffffff"></rect>
+            <path d="M0 13A13 13 0 0 1 13 0h38a13 13 0 0 1 13 13v21H0Z" fill="#101418"></path>
+            <g fill="#ffffff">
+              <rect x="12" y="12" width="7" height="14" rx="3.5"></rect>
+              <rect x="24" y="12" width="7" height="14" rx="3.5"></rect>
+            </g>
+            <g fill="#101418">
+              <rect x="12" y="42" width="40" height="6" rx="3"></rect>
+              <rect x="12" y="52" width="24" height="6" rx="3"></rect>
+            </g>
+          </svg>
+          <span class="brand__name">WDF · Web Document Format</span>
+        </a>
+        <div class="topbar__end">
+          <nav class="nav" aria-label="Sito">
+            <a href="manifesto.html">Manifesto</a>
+            <a href="../viewer.html?lang=it">Reader</a>
+            <a href="https://chromewebstore.google.com/detail/mfdcdphphjljdhaglmafkecnkpdbnnfn"
+              >Estensione</a
+            >
+            <a href="../spec.html" hreflang="en">Spec</a>
+            <a href="https://github.com/paoloomero/wdf">GitHub</a>
+          </nav>
+          <nav class="langs" aria-label="Lingua">
+            <a href="../" hreflang="en" lang="en">EN</a
+            ><a href="./" hreflang="it" lang="it" aria-current="true">IT</a>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="band hero" aria-labelledby="hero-title">
+        <div class="band__in">
+          <p class="eyebrow">Formato documentale aperto · Core 0.1 bozza</p>
+          <h1 class="hero__title" id="hero-title">
+            <span class="hero__name"
+              >Web Document Format <span class="hero__ext">(.wdf)</span></span
+            >
+            <span class="hero__claim">Ciò che leggi è ciò che legge l’<em>AI</em>.</span>
+          </h1>
+          <p class="hero__lede">
+            WDF è un formato documentale aperto e nativo del web,
+            <strong>pensato per l’accessibilità</strong>:
+            <strong>leggibile su qualsiasi schermo</strong>,
+            <strong>comprensibile alle macchine</strong> (i bot di AI),
+            <strong>verificabile per costruzione</strong>. Un solo file porta il testo, i dati e il
+            documento originale — e prova che coincidono.
+          </p>
+          <div class="btnrow">
+            <a
+              class="btn btn--primary"
+              href="../viewer.html?lang=it&amp;doc=examples/municipal-decree.wdf"
+            >
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 3h8l5 5v13H6z M14 3v5h5 M9 13h7 M9 17h5" />
+              </svg>
+              Apri un documento
+            </a>
+            <a class="btn" href="manifesto.html">Leggi il manifesto</a>
+            <a
+              class="btn"
+              href="https://chromewebstore.google.com/detail/mfdcdphphjljdhaglmafkecnkpdbnnfn"
+              >Scarica l’estensione per Chrome</a
+            >
+          </div>
+          <ul class="hero__facts" aria-label="In breve">
+            <li>Pensato per l’accessibilità — fatto per la pubblica amministrazione</li>
+            <li>ZIP + HTML + JSON, niente di inventato</li>
+            <li>Integrità SHA-256, verificata offline</li>
+            <li>Spec CC-BY 4.0 · Codice Apache-2.0</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="band" aria-labelledby="why-title">
+        <div class="band__in">
+          <h2 class="band__title band__title--big" id="why-title">Perché?</h2>
+          <p class="band__lede band__lede--big">
+            Oggi un documento ha due pubblici. <strong>Le persone e gli agenti.</strong> Ogni
+            formato in cui pubblichiamo è stato progettato per uno solo dei due.
+          </p>
+          <div class="why">
+            <div class="why__item">
+              <h3>Il lettore è cambiato. Il formato no.</h3>
+              <p>
+                Il PDF congela la vista di stampa e butta via la struttura che il documento aveva
+                mentre veniva scritto. Una pagina web conserva la struttura, ma non è un file:
+                cambia sotto la tua citazione e muore con il suo server.
+              </p>
+            </div>
+            <div class="why__item">
+              <h3>Nessun parser porta a una prova.</h3>
+              <p>
+                Un’intera industria ricostruisce a tentoni la struttura dei PDF prima di darli ai
+                modelli linguistici. Un parser ti dà un’interpretazione.
+                <strong
+                  >Nessuna pipeline può provare che ciò che la macchina ha letto è ciò che hai visto
+                  tu.</strong
+                >
+              </p>
+            </div>
+            <div class="why__item">
+              <h3>Tieni il PDF. Guadagni il resto.</h3>
+              <p>
+                WDF non combatte il mondo di prima. Il PDF dell’autore e il file Word originale
+                viaggiano <strong>dentro</strong> il pacchetto, accanto alla struttura vera — così
+                niente di ciò che consegni oggi va perso.
+              </p>
+            </div>
+            <div class="why__item">
+              <h3>Pensato per l’accessibilità.</h3>
+              <p>
+                Gli enti pubblici devono pubblicare documenti che tutti possano leggere — su un
+                telefono, con un lettore di schermo, a qualsiasi ingrandimento (Direttiva UE
+                2016/2102, European Accessibility Act). Un WDF è
+                <strong>HTML semantico su una lista chiusa di elementi ammessi</strong>: titoli,
+                elenchi, tabelle vere, testo che si riadatta, testo alternativo obbligatorio. La
+                struttura c’è fin dall’inizio, non va aggiunta dopo; ciò che resta — descrizioni,
+                contrasto, linguaggio chiaro — rimane compito dell’autore, e resta verificabile.
+              </p>
+            </div>
+          </div>
+          <p class="readmore"><a href="manifesto.html">Leggi perché lo facciamo →</a></p>
+        </div>
+      </section>
+
+      <section class="band demo" aria-labelledby="demo-title">
+        <div class="band__in">
+          <p class="eyebrow">Dal vivo</p>
+          <h2 class="band__title" id="demo-title">Il Reader, con dentro un documento vero.</h2>
+          <p class="band__lede">
+            Passa da <strong>Umano ad Agente</strong>, clicca un paragrafo qualsiasi, copia una
+            citazione: lo stesso elemento si illumina in entrambe le viste. Il bollino dice che il
+            file è stato verificato — qui, sul tuo computer, senza nessun server.
+          </p>
+          <div class="demo__frame">
+            <iframe
+              src="../viewer.html?lang=it&amp;doc=examples/municipal-decree.wdf"
+              title="Il WDF Reader con il decreto comunale di esempio"
+              loading="lazy"
+            ></iframe>
+          </div>
+          <p class="demo__caption">
+            <span>Un decreto comunale di fantasia, scritto per la dimostrazione (in inglese).</span>
+            <a href="../viewer.html?lang=it&amp;doc=examples/municipal-decree.wdf"
+              >Apri a schermo intero →</a
+            >
+          </p>
+          <ul class="examples">
+            <li>
+              <h3>Decreto comunale</h3>
+              <p>Una tabella di impegni tipizzata, legata a <code>data/commitments.json</code>.</p>
+              <p class="links">
+                <a href="../viewer.html?lang=it&amp;doc=examples/municipal-decree.wdf">Reader</a>
+                <a href="../examples/municipal-decree.wdf" download>.wdf</a>
+                <a href="../examples/municipal-decree.html">.wdf.html</a>
+                <a href="../examples/municipal-decree.pdf">PDF</a>
+              </p>
+            </li>
+            <li>
+              <h3>Rapporto energetico</h3>
+              <p>Due tabelle legate a dataset e un grafico SVG disegnato dagli stessi valori.</p>
+              <p class="links">
+                <a href="../viewer.html?lang=it&amp;doc=examples/energy-report.wdf">Reader</a>
+                <a href="../examples/energy-report.wdf" download>.wdf</a>
+                <a href="../examples/energy-report.html">.wdf.html</a>
+                <a href="../examples/energy-report.pdf">PDF</a>
+              </p>
+            </li>
+            <li>
+              <h3>Articolo tecnico</h3>
+              <p>Blocchi di codice, una figura, un glossario — e la sua storia di verifica.</p>
+              <p class="links">
+                <a href="../viewer.html?lang=it&amp;doc=examples/technical-article.wdf">Reader</a>
+                <a href="../examples/technical-article.wdf" download>.wdf</a>
+                <a href="../examples/technical-article.html">.wdf.html</a>
+                <a href="../examples/technical-article.pdf">PDF</a>
+              </p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="band features" aria-labelledby="feat-title">
+        <div class="band__in">
+          <p class="eyebrow">Cosa c’è nel file</p>
+          <h2 class="band__title" id="feat-title">Un file, ogni lettore.</h2>
+          <ul class="feats">
+            <li class="feat">
+              <img
+                src="../illustrations/one-file.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>Un solo file</h3>
+              <p>
+                Testo, dati tipizzati e documento originale viaggiano insieme in un unico
+                <code>.wdf</code> portabile.
+              </p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/verified.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>Verificato</h3>
+              <p>
+                Impronte SHA-256 e una derivazione deterministica al byte. Si verifica offline,
+                senza dover interpellare alcuna autorità.
+              </p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/ai-mcp.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>AI e MCP</h3>
+              <p>
+                Gli agenti si collegano alla struttura attraverso il server MCP. Non ne raschiano
+                mai un’immagine.
+              </p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/responsive.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>Qualsiasi schermo</h3>
+              <p>
+                Testo vero che si riadatta su telefono, tablet e computer — e viene letto ad alta
+                voce correttamente.
+              </p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/citations.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>Citazioni che portano al punto</h3>
+              <p>
+                Un URI <code>wdf:</code> apre esattamente il paragrafo da cui viene. Non “pagina 2”.
+              </p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/typed-data.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>Dati tipizzati</h3>
+              <p>
+                Le tabelle sono legate a dataset tipizzati: numeri su cui fare calcoli, non disegni
+                di cifre.
+              </p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/pdf-view.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>.wdf + vista PDF</h3>
+              <p>
+                Il PDF dell’autore viaggia dentro e si vede nella vista Originale, identico alla
+                carta.
+              </p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/source-download.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>.wdf + originale da scaricare</h3>
+              <p>Dentro c’è anche il file Word, e ne esce identico.</p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/capture.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>Salva la pagina</h3>
+              <p>
+                L’estensione per il browser trasforma qualsiasi pagina web in un file verificabile
+                da inviare.
+                <a href="https://chromewebstore.google.com/detail/mfdcdphphjljdhaglmafkecnkpdbnnfn"
+                  >Scaricala per Chrome →</a
+                >
+              </p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/offline.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>Funziona offline</h3>
+              <p>Un documento non tocca mai la rete. Né per aprirlo, né per verificarlo. Mai.</p>
+            </li>
+            <li class="feat">
+              <img
+                src="../illustrations/accessible.jpg"
+                alt=""
+                width="640"
+                height="640"
+                loading="lazy"
+              />
+              <h3>Accessibile</h3>
+              <p>
+                HTML semantico su una lista chiusa di elementi ammessi: la struttura che serve
+                all’accessibilità, costruita dentro anziché aggiunta dopo.
+              </p>
+            </li>
+            <li class="feat">
+              <img src="../illustrations/open.jpg" alt="" width="640" height="640" loading="lazy" />
+              <h3>Formato aperto</h3>
+              <p>
+                Spec CC-BY 4.0, implementazione di riferimento Apache-2.0. Niente licenze da
+                comprare, nessuno a cui chiedere.
+              </p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="band" aria-labelledby="cases-title">
+        <div class="band__in">
+          <p class="eyebrow">Ideale per</p>
+          <h2 class="band__title" id="cases-title">Dove i vecchi formati fanno più male.</h2>
+          <div class="cases">
+            <div class="case">
+              <p class="eyebrow">Pubblica amministrazione</p>
+              <h3>Documenti pubblici che tutti possono leggere</h3>
+              <p>
+                Decreti, relazioni, bandi: leggibili su un telefono, verificabili da qualsiasi
+                cittadino, con dentro il PDF per l’archivio. La struttura che le regole
+                sull’accessibilità richiedono, già costruita.
+              </p>
+              <p class="readmore">
+                <a href="../viewer.html?lang=it&amp;doc=examples/municipal-decree.wdf"
+                  >Guarda il decreto →</a
+                >
+              </p>
+            </div>
+            <div class="case">
+              <p class="eyebrow">Web</p>
+              <h3>Salvi una pagina, mandi un file</h3>
+              <p>
+                Un clic nel browser trasforma l’articolo che stai leggendo in un documento che si
+                apre ovunque e dichiara da dove viene. Fine dei link morti.
+              </p>
+              <p class="readmore">
+                <a href="https://chromewebstore.google.com/detail/mfdcdphphjljdhaglmafkecnkpdbnnfn"
+                  >Scarica l’estensione →</a
+                >
+              </p>
+            </div>
+            <div class="case">
+              <p class="eyebrow">AI</p>
+              <h3>Basi di conoscenza che citano</h3>
+              <p>
+                Un fascicolo convertito in WDF dà a un agente identificatori stabili e citazioni
+                verificabili attraverso MCP — niente parsing, niente numeri di pagina inventati.
+              </p>
+              <p class="readmore">
+                <a href="../mcp-demo.md" hreflang="en">Leggi la sessione MCP (in inglese) →</a>
+              </p>
+            </div>
+            <div class="case">
+              <p class="eyebrow">Ufficio</p>
+              <h3>Pubblica un documento Word, in modo nuovo</h3>
+              <p>
+                Entra <code>relazione.docx</code>, esce <code>relazione.wdf</code>: struttura,
+                tabelle tipizzate, il file originale e il PDF dell’autore, tutto in un pacchetto.
+              </p>
+              <p class="readmore">
+                <a href="../viewer.html?lang=it">Trascina un .docx nel Reader →</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" aria-labelledby="start-title">
+        <div class="band__in">
+          <p class="eyebrow">Per iniziare</p>
+          <h2 class="band__title" id="start-title">Tre modi per cominciare.</h2>
+          <div class="start">
+            <div class="start__cell">
+              <p class="eyebrow">Leggi</p>
+              <h3>WDF Reader</h3>
+              <p>
+                Un’app installabile: trascina un <code>.wdf</code>, un <code>.docx</code> o
+                un’esportazione HTML, leggilo, verificalo, citalo. Una volta installata funziona
+                offline.
+              </p>
+              <div class="btnrow">
+                <a class="btn btn--primary" href="../viewer.html?lang=it">Apri il Reader</a>
+              </div>
+              <p class="start__note">
+                Clicca <em>Installa</em> nel Reader (Chrome, Edge). Da quel momento i file .wdf si
+                aprono con un doppio clic.
+              </p>
+            </div>
+            <div class="start__cell">
+              <p class="eyebrow">Salva</p>
+              <h3>Estensione per il browser</h3>
+              <p>
+                <em>Save as WDF</em> cattura la pagina che stai guardando come <code>.wdf</code> o
+                come <code>.wdf.html</code> autonomo, con il lettore incorporato. Nessun server,
+                nessun dato raccolto.
+              </p>
+              <div class="btnrow">
+                <a
+                  class="btn btn--primary"
+                  href="https://chromewebstore.google.com/detail/mfdcdphphjljdhaglmafkecnkpdbnnfn"
+                  >Chrome Web Store</a
+                >
+              </div>
+              <p class="start__note">
+                Firefox: in revisione.
+                <a href="extension-privacy.html">Informativa sulla privacy</a>.
+              </p>
+            </div>
+            <div class="start__cell">
+              <p class="eyebrow">Costruisci</p>
+              <h3>Strumenti su npm</h3>
+              <p>
+                Valida, converti ed estrai da riga di comando, nella CI o dal tuo codice. Stesso
+                input, pacchetto identico al byte su qualsiasi piattaforma.
+              </p>
+              <pre class="cmd"><span class="c"># valida qualsiasi documento</span>
+npx @wdf-dev/cli validate documento.wdf
+<span class="c"># Word → WDF, con l’originale e il suo PDF</span>
+npx @wdf-dev/cli import relazione.docx \
+    --with-source --with-pdf relazione.pdf
+<span class="c"># dai il documento a un agente</span>
+claude mcp add wdf -- npx -y @wdf-dev/mcp</pre>
+              <p class="start__note">
+                <a href="https://github.com/paoloomero/wdf">Codice su GitHub</a> ·
+                <a href="../spec.html" hreflang="en">Spec, ~20 pagine (in inglese)</a> ·
+                <a href="../llm-extraction-comparison.md" hreflang="en"
+                  >PDF contro WDF, un solo prompt (in inglese)</a
+                >
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>
+        WDF è un formato aperto sviluppato da
+        <a href="https://www.infofactory.it/">infoFACTORY</a>. Specifica CC-BY 4.0 · Codice
+        Apache-2.0.
+      </p>
+      <p>
+        Gran parte del codice e dei testi di WDF è scritta con l’AI generativa (Claude).
+        <a href="https://github.com/paoloomero/wdf/blob/main/GENAI.md"
+          >Cosa è stato generato, e come riconoscerlo (in inglese)</a
+        >.
+      </p>
+      <p>
+        <a href="manifesto.html">Manifesto</a> · <a href="../spec.html" hreflang="en">Spec</a> ·
+        <a href="https://github.com/paoloomero/wdf">GitHub</a> ·
+        <a href="extension-privacy.html">Privacy</a>
+      </p>
+    </footer>
+  </body>
+</html>

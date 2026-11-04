@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Save as WDF — Informativa sulla privacy</title>
+    <meta
+      name="description"
+      content="Informativa sulla privacy dell’estensione per il browser Save as WDF: nessun dato raccolto, nessuna richiesta di rete propria."
+    />
+    <link rel="canonical" href="https://wdf.dev/it/extension-privacy.html" />
+    <link rel="alternate" hreflang="en" href="https://wdf.dev/extension-privacy.html" />
+    <link rel="alternate" hreflang="it" href="https://wdf.dev/it/extension-privacy.html" />
+    <link rel="alternate" hreflang="x-default" href="https://wdf.dev/extension-privacy.html" />
+    <link rel="icon" href="../icons/wdf-favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../icons/wdf-favicon-32.png" sizes="32x32" />
+    <link rel="stylesheet" href="../site.css" />
+    <style>
+      main.policy {
+        max-width: 44rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      main.policy h2 {
+        margin-top: 1.6rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="policy">
+      <h1>Save as WDF — Informativa sulla privacy</h1>
+      <p><em>In vigore dal 10 agosto 2026 · si applica alla versione 0.1.x dell’estensione</em></p>
+      <p>
+        <a href="../extension-privacy.html" hreflang="en" lang="en">English version</a> — in caso di
+        differenze prevale la versione inglese, a cui rimandano gli store.
+      </p>
+
+      <h2>In breve</h2>
+      <p>
+        <strong>Questa estensione non raccoglie dati e non ne invia, a nessuno, mai.</strong> Non ha
+        server, né statistiche, né telemetria, e non fa richieste di rete proprie.
+      </p>
+
+      <h2>Che cosa fa l’estensione</h2>
+      <p>
+        Save as WDF ha un solo scopo: quando <em>tu</em> la clicchi, converte la pagina che stai
+        leggendo in un documento verificabile (un pacchetto <code>.wdf</code>, oppure un file
+        <code>.wdf.html</code> autonomo con il lettore offline incorporato) e lo salva come un
+        normale download sul tuo computer. La conversione avviene interamente sul tuo computer, a
+        partire da ciò che la pagina ha già caricato nel tuo browser.
+      </p>
+
+      <h2>Permessi, e perché</h2>
+      <ul>
+        <li>
+          <strong>activeTab + scripting</strong> — leggere la pagina che stai guardando, solo dopo
+          il tuo clic esplicito sull’estensione. Non ci sono permessi sui siti: l’estensione non può
+          leggere nessuna pagina di sua iniziativa, e nessuno script di contenuto parte prima che tu
+          lo chieda.
+        </li>
+        <li>
+          <strong>storage</strong> — un solo indicatore locale che ricorda che hai preso visione
+          dell’avviso sulla privacy mostrato una volta. Non viene conservato nient’altro, e questo
+          indicatore non lascia mai il tuo browser.
+        </li>
+      </ul>
+
+      <h2>Che cosa finisce nel documento che salvi</h2>
+      <p>
+        Il documento catturato contiene ciò che la pagina mostrava <em>a te</em> — compresi, se
+        avevi effettuato l’accesso, contenuti personali della tua sessione. Quel file è tuo, sul tuo
+        disco; prima della prima cattura l’estensione mostra un avviso su questo. Il documento
+        registra anche la provenienza della cattura (indirizzo della pagina, ora, user agent del
+        browser, dimensioni della finestra) dentro il pacchetto, così chi lo riceve può vedere dove
+        e quando è stato catturato. L’estensione non trasmette nulla, da nessuna parte.
+      </p>
+
+      <h2>Modifiche</h2>
+      <p>
+        Se una versione futura cambiasse qualcosa di quanto sopra, questa pagina e le schede
+        dell’estensione negli store lo direbbero esplicitamente prima che la modifica venga
+        distribuita.
+      </p>
+
+      <p>
+        <a href="./">← wdf.dev</a> · L’estensione è open source:
+        <a href="https://github.com/paoloomero/wdf">github.com/paoloomero/wdf</a>
+        (<code>packages/extension</code>).
+      </p>
+    </main>
+  </body>
+</html>

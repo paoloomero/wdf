@@ -23,7 +23,7 @@ export const SHELL_IT: Readonly<Record<string, string>> = {
   'home.lang': 'Lingua',
   'home.title': 'Leggilo.<br />Convertilo.',
   'home.lede':
-    '<strong>Web Document Format</strong>: in un unico file da condividere: (1) <b>HTML</b> accessibile, (2) una versione <b>Markdown</b> per gli agenti AI e (3) un <b>PDF</b> per leggere e stampare. Ciò che leggono le persone e ciò che leggono gli agenti AI è la stessa cosa — in modo verificabile.',
+    '<strong>Web Document Format</strong>: in un unico file da condividere: (1) <b>HTML</b> accessibile, (2) una versione <b>Markdown</b> per gli agenti AI e (3) un <b>PDF</b> per leggere e stampare — quello dell’autore, quando è allegato. Ciò che leggono le persone e ciò che leggono gli agenti AI è la stessa cosa — in modo verificabile.',
   // Home: Read card
   'read.eyebrow': 'Leggi',
   'read.title': 'Apri un WDF',
@@ -387,6 +387,13 @@ export function initLang(): void {
       const next = button.dataset['lang'];
       if ((next === 'en' || next === 'it') && next !== current) setLang(next);
     });
+  }
+  // ?lang=en|it (plan §10.83: the Italian site links the Reader with
+  // ?lang=it) is an explicit choice, saved like the switch's.
+  const asked = new URLSearchParams(location.search).get('lang');
+  if (asked === 'en' || asked === 'it') {
+    setLang(asked);
+    return;
   }
   const browser = navigator.languages.length > 0 ? navigator.languages : [navigator.language];
   const start = initialLang(readSaved(), browser);
