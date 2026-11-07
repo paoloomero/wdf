@@ -1,0 +1,55 @@
+# Changelog
+
+The five public packages (`@wdf-dev/core`, `@wdf-dev/import`, `@wdf-dev/viewer`,
+`@wdf-dev/cli`, `@wdf-dev/mcp`) share one version number. The package version is
+not the format version: every release below reads and writes **WDF Core 0.1**
+(`spec/wdf-core-0.1.md`).
+
+## 0.2.0 — unreleased
+
+Everything since 0.1.0 (12 August 2026).
+
+### Convert
+
+- **Word `.docx`, natively** (`wdf import report.docx`): styles, headings,
+  lists, tables with merged cells, images, links, bookmarks, headers and
+  footers, authored page breaks, notes, fields, equations. Extension
+  `pagination` 0.1.
+- **The author's PDF**, kept next to the converted document:
+  `--with-pdf report.pdf` (extension `source` 0.5, visual rendition).
+- **Revisions keep their identity**: `--id <urn:uuid:…>` and
+  `--previous <file.wdf>` keep the document id and the ids of unchanged
+  elements (spec §4.1, §6.4.4).
+- **Conversion report inside the package** with `--with-source` (extension
+  `source` 0.6): what was dropped or changed, and why.
+- `--standalone` writes a single self-contained `.wdf.html` next to the
+  package.
+- Markdown: inline runs across line breaks, list item continuation lines,
+  GitHub-style heading anchors.
+- HTML: `<time datetime>` values normalised to RFC 3339.
+
+### Read
+
+- **Original view**: the author's PDF rendered page by page (PDF.js, as
+  same-origin lazy assets of the Reader deployment); in a `.wdf.html`, the
+  browser's own PDF viewer. Download links for the original file and the PDF.
+- **Plain view**: the document without the author's stylesheet (spec §6.7.4).
+- New home with two entry points, Read and Convert; English and Italian
+  interface.
+- Citations: persistent mark on the cited element, `wdf:` URIs resolved from
+  the search box, documents open at a `#anchor`.
+- Installable app (PWA): install button and `.wdf` file association.
+
+### Verify
+
+- One verification pipeline, `validatePackage()`, shared by the CLI, the
+  Reader and the MCP server; spec §8.2 errata.
+
+### Fixed
+
+- Agent and Original views scroll again.
+- The author's PDF attaches whatever its file name.
+
+## 0.1.0 — 12 August 2026
+
+First public release.

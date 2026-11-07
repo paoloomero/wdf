@@ -4,13 +4,14 @@ import { Command } from 'commander';
 import { WDF_VERSION } from '@wdf-dev/core';
 
 import { cmdExtract, cmdImport, cmdNew, cmdPack, cmdUnpack, cmdValidate } from './commands.js';
+import { CLI_VERSION } from './version.js';
 
 const program = new Command();
 
 program
   .name('wdf')
   .description('Web Document Format tooling (WDF Core 0.1)')
-  .version(`wdf ${WDF_VERSION}`);
+  .version(`wdf ${CLI_VERSION} (WDF Core ${WDF_VERSION})`);
 
 program
   .command('validate')

@@ -29,7 +29,6 @@ describe('npm publish contract (plan §10.46)', () => {
   it.each(PUBLISHED)('%s carries the required publish metadata', (dir) => {
     const pkg = readPkg(dir);
     expect(pkg.name).toBe(`@wdf-dev/${dir}`);
-    expect(pkg.version).toBe('0.1.0');
     expect(pkg.license).toBe('Apache-2.0');
     expect(pkg.homepage).toBe('https://wdf.dev');
     expect(pkg.bugs).toBe('https://github.com/paoloomero/wdf/issues');
@@ -55,6 +54,21 @@ describe('npm publish contract (plan §10.46)', () => {
       const src = readFileSync(join(packagesDir, dir, 'src/index.ts'), 'utf8');
       expect(src.startsWith('#!/usr/bin/env node'), `${dir} shebang`).toBe(true);
     }
+  });
+
+  // Plan §10.86: one version for the five packages, and every place that
+  // reports it (CLI --version, MCP serverInfo, conversion reports) agrees, with
+  // a CHANGELOG entry for it.
+  it('the five packages share one version, reported everywhere', () => {
+    const version = String(readPkg('cli').version);
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    for (const dir of PUBLISHED) expect(readPkg(dir).version, dir).toBe(version);
+    const src = (path: string): string => readFileSync(join(packagesDir, path), 'utf8');
+    expect(src('cli/src/version.ts')).toContain(`CLI_VERSION = '${version}'`);
+    expect(src('import/src/version.ts')).toContain(`IMPORT_VERSION = '${version}'`);
+    expect(src('mcp/src/rpc.ts')).toContain(`name: 'wdf-mcp', version: '${version}'`);
+    const changelog = readFileSync(join(packagesDir, '../CHANGELOG.md'), 'utf8');
+    expect(changelog).toContain(`## ${version} — `);
   });
 
   it('the CLI ships its runtime fonts', () => {
