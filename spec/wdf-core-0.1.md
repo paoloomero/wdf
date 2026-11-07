@@ -2,7 +2,7 @@
 
 **Status:** Editor's Draft · **Version:** 0.1.0-draft · **Date:** 2026-07-18
 **Editor:** Paolo Omero (infoFACTORY)
-**License:** CC-BY 4.0 (planned)
+**License:** CC-BY 4.0 ([`LICENSE-SPEC`](https://github.com/paoloomero/wdf/blob/main/LICENSE-SPEC))
 **Provenance:** this draft was written with generative AI (Claude, through
 Claude Code) under the editor's direction. It is pre-existing AI-generated
 content; see [`GENAI.md`](https://github.com/paoloomero/wdf/blob/main/GENAI.md).
