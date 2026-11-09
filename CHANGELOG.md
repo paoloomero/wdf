@@ -32,6 +32,10 @@ Everything since 0.1.0 (12 August 2026).
 - Page-number fields (PAGE, NUMPAGES) no longer leave stale numbers; the
   alt text Word writes by itself is removed. Every change is in the
   conversion report.
+- Pictures inside headings or list items move to their own paragraph
+  (§6.2.9): such documents used to fail validation. An empty document
+  title no longer breaks the manifest. Tested on 2031 real `.docx` files:
+  0 validation errors.
 - `--standalone` writes a single self-contained `.wdf.html` next to the
   package.
 - Markdown: inline runs across line breaks, list item continuation lines,

@@ -304,3 +304,140 @@ describe('convertDocx — layout tables, Europass-like CV (plan §10.87)', () =>
     expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
   });
 });
+
+// Plan §10.89 (corpus of 2031 real .docx): pictures where the profile admits
+// none made 70 conversions fail validation; an empty dc:title crashed three.
+describe('convertDocx — pictures in headings and list items (plan §10.89)', () => {
+  const heading = (inner: string): string =>
+    `<w:p><w:pPr><w:outlineLvl w:val="1"/></w:pPr>${inner}</w:p>`;
+  const item = (inner: string): string =>
+    `<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr>${inner}</w:p>`;
+  const run = (text: string): string => `<w:r><w:t xml:space="preserve">${text}</w:t></w:r>`;
+
+  it('moves a picture out of a heading, before it; an image-only heading becomes a paragraph', async () => {
+    const { blocks, report } = await convertCv(
+      heading(picture('Logo') + run('Il sistema')) + heading(picture('Firma')),
+    );
+    const body = blocks.filter((b) => b.tag !== 'footer');
+    expect(body.map((b) => [b.tag, textOf(b), findAll([b], 'img').length])).toEqual([
+      ['p', '', 1],
+      ['h2', 'Il sistema', 0],
+      ['p', '', 1],
+    ]);
+    expect(report).toContain(
+      'moved 2 images out of headings and list items into their own paragraph (§6.2.9)',
+    );
+  });
+
+  it('moves a picture out of a list item, after it, splitting the list', async () => {
+    const { blocks } = await convertCv(
+      item(run('uno')) + item(run('due') + picture('Grafico')) + item(run('tre')),
+    );
+    const body = blocks.filter((b) => b.tag !== 'footer');
+    expect(body.map((b) => [b.tag, textOf(b), findAll([b], 'img').length])).toEqual([
+      ['ul', 'unodue', 0],
+      ['p', '', 1],
+      ['ul', 'tre', 0],
+    ]);
+  });
+
+  it('every converted document passes the profile', async () => {
+    const { blocks, stylesheet } = await convertCv(
+      heading(picture('Logo') + run('Titolo')) + item(run('voce') + picture('x')),
+    );
+    ensureIds(blocks, []);
+    const html = serializeDocument('it', 'Immagini', blocks, stylesheet !== undefined);
+    const errors = validateProfile(html).filter((v) => v.severity === 'error');
+    expect(errors, JSON.stringify(errors, null, 2)).toEqual([]);
+  });
+});
+
+describe('importDocument — title (plan §10.89)', () => {
+  it('skips an empty dc:title and a picture-only heading', async () => {
+    const { importDocument } = await import('@wdf-dev/import');
+    const document =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      `<w:document xmlns:w="${W_NS}"><w:body>` +
+      '<w:p><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:r><w:t>Proposta di consulenza</w:t></w:r></w:p>' +
+      '<w:p><w:r><w:t>Testo.</w:t></w:r></w:p><w:sectPr/></w:body></w:document>';
+    const core =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title></dc:title></cp:coreProperties>';
+    const result = await importDocument(
+      {
+        kind: 'docx',
+        text: '',
+        bytes: makeDocx({ document, extra: { 'docProps/core.xml': core } }),
+        baseName: 'proposta',
+        sourceName: 'proposta.docx',
+      },
+      { date: '2026-01-01T00:00:00Z' },
+    );
+    expect(result?.title).toBe('Proposta di consulenza');
+  });
+});
+
+// Plan §10.89: borderless DATA tables found in the corpus must stay tables.
+describe('convertDocx — borderless data tables stay tables (plan §10.89)', () => {
+  it('a rating grid whose questions are numbered paragraphs', async () => {
+    const q = (text: string): string => li(text, '1');
+    const row = (label: string): string =>
+      tr(tc(q(label)), tc(p('1')), tc(p('2')), tc(p('3')), tc(p('4')));
+    const { blocks } = await convertCv(
+      tbl(
+        tr(tc(''), tc(p('Scarsa')), tc(p('Sufficiente')), tc(p('Buona')), tc(p('Ottima'))) +
+          row('Durata?') +
+          row('Organizzazione?'),
+      ),
+    );
+    expect(blocks[0]?.tag).toBe('table');
+  });
+
+  it('a glossary in a gallery style without lines, even with two-paragraph cells', async () => {
+    const styles = STYLES_XML.replace(
+      '</w:styles>',
+      '<w:style w:type="table" w:styleId="PlainTable3"><w:name w:val="Plain Table 3"/></w:style></w:styles>',
+    );
+    const document =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      `<w:document xmlns:w="${W_NS}"><w:body>` +
+      tbl(
+        tr(tc(p('AI')), tc(p('Artificial Intelligence') + p('Simulazione dei processi'))) +
+          tr(tc(p('CAN')), tc(p('Controller Area Network'))),
+        '<w:tblStyle w:val="PlainTable3"/>',
+      ) +
+      '<w:sectPr/></w:body></w:document>';
+    const report: string[] = [];
+    const result = await convertDocx(
+      makeDocx({ document, extra: { 'word/styles.xml': styles } }),
+      report,
+    );
+    expect(result.blocks[0]?.tag).toBe('table');
+  });
+
+  it('a first row marked "repeat as header row"', async () => {
+    const { blocks } = await convertCv(
+      tbl(
+        '<w:tr><w:trPr><w:tblHeader/></w:trPr>' +
+          tc(p('Studio')) +
+          tc(p('Risultati')) +
+          '</w:tr>' +
+          tr(tc(p('MIT, 2025')), tc(p('Uso raro') + p('ma intenso'))),
+      ),
+    );
+    expect(blocks[0]?.tag).toBe('table');
+  });
+
+  it('a dense borderless grid (3×3, every cell filled)', async () => {
+    const r3 = (a: string, b: string, c: string): string =>
+      tr(tc(p(a)), tc(p(b)), tc(p(c) + p('nota')));
+    const { blocks } = await convertCv(
+      tbl(
+        r3('ID', 'Requisito', 'Priorità') +
+          r3('ND01', 'Info', 'Must') +
+          r3('ND02', 'Altro', 'Could'),
+      ),
+    );
+    expect(blocks[0]?.tag).toBe('table');
+  });
+});

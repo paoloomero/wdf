@@ -177,11 +177,15 @@ export async function importDocument(
   ensureIds(blocks, report, seed);
   fixDanglingFragments(blocks, report);
 
-  const firstHeading = blocks.find((b) => /^h[1-6]$/.test(b.tag));
+  // The first NON-EMPTY candidate (plan §10.89): Word files carry empty
+  // dc:title elements, and a heading may hold only a picture — an empty
+  // manifest title is invalid (§4).
+  const firstHeading = blocks.find((b) => /^h[1-6]$/.test(b.tag) && textOf(b).trim() !== '');
   const title =
-    opts.title ??
-    sourceTitle ??
-    (firstHeading === undefined ? input.baseName : textOf(firstHeading).trim());
+    [opts.title, sourceTitle, firstHeading === undefined ? undefined : textOf(firstHeading)]
+      .map((t) => t?.replace(/\s+/g, ' ').trim())
+      .find((t): t is string => t !== undefined && t !== '') ??
+    (input.baseName.trim() === '' ? 'Untitled' : input.baseName.trim());
   const lang = opts.lang ?? sourceLang ?? 'en';
   const html = serializeDocument(lang, title, blocks, stylesheet !== undefined);
   const htmlBytes = enc.encode(html);

@@ -1515,8 +1515,8 @@ function paragraphHasContent(p: XmlElement): boolean {
 }
 
 /**
- * Content a WDF cell cannot hold (§6.2.3): more than one paragraph, a list
- * item, a heading, a nested table.
+ * Content a WDF cell cannot hold (§6.2.3): more than one paragraph (a list
+ * among them), a heading, a nested table.
  */
 function cellHasBlockContent(tc: XmlElement, ctx: WmlContext): boolean {
   let paragraphs = 0;
@@ -1532,8 +1532,8 @@ function cellHasBlockContent(tc: XmlElement, ctx: WmlContext): boolean {
       if (child.local !== 'p' || !paragraphHasContent(child)) continue;
       const direct = parsePPr(xmlChild(child, W_NS, 'pPr'));
       if (ctx.styles.headingLevel(direct) !== undefined) return true;
-      const numId = ctx.styles.effectivePara(direct).numId;
-      if (numId !== undefined && numId !== '0') return true;
+      // A single numbered paragraph is a row label ("1. Come valuta…"), not
+      // a list: a list needs a second paragraph (plan §10.89).
       paragraphs += 1;
       if (paragraphs > 1) return true;
     }
@@ -1645,6 +1645,33 @@ function labelValueOf(tbl: XmlElement, ctx: WmlContext): [XmlElement, XmlElement
  * author did not draw a grid; the table only places text side by side. Its
  * content is converted as flowing blocks instead (plan §10.87).
  */
+/** Word's table-style gallery ("Plain Table 3", "Grid Table 4", "List Table 2"). */
+const GALLERY_TABLE_STYLE = /^(?:plain|grid|list) table\b/;
+
+/**
+ * Signals that the author made a DATA table, whatever its borders (plan
+ * §10.89, corpus of 2031 real .docx): a style from Word's table gallery
+ * (several have no outer lines), a first row marked "repeat as header row",
+ * or a dense grid — at least 3×3 with nearly every cell filled. Layout grids
+ * are sparse: labels on the left, empty continuation cells.
+ */
+function looksLikeDataTable(
+  tbl: XmlElement,
+  styleId: string | undefined,
+  ctx: WmlContext,
+): boolean {
+  if (ctx.styles.chain(styleId).some((st) => GALLERY_TABLE_STYLE.test(st.name))) return true;
+  const trs = xmlChildren(tbl, W_NS, 'tr');
+  const firstPr = trs[0] === undefined ? undefined : xmlChild(trs[0], W_NS, 'trPr');
+  if (firstPr !== undefined && onOff(xmlChild(firstPr, W_NS, 'tblHeader')) === true) return true;
+  const rows = trs.map((tr) => xmlChildren(tr, W_NS, 'tc'));
+  const columns = Math.max(0, ...rows.map((r) => r.length));
+  if (rows.length < 3 || columns < 3) return false;
+  const cells = rows.flat();
+  const empty = cells.filter((tc) => contentParagraphs(tc).length === 0).length;
+  return empty <= cells.length * 0.1;
+}
+
 function isLayoutTable(tbl: XmlElement, ctx: WmlContext): boolean {
   const tblPr = xmlChild(tbl, W_NS, 'tblPr');
   const styleId = tblPr === undefined ? undefined : wVal(tblPr, 'tblStyle');
@@ -1652,6 +1679,7 @@ function isLayoutTable(tbl: XmlElement, ctx: WmlContext): boolean {
   if (BORDER_SIDES.some((side) => borders[side]?.visible === true)) return false;
   const trs = xmlChildren(tbl, W_NS, 'tr');
   if (trs.length === 0) return false;
+  if (trs.length > 1 && looksLikeDataTable(tbl, styleId, ctx)) return false;
   let blockContent = trs.length === 1;
   for (const tr of trs) {
     // A row with nothing in any cell is vertical spacing, not a record.
@@ -1825,6 +1853,71 @@ function tableToBlock(tbl: XmlElement, caption: string, ctx: WmlContext): MEl | 
       bodyRows.map((r) => rowOf(r, 'td')),
     ),
   ]);
+}
+
+// ---------------------------------------------------------------------------
+// Pictures where the profile admits none (plan §10.89, §6.2.9)
+
+const hasImage = (n: MNode): boolean => isEl(n) && (n.tag === 'img' || n.children.some(hasImage));
+
+/** Removes every <img> from an inline tree, in order; wrappers left empty go too. */
+function takeImages(nodes: MNode[], out: MEl[]): MNode[] {
+  return nodes.flatMap((n): MNode[] => {
+    if (!isEl(n)) return [n];
+    if (n.tag === 'img') {
+      out.push(n);
+      return [];
+    }
+    const had = n.children.length;
+    n.children = takeImages(n.children, out);
+    return had > 0 && n.children.length === 0 ? [] : [n];
+  });
+}
+
+/**
+ * Word puts pictures anywhere; WDF admits them only in a paragraph, a table
+ * cell or a figure (§6.2.9). A picture in a heading moves to a paragraph
+ * right before it (a heading left without text goes); a picture in a list
+ * item moves to a paragraph right after the item, splitting the list there.
+ * Without this the whole conversion failed validation (plan §10.89).
+ */
+function liftImages(blocks: MEl[], moved: { count: number; replaced: Map<MEl, MEl> }): MEl[] {
+  const out: MEl[] = [];
+  for (const block of blocks) {
+    if (['header', 'footer', 'section', 'nav'].includes(block.tag)) {
+      block.children = liftImages(block.children.filter(isEl), moved);
+      out.push(block);
+    } else if (/^h[1-6]$/.test(block.tag) && block.children.some(hasImage)) {
+      const images: MEl[] = [];
+      block.children = takeImages(block.children, images);
+      moved.count += images.length;
+      const p = el('p', {}, images);
+      out.push(p);
+      if (textOf(block).trim() !== '') out.push(block);
+      else moved.replaced.set(block, p); // an authored page break stays anchored
+    } else if ((block.tag === 'ul' || block.tag === 'ol') && block.children.some(hasImage)) {
+      const items = block.children.filter(isEl);
+      block.children = [];
+      let current = block; // the first part keeps the original element
+      for (const li of items) {
+        const images: MEl[] = [];
+        li.children = takeImages(li.children, images);
+        if (li.children.length > 0 && (textOf(li).trim() !== '' || li.children.some(isEl))) {
+          current.children.push(li);
+        }
+        if (images.length > 0) {
+          moved.count += images.length;
+          if (current.children.length > 0) out.push(current);
+          out.push(el('p', {}, images));
+          current = el(block.tag, { ...block.attrs });
+        }
+      }
+      if (current.children.length > 0) out.push(current);
+    } else {
+      out.push(block);
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -2098,6 +2191,17 @@ export async function convertDocx(
   if (ctx.stats.autoAlt > 0) {
     report.push(
       `removed the alt text Word generated by itself for ${plural(ctx.stats.autoAlt, 'image', 'images')} (not the author's description)`,
+    );
+  }
+  const moved = { count: 0, replaced: new Map<MEl, MEl>() };
+  blocks.splice(0, blocks.length, ...liftImages(blocks, moved));
+  pageBreakBlocks.forEach((b, i) => {
+    const swapped = moved.replaced.get(b);
+    if (swapped !== undefined) pageBreakBlocks[i] = swapped;
+  });
+  if (moved.count > 0) {
+    report.push(
+      `moved ${plural(moved.count, 'image', 'images')} out of headings and list items into their own paragraph (§6.2.9)`,
     );
   }
   if (emptyParagraphs > 0) {
