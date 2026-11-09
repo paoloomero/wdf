@@ -42,6 +42,10 @@ function tbl(rows: string, tblPr = ''): string {
   return `<w:tbl>${tblPr === '' ? '' : `<w:tblPr>${tblPr}</w:tblPr>`}${rows}</w:tbl>`;
 }
 
+// A drawn grid: borders from the table style. Borderless tables with block
+// content or a single row are layout tables (plan §10.87, docx-layout.spec).
+const GRID = '<w:tblStyle w:val="GrigliaBase"/>';
+
 function para(text: string, pPr = ''): string {
   return `<w:p>${pPr === '' ? '' : `<w:pPr>${pPr}</w:pPr>`}<w:r><w:t>${text}</w:t></w:r></w:p>`;
 }
@@ -147,7 +151,7 @@ describe('convertDocx — tables', () => {
 
   it('a caption-style paragraph NOT adjacent to a table stays a paragraph', async () => {
     const { blocks } = await convert(
-      para('Solo testo', '<w:pStyle w:val="Didascalia"/>') + para('altro') + tbl(tr(tc('a'))),
+      para('Solo testo', '<w:pStyle w:val="Didascalia"/>') + para('altro') + tbl(tr(tc('a')), GRID),
     );
     expect(blocks.map((b) => b.tag)).toEqual(['p', 'p', 'table']);
   });
@@ -169,16 +173,19 @@ describe('convertDocx — tables', () => {
     const cell =
       '<w:tc><w:p><w:r><w:t>riga uno</w:t><w:br/></w:r></w:p><w:p><w:r><w:t>riga due</w:t></w:r></w:p>' +
       '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>annidata</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc>';
-    const { blocks, report } = await convert(tbl(`<w:tr>${cell}</w:tr>` + tr(tc('x'))));
+    const { blocks, report } = await convert(tbl(`<w:tr>${cell}</w:tr>` + tr(tc('x')), GRID));
     const { thead } = partsOf(blocks[0]);
     const th = rowsOf(thead)[0]?.[0];
     expect(textOf(th as MEl)).toBe('riga uno riga due annidata');
     expect(JSON.stringify(th)).not.toContain('"br"');
     expect(report.some((r) => r.includes('nested table flattened'))).toBe(true);
+    expect(report).toContain(
+      'dropped the paragraph breaks of 1 table cell (a cell holds one line of text, §6.2.3, §6.2.8)',
+    );
   });
 
   it('a single-row table keeps the header with an empty body, reported', async () => {
-    const { blocks, report } = await convert(tbl(tr(tc('sola'))));
+    const { blocks, report } = await convert(tbl(tr(tc('sola')), GRID));
     const { tbody } = partsOf(blocks[0]);
     expect(rowsOf(tbody)).toHaveLength(0);
     expect(report.some((r) => r.includes('single row'))).toBe(true);

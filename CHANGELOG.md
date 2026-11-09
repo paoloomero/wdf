@@ -22,6 +22,13 @@ Everything since 0.1.0 (12 August 2026).
   elements (spec §4.1, §6.4.4).
 - **Conversion report inside the package** with `--with-source` (extension
   `source` 0.6): what was dropped or changed, and why.
+- **Layout tables** in `.docx` (borderless grids that only place text,
+  as in Europass CVs) become paragraphs, headings and lists instead of
+  tables; a one-row section label becomes a heading. Drawn grids stay
+  tables, list labels kept as text in their cells.
+- Page-number fields (PAGE, NUMPAGES) no longer leave stale numbers; the
+  alt text Word writes by itself is removed. Every change is in the
+  conversion report.
 - `--standalone` writes a single self-contained `.wdf.html` next to the
   package.
 - Markdown: inline runs across line breaks, list item continuation lines,

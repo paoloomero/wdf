@@ -369,18 +369,33 @@ const ORDERED_FORMATS = new Set([
   'upperRoman',
 ]);
 
+/** One numbering level: format, label template ("%1)"), first number. */
+interface NumberingLevel {
+  readonly fmt: string;
+  readonly text: string | undefined;
+  readonly start: number;
+}
+
+function numberingLevelOf(lvl: XmlElement): NumberingLevel | undefined {
+  const fmt = wVal(lvl, 'numFmt');
+  if (fmt === undefined) return undefined;
+  return { fmt, text: wVal(lvl, 'lvlText'), start: twips(wVal(lvl, 'start')) ?? 1 };
+}
+
 /**
  * The numbering model: w:num instances point at w:abstractNum definitions;
- * each abstract level carries a numFmt. Only the format matters here — the
- * numbers themselves are rendered by the list element, never as text.
+ * each abstract level carries a numFmt. In body lists only the format
+ * matters — the numbers are rendered by the list element, never as text.
+ * Inside a data-table cell, where no list element can exist (§6.2.3), the
+ * label is written out as text (plan §10.87): hence lvlText and start.
  */
 export class DocxNumbering {
   /** numId → abstractNumId. */
   private readonly nums = new Map<string, string>();
-  /** numId → per-level format overrides (w:lvlOverride). */
-  private readonly overrides = new Map<string, Map<number, string>>();
-  /** abstractNumId → ilvl → numFmt. */
-  private readonly abstract = new Map<string, Map<number, string>>();
+  /** numId → per-level overrides (w:lvlOverride). */
+  private readonly overrides = new Map<string, Map<number, NumberingLevel>>();
+  /** abstractNumId → ilvl → level. */
+  private readonly abstract = new Map<string, Map<number, NumberingLevel>>();
 
   constructor(numberingXml: string | undefined) {
     if (numberingXml === undefined) return;
@@ -388,11 +403,11 @@ export class DocxNumbering {
     for (const abs of xmlChildren(root, W_NS, 'abstractNum')) {
       const id = xmlAttr(abs, W_NS, 'abstractNumId');
       if (id === undefined) continue;
-      const levels = new Map<number, string>();
+      const levels = new Map<number, NumberingLevel>();
       for (const lvl of xmlChildren(abs, W_NS, 'lvl')) {
         const ilvl = twips(xmlAttr(lvl, W_NS, 'ilvl'));
-        const fmt = wVal(lvl, 'numFmt');
-        if (ilvl !== undefined && fmt !== undefined) levels.set(ilvl, fmt);
+        const level = numberingLevelOf(lvl);
+        if (ilvl !== undefined && level !== undefined) levels.set(ilvl, level);
       }
       this.abstract.set(id, levels);
     }
@@ -401,24 +416,109 @@ export class DocxNumbering {
       const absId = wVal(num, 'abstractNumId');
       if (id === undefined || absId === undefined) continue;
       this.nums.set(id, absId);
-      const overrides = new Map<number, string>();
+      const overrides = new Map<number, NumberingLevel>();
       for (const over of xmlChildren(num, W_NS, 'lvlOverride')) {
         const ilvl = twips(xmlAttr(over, W_NS, 'ilvl'));
         const lvl = xmlChild(over, W_NS, 'lvl');
-        const fmt = lvl === undefined ? undefined : wVal(lvl, 'numFmt');
-        if (ilvl !== undefined && fmt !== undefined) overrides.set(ilvl, fmt);
+        const level = lvl === undefined ? undefined : numberingLevelOf(lvl);
+        if (ilvl !== undefined && level !== undefined) overrides.set(ilvl, level);
       }
       if (overrides.size > 0) this.overrides.set(id, overrides);
     }
   }
 
-  /** numFmt of an instance level, or undefined when the definition is missing. */
-  format(numId: string, ilvl: number): string | undefined {
+  /** Level definition of an instance, or undefined when it is missing. */
+  level(numId: string, ilvl: number): NumberingLevel | undefined {
     const override = this.overrides.get(numId)?.get(ilvl);
     if (override !== undefined) return override;
     const absId = this.nums.get(numId);
     if (absId === undefined) return undefined;
     return this.abstract.get(absId)?.get(ilvl);
+  }
+
+  /** numFmt of an instance level, or undefined when the definition is missing. */
+  format(numId: string, ilvl: number): string | undefined {
+    return this.level(numId, ilvl)?.fmt;
+  }
+}
+
+/** A number in a Word numbering format; unknown formats fall back to decimal. */
+function formatNumber(n: number, fmt: string): string {
+  const letters = (upper: boolean): string => {
+    // Word repeats the letter past z: 27 → aa, 28 → bb.
+    const letter = String.fromCharCode((upper ? 65 : 97) + ((n - 1) % 26));
+    return letter.repeat(Math.floor((n - 1) / 26) + 1);
+  };
+  const roman = (): string => {
+    const table: [number, string][] = [
+      [1000, 'm'],
+      [900, 'cm'],
+      [500, 'd'],
+      [400, 'cd'],
+      [100, 'c'],
+      [90, 'xc'],
+      [50, 'l'],
+      [40, 'xl'],
+      [10, 'x'],
+      [9, 'ix'],
+      [5, 'v'],
+      [4, 'iv'],
+      [1, 'i'],
+    ];
+    let rest = n;
+    let out = '';
+    for (const [value, digits] of table) {
+      while (rest >= value) {
+        out += digits;
+        rest -= value;
+      }
+    }
+    return out;
+  };
+  if (n < 1) return String(n);
+  switch (fmt) {
+    case 'lowerLetter':
+      return letters(false);
+    case 'upperLetter':
+      return letters(true);
+    case 'lowerRoman':
+      return roman();
+    case 'upperRoman':
+      return roman().toUpperCase();
+    case 'decimalZero':
+      return n < 10 ? `0${String(n)}` : String(n);
+    default:
+      return String(n);
+  }
+}
+
+/**
+ * Writes list labels out as text, for list paragraphs that end up inside a
+ * data-table cell (plan §10.87): "a) ", "1.2. ", "• ". Counters follow
+ * Word's model — per numbering instance, deeper levels restart when a
+ * shallower item appears.
+ */
+class ListLabels {
+  private readonly counters = new Map<string, number[]>();
+
+  constructor(private readonly numbering: DocxNumbering) {}
+
+  next(info: ListInfo): string {
+    const level = this.numbering.level(info.numId, info.level);
+    if (level === undefined || level.fmt === 'bullet') return '\u2022 ';
+    const counts = this.counters.get(info.numId) ?? [];
+    counts.length = info.level + 1;
+    counts[info.level] =
+      counts[info.level] === undefined ? level.start : (counts[info.level] as number) + 1;
+    this.counters.set(info.numId, counts);
+    const template = level.text ?? `%${String(info.level + 1)}.`;
+    const label = template.replace(/%([1-9])/g, (_, k: string) => {
+      const at = Number(k) - 1;
+      const def = this.numbering.level(info.numId, at);
+      const value = counts[at] ?? def?.start ?? 1;
+      return formatNumber(value, def?.fmt ?? 'decimal');
+    });
+    return `${label} `;
   }
 }
 
@@ -636,6 +736,20 @@ interface WmlContext {
   readonly mediaTotal: { bytes: number };
   /** Footnotes/endnotes (T20.7): content by id, and the reference order. */
   readonly notes: NotesRegistry;
+  /** Page header/footer part: page-number zones drop whole (plan §10.87). */
+  readonly furniture: boolean;
+  /** Counters shared across part contexts, reported once at the end (§10.87). */
+  readonly stats: ConversionStats;
+}
+
+interface ConversionStats {
+  /** Layout tables being unwrapped around the current block (nesting). */
+  layoutDepth: number;
+  layoutTables: number;
+  sectionLabels: number;
+  joinedCells: number;
+  pageFields: number;
+  autoAlt: number;
 }
 
 /** OOXML math namespace (T20.7): formulas flatten to their text. */
@@ -685,11 +799,12 @@ function loadNotesPart(
 }
 
 /** A context for another part (header/footer): same document, its own rels. */
-function partContext(ctx: WmlContext, partName: string): WmlContext {
+function partContext(ctx: WmlContext, partName: string, furniture = false): WmlContext {
   return {
     ...ctx,
     mainPart: partName,
     rels: new Map(ctx.container.relationshipsOf(partName).map((r) => [r.id, r])),
+    furniture,
   };
 }
 
@@ -775,6 +890,28 @@ function emitImage(
   return el('img', attrs);
 }
 
+/**
+ * Suffixes Word appends to the alt text it writes by itself ("Immagine che
+ * contiene testo — Descrizione generata automaticamente"): a guess about
+ * the picture, not the author's description (plan §10.87).
+ */
+const AUTO_ALT =
+  /(?:descrizione generata automaticamente|description automatically generated|description générée automatiquement|automatisch generierte beschreibung|descripción generada automáticamente|descrição gerada automaticamente|automatisch gegenereerde beschrijving)\.?\s*$/i;
+/** Office 2019+ "mark as decorative" (a16 / adec extension on docPr). */
+const DECORATIVE_NS = 'http://schemas.microsoft.com/office/drawing/2017/decorative';
+
+/** The author's alt text of a picture: empty when decorative or Word-generated. */
+function meaningfulAlt(docPr: XmlElement, ctx: WmlContext): string {
+  const decorative = findDescendant(docPr, DECORATIVE_NS, 'decorative');
+  if (decorative !== undefined && xmlAttr(decorative, '', 'val') !== '0') return '';
+  const alt = xmlAttr(docPr, '', 'descr') ?? '';
+  if (AUTO_ALT.test(alt.trim())) {
+    ctx.stats.autoAlt += 1;
+    return '';
+  }
+  return alt;
+}
+
 /** <img> from a w:drawing (DrawingML): blip r:embed, extent, docPr alt. */
 function imageFromDrawing(drawing: XmlElement, ctx: WmlContext): MEl | undefined {
   if (findDescendant(drawing, WP_NS, 'anchor') !== undefined) {
@@ -799,7 +936,7 @@ function imageFromDrawing(drawing: XmlElement, ctx: WmlContext): MEl | undefined
     return undefined;
   }
   const docPr = findDescendant(drawing, WP_NS, 'docPr');
-  const alt = docPr === undefined ? '' : (xmlAttr(docPr, '', 'descr') ?? '');
+  const alt = docPr === undefined ? '' : meaningfulAlt(docPr, ctx);
   const extent = findDescendant(drawing, WP_NS, 'extent');
   // EMU → CSS px at 96dpi: 9525 EMU per pixel.
   const px = (v: string | undefined): number => Math.round((twips(v) ?? 0) / 9525);
@@ -1101,6 +1238,106 @@ function listInfoOf(direct: ParaProps, ctx: WmlContext): ListInfo | undefined {
   return { level, ordered: fmt !== 'bullet', numId };
 }
 
+// ---------------------------------------------------------------------------
+// Page-number fields (plan §10.87): a reflowed document has no pages
+
+const PAGE_FIELD = /^\s*(?:PAGE|NUMPAGES|SECTIONPAGES)\b/i;
+
+interface FieldItem {
+  /** The run the item comes from, or undefined for a paragraph-level node. */
+  readonly run: XmlElement | undefined;
+  readonly node: XmlElement;
+  zone: number;
+  page: boolean;
+}
+
+/**
+ * The paragraph without the text of its page-number fields (PAGE, NUMPAGES,
+ * SECTIONPAGES — complex fields and fldSimple). Word stores the value it
+ * last rendered ("5 / 6"), which is false in any other rendering. In a page
+ * header/footer, the whole tab-separated zone holding the field goes
+ * ("Pagina 5 / 6"); the rest of the line stays. Unchanged paragraphs are
+ * returned as is.
+ */
+function withoutPageFields(p: XmlElement, ctx: WmlContext): XmlElement {
+  const items: FieldItem[] = [];
+  let zone = 0;
+  for (const child of p.children) {
+    if (child.kind !== 'element') continue;
+    if (child.ns === W_NS && child.local === 'r') {
+      for (const node of child.children) {
+        if (node.kind !== 'element') continue;
+        items.push({ run: child, node, zone, page: false });
+        if (node.ns === W_NS && (node.local === 'tab' || node.local === 'ptab')) zone += 1;
+      }
+    } else {
+      items.push({ run: undefined, node: child, zone, page: false });
+    }
+  }
+
+  // Complex fields: begin … instrText … separate … result … end, nestable.
+  const stack: { instr: string; page: boolean }[] = [];
+  let fields = 0;
+  for (const item of items) {
+    const { node } = item;
+    if (node.ns === W_NS && node.local === 'fldChar') {
+      const type = xmlAttr(node, W_NS, 'fldCharType');
+      if (type === 'begin') stack.push({ instr: '', page: false });
+      const top = stack[stack.length - 1];
+      if (type === 'separate' && top !== undefined && PAGE_FIELD.test(top.instr)) {
+        top.page = true;
+        fields += 1;
+      }
+      if (type === 'end') stack.pop();
+      continue;
+    }
+    if (node.ns === W_NS && node.local === 'instrText') {
+      const top = stack[stack.length - 1];
+      if (top !== undefined) top.instr += xmlText(node);
+      continue;
+    }
+    if (node.ns === W_NS && node.local === 'fldSimple') {
+      if (PAGE_FIELD.test(xmlAttr(node, W_NS, 'instr') ?? '')) {
+        item.page = true;
+        fields += 1;
+      }
+      continue;
+    }
+    if (stack.some((f) => f.page)) item.page = true;
+  }
+  if (fields === 0) return p;
+  ctx.stats.pageFields += fields;
+
+  const dropZones = new Set(ctx.furniture ? items.filter((i) => i.page).map((i) => i.zone) : []);
+  const kept = items.filter((i) => !i.page && !dropZones.has(i.zone));
+  const children: XmlElement[] = [];
+  let current: { run: XmlElement; nodes: XmlElement[] } | undefined;
+  const flush = (): void => {
+    if (current === undefined) return;
+    const rPr = xmlChild(current.run, W_NS, 'rPr');
+    children.push({
+      ...current.run,
+      children: rPr === undefined ? current.nodes : [rPr, ...current.nodes],
+    });
+    current = undefined;
+  };
+  for (const item of kept) {
+    if (item.run === undefined) {
+      flush();
+      children.push(item.node);
+    } else if (current?.run === item.run) {
+      current.nodes.push(item.node);
+    } else {
+      flush();
+      if (!(item.node.ns === W_NS && item.node.local === 'rPr')) {
+        current = { run: item.run, nodes: [item.node] };
+      }
+    }
+  }
+  flush();
+  return { ...p, children };
+}
+
 /** Unwraps redundant <strong> in heading content, keeping its signature. */
 function stripHeadingStrong(children: MNode[]): MNode[] {
   return children.flatMap((c): MNode[] => {
@@ -1122,11 +1359,16 @@ function paragraphToBlock(
   tag: string,
   ctx: WmlContext,
 ): MEl | undefined {
-  let children = inlineContent(p, direct.styleId, ctx);
+  let children = inlineContent(withoutPageFields(p, ctx), direct.styleId, ctx);
   // Word expresses vertical rhythm with empty paragraphs; spacing is style.
-  const text = children.map((c) => (typeof c === 'string' ? c : '')).join('');
-  const hasContent = children.some((c) => typeof c !== 'string') || text.trim() !== '';
-  if (!hasContent) return undefined;
+  // A styled run of tabs or spaces is still empty (plan §10.87).
+  const rendersSomething = (nodes: MNode[]): boolean =>
+    nodes.some((c) =>
+      typeof c === 'string'
+        ? c.trim() !== ''
+        : c.tag === 'img' || c.tag === 'br' || rendersSomething(c.children),
+    );
+  if (!rendersSomething(children)) return undefined;
 
   // Headings render bold natively: a strong wrapper is redundant semantics —
   // but its typographic signature must survive the unwrap.
@@ -1142,6 +1384,11 @@ function paragraphToBlock(
     delete effective.indentLeft;
     delete effective.firstLine;
     delete effective.hanging;
+  }
+  if (ctx.stats.layoutDepth > 0 && (effective.jc === 'right' || effective.jc === 'end')) {
+    // Right-aligned against a neighbouring column that no longer exists
+    // (an unwrapped layout table, plan §10.87): the line reads from the left.
+    delete effective.jc;
   }
   const signature = mergeSignatures(signatureOf(paraDecls(effective)), hoisted.signature);
   const attrs: Record<string, string> = {};
@@ -1219,6 +1466,162 @@ function cellParagraphs(tc: XmlElement, ctx: WmlContext): XmlElement[] {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Layout tables (plan §10.87): grids used to place text, not to hold data
+
+/** True when any border child of a w:tblBorders / w:tcBorders is a visible line. */
+function anyVisibleBorder(borders: XmlElement | undefined): boolean {
+  if (borders === undefined) return false;
+  return borders.children.some((b) => {
+    if (b.kind !== 'element' || b.ns !== W_NS) return false;
+    const val = xmlAttr(b, W_NS, 'val') ?? 'single';
+    return val !== 'none' && val !== 'nil';
+  });
+}
+
+/** A paragraph that renders something: text or a picture. */
+function paragraphHasContent(p: XmlElement): boolean {
+  let found = false;
+  const walk = (node: XmlElement): void => {
+    for (const child of node.children) {
+      if (found || child.kind !== 'element') continue;
+      if (child.ns === W_NS && child.local === 't' && xmlText(child).trim() !== '') found = true;
+      else if (child.ns === W_NS && (child.local === 'drawing' || child.local === 'pict'))
+        found = true;
+      else if (!(child.ns === W_NS && child.local === 'pPr')) walk(child);
+    }
+  };
+  walk(p);
+  return found;
+}
+
+/**
+ * Content a WDF cell cannot hold (§6.2.3): more than one paragraph, a list
+ * item, a heading, a nested table.
+ */
+function cellHasBlockContent(tc: XmlElement, ctx: WmlContext): boolean {
+  let paragraphs = 0;
+  const walk = (parent: XmlElement): boolean => {
+    for (const child of parent.children) {
+      if (child.kind !== 'element' || child.ns !== W_NS) continue;
+      if (child.local === 'tbl') return true;
+      if (child.local === 'sdt') {
+        const content = xmlChild(child, W_NS, 'sdtContent');
+        if (content !== undefined && walk(content)) return true;
+        continue;
+      }
+      if (child.local !== 'p' || !paragraphHasContent(child)) continue;
+      const direct = parsePPr(xmlChild(child, W_NS, 'pPr'));
+      if (ctx.styles.headingLevel(direct) !== undefined) return true;
+      const numId = ctx.styles.effectivePara(direct).numId;
+      if (numId !== undefined && numId !== '0') return true;
+      paragraphs += 1;
+      if (paragraphs > 1) return true;
+    }
+    return false;
+  };
+  return walk(tc);
+}
+
+/** Longest label a layout-table section row may carry (plan §10.87). */
+const MAX_SECTION_LABEL = 100;
+
+/** The paragraphs of a cell that render something, sdt content included. */
+function contentParagraphs(tc: XmlElement): XmlElement[] {
+  const out: XmlElement[] = [];
+  const walk = (parent: XmlElement): void => {
+    for (const child of parent.children) {
+      if (child.kind !== 'element' || child.ns !== W_NS) continue;
+      if (child.local === 'p' && paragraphHasContent(child)) out.push(child);
+      else if (child.local === 'sdt' || child.local === 'sdtContent' || child.local === 'tbl')
+        walk(child);
+      else if (child.local === 'tr' || child.local === 'tc') walk(child);
+    }
+  };
+  walk(tc);
+  return out;
+}
+
+/** Visible text of a paragraph (w:t only). */
+function paragraphText(p: XmlElement): string {
+  let text = '';
+  const walk = (node: XmlElement): void => {
+    for (const child of node.children) {
+      if (child.kind !== 'element') continue;
+      if (child.ns === W_NS && child.local === 't') text += xmlText(child);
+      else walk(child);
+    }
+  };
+  walk(p);
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The label of a section row, or undefined: a layout table of ONE row and
+ * two or more cells whose only text is one short paragraph in the FIRST
+ * cell — the others empty or holding pictures (a decorative rule). That is
+ * how a CV or a form names its sections ("ESPERIENZA PROFESSIONALE | ———");
+ * the structure says heading, whatever the font size (plan §10.87). Inside
+ * a longer table the same shape is usually a value with empty neighbours,
+ * so it stays a paragraph: when in doubt, no invented structure.
+ */
+function sectionLabelOf(tbl: XmlElement, ctx: WmlContext): XmlElement | undefined {
+  const rows = xmlChildren(tbl, W_NS, 'tr');
+  const tr = rows[0];
+  if (rows.length !== 1 || tr === undefined) return undefined;
+  const cells = xmlChildren(tr, W_NS, 'tc');
+  if (cells.length < 2) return undefined;
+  const [first, ...rest] = cells;
+  if (first === undefined) return undefined;
+  const label = contentParagraphs(first);
+  if (label.length !== 1) return undefined;
+  const p = label[0] as XmlElement;
+  const text = paragraphText(p);
+  if (text === '' || text.length > MAX_SECTION_LABEL) return undefined;
+  const direct = parsePPr(xmlChild(p, W_NS, 'pPr'));
+  const numId = ctx.styles.effectivePara(direct).numId;
+  if (numId !== undefined && numId !== '0') return undefined;
+  if (rest.some((tc) => contentParagraphs(tc).some((q) => paragraphText(q) !== ''))) {
+    return undefined;
+  }
+  return p;
+}
+
+/**
+ * A layout table: no visible border anywhere (table, direct or by style, and
+ * cells), and content no data table can hold — block content in a cell — or
+ * a single row (a WDF table needs a header row and a body, §6.2.8), or an
+ * entirely empty row (spacing). The
+ * author did not draw a grid; the table only places text side by side. Its
+ * content is converted as flowing blocks instead (plan §10.87).
+ */
+function isLayoutTable(tbl: XmlElement, ctx: WmlContext): boolean {
+  const tblPr = xmlChild(tbl, W_NS, 'tblPr');
+  const styleId = tblPr === undefined ? undefined : wVal(tblPr, 'tblStyle');
+  const borders = ctx.styles.effectiveTableBorders(styleId, parseTblBorders(tblPr));
+  if (BORDER_SIDES.some((side) => borders[side]?.visible === true)) return false;
+  const trs = xmlChildren(tbl, W_NS, 'tr');
+  if (trs.length === 0) return false;
+  let blockContent = trs.length === 1;
+  for (const tr of trs) {
+    // A row with nothing in any cell is vertical spacing, not a record.
+    if (
+      !blockContent &&
+      xmlChildren(tr, W_NS, 'tc').every((tc) => contentParagraphs(tc).length === 0)
+    ) {
+      blockContent = true;
+    }
+    for (const tc of xmlChildren(tr, W_NS, 'tc')) {
+      const tcPr = xmlChild(tc, W_NS, 'tcPr');
+      if (anyVisibleBorder(tcPr === undefined ? undefined : xmlChild(tcPr, W_NS, 'tcBorders'))) {
+        return false;
+      }
+      if (!blockContent) blockContent = cellHasBlockContent(tc, ctx);
+    }
+  }
+  return blockContent;
+}
+
 function tableToBlock(tbl: XmlElement, caption: string, ctx: WmlContext): MEl | undefined {
   const trs = xmlChildren(tbl, W_NS, 'tr');
   if (trs.length === 0) {
@@ -1294,17 +1697,26 @@ function tableToBlock(tbl: XmlElement, caption: string, ctx: WmlContext): MEl | 
   const width = Math.max(...outRows.map((r) => r.length));
 
   const inside = [borders.insideH, borders.insideV].find((b) => b?.visible === true);
+  // A cell holds one line of phrasing (§6.2.3, §6.2.8): list items keep
+  // their label as text so their boundaries survive (plan §10.87).
+  const labels = new ListLabels(ctx.numbering);
   const cellOf = (cell: RawCell, tag: 'th' | 'td'): MEl => {
     const parts: MNode[] = [];
     let align: string | undefined;
+    let paragraphs = 0;
     for (const p of cellParagraphs(cell.tc, ctx)) {
       const direct = parsePPr(xmlChild(p, W_NS, 'pPr'));
-      const inline = stripBr(inlineContent(p, direct.styleId, ctx));
+      const inline = stripBr(inlineContent(withoutPageFields(p, ctx), direct.styleId, ctx));
       if (inline.length === 0) continue;
+      paragraphs += 1;
       align ??= ctx.styles.effectivePara(direct).jc;
       if (parts.length > 0) appendInline(parts, [' ']);
+      const info =
+        ctx.styles.headingLevel(direct) === undefined ? listInfoOf(direct, ctx) : undefined;
+      if (info !== undefined) appendInline(parts, [labels.next(info)]);
       appendInline(parts, inline);
     }
+    if (paragraphs > 1) ctx.stats.joinedCells += 1;
     const hoisted = hoistUniformRunStyle(parts);
     const decls: Decls = new Map();
     if (inside !== undefined) decls.set('border', borderCss(inside));
@@ -1498,6 +1910,15 @@ export async function convertDocx(
       footnotesPart: loadedFootnotes.part,
       endnotesPart: loadedEndnotes.part,
     },
+    furniture: false,
+    stats: {
+      layoutDepth: 0,
+      layoutTables: 0,
+      sectionLabels: 0,
+      joinedCells: 0,
+      pageFields: 0,
+      autoAlt: 0,
+    },
   };
 
   const body = xmlChild(root, W_NS, 'body');
@@ -1526,7 +1947,7 @@ export async function convertDocx(
       const part = resolveTarget(mainPart, rel.target);
       const partXml = container.partText(part);
       if (partXml === undefined) continue;
-      const partResult = convertBlocks(parseXml(partXml), partContext(ctx, part), false);
+      const partResult = convertBlocks(parseXml(partXml), partContext(ctx, part, true), false);
       emptyParagraphs += partResult.empty;
       if (partResult.blocks.length === 0) continue; // empty containers are pruned (T14.1)
       if (kind === 'header') {
@@ -1574,6 +1995,33 @@ export async function convertDocx(
     }
   }
 
+  const plural = (n: number, one: string, many: string): string =>
+    `${String(n)} ${n === 1 ? one : many}`;
+  if (ctx.stats.layoutTables > 0) {
+    report.push(
+      `replaced ${plural(ctx.stats.layoutTables, 'layout table', 'layout tables')} with their content as paragraphs and lists (no visible borders, block content in cells)`,
+    );
+  }
+  if (ctx.stats.sectionLabels > 0) {
+    report.push(
+      `promoted ${plural(ctx.stats.sectionLabels, 'section label', 'section labels')} of layout tables to <h2> (a row holding only a short label)`,
+    );
+  }
+  if (ctx.stats.joinedCells > 0) {
+    report.push(
+      `dropped the paragraph breaks of ${plural(ctx.stats.joinedCells, 'table cell', 'table cells')} (a cell holds one line of text, §6.2.3, §6.2.8)`,
+    );
+  }
+  if (ctx.stats.pageFields > 0) {
+    report.push(
+      `removed ${plural(ctx.stats.pageFields, 'page-number field', 'page-number fields')} (a reflowed document has no pages)`,
+    );
+  }
+  if (ctx.stats.autoAlt > 0) {
+    report.push(
+      `removed the alt text Word generated by itself for ${plural(ctx.stats.autoAlt, 'image', 'images')} (not the author's description)`,
+    );
+  }
   if (emptyParagraphs > 0) {
     report.push(
       `dropped ${String(emptyParagraphs)} empty paragraph${emptyParagraphs === 1 ? '' : 's'} (spacing is translated style, not content)`,
@@ -1744,6 +2192,32 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
         }
         case 'tbl': {
           lists.flush();
+          if (isLayoutTable(child, ctx)) {
+            // Plan §10.87: the grid only placed text — its cells become
+            // flowing blocks, row by row, cell by cell, through this same
+            // walk (nested tables are judged again on their own).
+            ctx.stats.layoutTables += 1;
+            ctx.stats.layoutDepth += 1;
+            pendingCaption = undefined;
+            for (const tr of xmlChildren(child, W_NS, 'tr')) {
+              const label = sectionLabelOf(child, ctx);
+              for (const [n, tc] of xmlChildren(tr, W_NS, 'tc').entries()) {
+                if (n === 0 && label !== undefined) {
+                  const direct = parsePPr(xmlChild(label, W_NS, 'pPr'));
+                  const heading = paragraphToBlock(label, direct, 'h2', ctx);
+                  if (heading !== undefined) {
+                    blocks.push(heading);
+                    ctx.stats.sectionLabels += 1;
+                  }
+                  continue;
+                }
+                walkBody(tc);
+                lists.flush();
+              }
+            }
+            ctx.stats.layoutDepth -= 1;
+            break;
+          }
           let caption = '';
           let consumed: MEl | undefined;
           if (pendingCaption !== undefined && blocks[blocks.length - 1] === pendingCaption) {
@@ -1796,6 +2270,7 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
           break;
         }
         case 'sectPr': // trailing section properties: consumed by convertDocx
+        case 'tcPr': // properties of an unwrapped layout-table cell
         case 'bookmarkStart': // markers, not content
         case 'bookmarkEnd':
           break;
