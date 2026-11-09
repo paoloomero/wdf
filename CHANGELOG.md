@@ -26,6 +26,9 @@ Everything since 0.1.0 (12 August 2026).
   as in Europass CVs) become paragraphs, headings and lists instead of
   tables; a one-row section label becomes a heading. Drawn grids stay
   tables, list labels kept as text in their cells.
+- `.docx` forms: blank rows of tables are dropped; a one-row table is
+  never a data table — a label/value pair becomes a definition list, other
+  content becomes paragraphs.
 - Page-number fields (PAGE, NUMPAGES) no longer leave stale numbers; the
   alt text Word writes by itself is removed. Every change is in the
   conversion report.

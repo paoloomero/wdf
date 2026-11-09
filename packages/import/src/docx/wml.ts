@@ -705,7 +705,14 @@ function mergeSignatures(base: string | undefined, over: string | undefined): st
 // Runs and paragraphs
 
 /** Run children that are formatting/noise, silently skipped by design. */
-const RUN_NOISE = new Set(['rPr', 'lastRenderedPageBreak', 'fldChar', 'instrText', 'delText']);
+const RUN_NOISE = new Set([
+  'rPr',
+  'lastRenderedPageBreak',
+  'fldChar',
+  'instrText',
+  'delText',
+  'pgNum',
+]);
 /** Paragraph children that are markers/noise at this stage. */
 const PARA_NOISE = new Set([
   'pPr',
@@ -747,6 +754,12 @@ interface ConversionStats {
   layoutDepth: number;
   layoutTables: number;
   sectionLabels: number;
+  /** One-row tables with visible borders, converted as content (§10.88). */
+  oneRowTables: number;
+  /** Label/value rows turned into definition lists (§10.88). */
+  definitionRows: number;
+  /** Blank body rows of data tables (forms, templates), dropped (§10.88). */
+  emptyRows: number;
   joinedCells: number;
   pageFields: number;
   autoAlt: number;
@@ -1296,6 +1309,12 @@ function withoutPageFields(p: XmlElement, ctx: WmlContext): XmlElement {
       if (top !== undefined) top.instr += xmlText(node);
       continue;
     }
+    if (node.ns === W_NS && node.local === 'pgNum') {
+      // The legacy page-number element: the same falsehood, no field code.
+      item.page = true;
+      fields += 1;
+      continue;
+    }
     if (node.ns === W_NS && node.local === 'fldSimple') {
       if (PAGE_FIELD.test(xmlAttr(node, W_NS, 'instr') ?? '')) {
         item.page = true;
@@ -1566,6 +1585,7 @@ function paragraphText(p: XmlElement): string {
  * so it stays a paragraph: when in doubt, no invented structure.
  */
 function sectionLabelOf(tbl: XmlElement, ctx: WmlContext): XmlElement | undefined {
+  if (!isLayoutTable(tbl, ctx)) return undefined; // a bordered box is not a section rule
   const rows = xmlChildren(tbl, W_NS, 'tr');
   const tr = rows[0];
   if (rows.length !== 1 || tr === undefined) return undefined;
@@ -1585,6 +1605,35 @@ function sectionLabelOf(tbl: XmlElement, ctx: WmlContext): XmlElement | undefine
     return undefined;
   }
   return p;
+}
+
+/**
+ * The label and value of a one-row table holding exactly two non-empty
+ * cells, each one short paragraph of text — "Nazionalità | Italiana",
+ * "Patente di guida | Patente B" — or undefined. They become a definition
+ * list (dt/dd hold phrasing, §6.2.3; Markdown §7.5.6), which keeps the pair
+ * together without pretending it is a data table (plan §10.88).
+ */
+function labelValueOf(tbl: XmlElement, ctx: WmlContext): [XmlElement, XmlElement] | undefined {
+  const rows = xmlChildren(tbl, W_NS, 'tr');
+  const tr = rows[0];
+  if (rows.length !== 1 || tr === undefined) return undefined;
+  const filled = xmlChildren(tr, W_NS, 'tc')
+    .map((tc) => contentParagraphs(tc))
+    .filter((ps) => ps.length > 0);
+  if (filled.length !== 2 || filled.some((ps) => ps.length !== 1)) return undefined;
+  const pair = filled.map((ps) => ps[0] as XmlElement);
+  for (const p of pair) {
+    if (paragraphText(p) === '') return undefined;
+    if (findDescendant(p, W_NS, 'drawing') !== undefined) return undefined; // no img in dt/dd
+    if (findDescendant(p, W_NS, 'pict') !== undefined) return undefined;
+    const direct = parsePPr(xmlChild(p, W_NS, 'pPr'));
+    if (ctx.styles.headingLevel(direct) !== undefined) return undefined;
+    const numId = ctx.styles.effectivePara(direct).numId;
+    if (numId !== undefined && numId !== '0') return undefined;
+  }
+  if (paragraphText(pair[0] as XmlElement).length > MAX_SECTION_LABEL) return undefined;
+  return [pair[0] as XmlElement, pair[1] as XmlElement];
 }
 
 /**
@@ -1694,6 +1743,15 @@ function tableToBlock(tbl: XmlElement, caption: string, ctx: WmlContext): MEl | 
         : 'dropped colspan/rowspan (table grid could not be reconciled)',
     );
   }
+  // Blank rows of a form or template (plan §10.88): a body row with nothing
+  // in any cell carries no record. Only when no span is kept, so the grid
+  // stays exactly what the spans describe.
+  if (!keepSpans) {
+    const before = restRows.length;
+    const kept = restRows.filter((row) => row.some((c) => contentParagraphs(c.tc).length > 0));
+    restRows.splice(0, restRows.length, ...kept);
+    ctx.stats.emptyRows += before - kept.length;
+  }
   const width = Math.max(...outRows.map((r) => r.length));
 
   const inside = [borders.insideH, borders.insideV].find((b) => b?.visible === true);
@@ -1754,7 +1812,8 @@ function tableToBlock(tbl: XmlElement, caption: string, ctx: WmlContext): MEl | 
   if (caption === '') ctx.report.push('synthesized empty <caption> for a table');
   const bodyRows = restRows;
   if (bodyRows.length === 0) {
-    ctx.report.push('table had a single row: kept as header with empty body');
+    // One-row tables never get here (plan §10.88): the body was blank rows.
+    ctx.report.push('kept a table whose body rows were all empty: header only');
   }
   return el('table', tableAttrs, [
     el('caption', {}, caption === '' ? [] : [caption]),
@@ -1915,6 +1974,9 @@ export async function convertDocx(
       layoutDepth: 0,
       layoutTables: 0,
       sectionLabels: 0,
+      oneRowTables: 0,
+      definitionRows: 0,
+      emptyRows: 0,
       joinedCells: 0,
       pageFields: 0,
       autoAlt: 0,
@@ -2000,6 +2062,21 @@ export async function convertDocx(
   if (ctx.stats.layoutTables > 0) {
     report.push(
       `replaced ${plural(ctx.stats.layoutTables, 'layout table', 'layout tables')} with their content as paragraphs and lists (no visible borders, block content in cells)`,
+    );
+  }
+  if (ctx.stats.oneRowTables > 0) {
+    report.push(
+      `replaced ${plural(ctx.stats.oneRowTables, 'one-row table', 'one-row tables')} with their content (a table needs a header row and a body, §6.2.8)`,
+    );
+  }
+  if (ctx.stats.definitionRows > 0) {
+    report.push(
+      `replaced ${plural(ctx.stats.definitionRows, 'label/value row', 'label/value rows')} with a definition list (dl)`,
+    );
+  }
+  if (ctx.stats.emptyRows > 0) {
+    report.push(
+      `dropped ${plural(ctx.stats.emptyRows, 'empty table row', 'empty table rows')} (blank rows of a form or template)`,
     );
   }
   if (ctx.stats.sectionLabels > 0) {
@@ -2192,13 +2269,39 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
         }
         case 'tbl': {
           lists.flush();
-          if (isLayoutTable(child, ctx)) {
+          const layout = isLayoutTable(child, ctx);
+          const oneRow = xmlChildren(child, W_NS, 'tr').length === 1;
+          if (layout || oneRow) {
             // Plan §10.87: the grid only placed text — its cells become
             // flowing blocks, row by row, cell by cell, through this same
-            // walk (nested tables are judged again on their own).
-            ctx.stats.layoutTables += 1;
-            ctx.stats.layoutDepth += 1;
+            // walk (nested tables are judged again on their own). Plan
+            // §10.88: a one-row table, bordered or not, is never a data
+            // table (no body); a label/value pair becomes a dl.
+            if (layout) ctx.stats.layoutTables += 1;
+            else ctx.stats.oneRowTables += 1;
             pendingCaption = undefined;
+            const pair = oneRow ? labelValueOf(child, ctx) : undefined;
+            if (pair !== undefined) {
+              const [labelP, valueP] = pair;
+              const dt = paragraphToBlock(
+                labelP,
+                parsePPr(xmlChild(labelP, W_NS, 'pPr')),
+                'dt',
+                ctx,
+              );
+              const dd = paragraphToBlock(
+                valueP,
+                parsePPr(xmlChild(valueP, W_NS, 'pPr')),
+                'dd',
+                ctx,
+              );
+              if (dt !== undefined && dd !== undefined) {
+                blocks.push(el('dl', {}, [dt, dd]));
+                ctx.stats.definitionRows += 1;
+                break;
+              }
+            }
+            ctx.stats.layoutDepth += 1;
             for (const tr of xmlChildren(child, W_NS, 'tr')) {
               const label = sectionLabelOf(child, ctx);
               for (const [n, tc] of xmlChildren(tr, W_NS, 'tc').entries()) {

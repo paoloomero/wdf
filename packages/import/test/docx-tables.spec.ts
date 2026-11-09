@@ -151,7 +151,9 @@ describe('convertDocx — tables', () => {
 
   it('a caption-style paragraph NOT adjacent to a table stays a paragraph', async () => {
     const { blocks } = await convert(
-      para('Solo testo', '<w:pStyle w:val="Didascalia"/>') + para('altro') + tbl(tr(tc('a')), GRID),
+      para('Solo testo', '<w:pStyle w:val="Didascalia"/>') +
+        para('altro') +
+        tbl(tr(tc('a')) + tr(tc('b')), GRID),
     );
     expect(blocks.map((b) => b.tag)).toEqual(['p', 'p', 'table']);
   });
@@ -184,11 +186,40 @@ describe('convertDocx — tables', () => {
     );
   });
 
-  it('a single-row table keeps the header with an empty body, reported', async () => {
-    const { blocks, report } = await convert(tbl(tr(tc('sola')), GRID));
-    const { tbody } = partsOf(blocks[0]);
-    expect(rowsOf(tbody)).toHaveLength(0);
-    expect(report.some((r) => r.includes('single row'))).toBe(true);
+  // Plan §10.88: a one-row table has no body — never a data table.
+  it('a one-row table, even with borders, becomes its content', async () => {
+    const box = await convert(tbl(tr(tc('Informazioni personali')), GRID));
+    expect(box.blocks.map((b) => [b.tag, textOf(b)])).toEqual([['p', 'Informazioni personali']]);
+    expect(box.report).toContain(
+      'replaced 1 one-row table with their content (a table needs a header row and a body, §6.2.8)',
+    );
+    const pair = await convert(tbl(tr(tc('Nazionalità'), tc('Italiana'), tc('')), GRID));
+    const dl = pair.blocks[0];
+    expect(dl?.tag).toBe('dl');
+    expect(dl?.children.map((c) => [(c as MEl).tag, textOf(c as MEl)])).toEqual([
+      ['dt', 'Nazionalità'],
+      ['dd', 'Italiana'],
+    ]);
+    expect(pair.report).toContain('replaced 1 label/value row with a definition list (dl)');
+  });
+
+  it('drops the blank rows of a form, keeps the filled ones', async () => {
+    const { blocks, report } = await convert(
+      tbl(
+        tr(tc('Istituzione'), tc('Anno')) +
+          tr(tc('Università di Udine'), tc('2003')) +
+          tr(tc(''), tc('')) +
+          tr(tc(''), tc('')),
+        GRID,
+      ),
+    );
+    expect(rowsOf(partsOf(blocks[0]).tbody).map((r) => r.map((c) => textOf(c)))).toEqual([
+      ['Università di Udine', '2003'],
+    ]);
+    expect(report).toContain('dropped 2 empty table rows (blank rows of a form or template)');
+    const blank = await convert(tbl(tr(tc('Istituzione')) + tr(tc('')), GRID));
+    expect(rowsOf(partsOf(blank.blocks[0]).tbody)).toHaveLength(0);
+    expect(blank.report).toContain('kept a table whose body rows were all empty: header only');
   });
 
   it('tables between list items split the list', async () => {
