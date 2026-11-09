@@ -756,7 +756,7 @@ interface ConversionStats {
   sectionLabels: number;
   /** One-row tables with visible borders, converted as content (§10.88). */
   oneRowTables: number;
-  /** Label/value rows turned into definition lists (§10.88). */
+  /** Label/value rows turned into one paragraph each (§10.88). */
   definitionRows: number;
   /** Blank body rows of data tables (forms, templates), dropped (§10.88). */
   emptyRows: number;
@@ -1610,9 +1610,10 @@ function sectionLabelOf(tbl: XmlElement, ctx: WmlContext): XmlElement | undefine
 /**
  * The label and value of a one-row table holding exactly two non-empty
  * cells, each one short paragraph of text — "Nazionalità | Italiana",
- * "Patente di guida | Patente B" — or undefined. They become a definition
- * list (dt/dd hold phrasing, §6.2.3; Markdown §7.5.6), which keeps the pair
- * together without pretending it is a data table (plan §10.88).
+ * "Patente di guida | Patente B" — or undefined. They become ONE paragraph,
+ * label then value: the pair stays together on a citable line without
+ * pretending to be a data table. A dl would say more but has no anchor in
+ * core 0.1 (§6.4.1); citability wins (plan §10.88, Paolo 10 Nov).
  */
 function labelValueOf(tbl: XmlElement, ctx: WmlContext): [XmlElement, XmlElement] | undefined {
   const rows = xmlChildren(tbl, W_NS, 'tr');
@@ -2071,7 +2072,7 @@ export async function convertDocx(
   }
   if (ctx.stats.definitionRows > 0) {
     report.push(
-      `replaced ${plural(ctx.stats.definitionRows, 'label/value row', 'label/value rows')} with a definition list (dl)`,
+      `replaced ${plural(ctx.stats.definitionRows, 'label/value row', 'label/value rows')} with one paragraph each (label and value on one citable line)`,
     );
   }
   if (ctx.stats.emptyRows > 0) {
@@ -2283,20 +2284,31 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
             const pair = oneRow ? labelValueOf(child, ctx) : undefined;
             if (pair !== undefined) {
               const [labelP, valueP] = pair;
-              const dt = paragraphToBlock(
+              const label = paragraphToBlock(
                 labelP,
                 parsePPr(xmlChild(labelP, W_NS, 'pPr')),
-                'dt',
+                'p',
                 ctx,
               );
-              const dd = paragraphToBlock(
+              const value = paragraphToBlock(
                 valueP,
                 parsePPr(xmlChild(valueP, W_NS, 'pPr')),
-                'dd',
+                'p',
                 ctx,
               );
-              if (dt !== undefined && dd !== undefined) {
-                blocks.push(el('dl', {}, [dt, dd]));
+              if (label !== undefined && value !== undefined) {
+                // One citable line (§6.4.1 — a dl has no anchor in core 0.1):
+                // label and value side by side, each keeping its own style.
+                const part = (block: MEl): MNode[] => {
+                  const sig = block.attrs[STYLE_TMP_ATTR];
+                  return sig === undefined
+                    ? block.children
+                    : [el('span', { [STYLE_TMP_ATTR]: sig }, block.children)];
+                };
+                const attrs: Record<string, string> = {};
+                const id = label.attrs['id'] ?? value.attrs['id'];
+                if (id !== undefined) attrs['id'] = id;
+                blocks.push(el('p', attrs, [...part(label), ' ', ...part(value)]));
                 ctx.stats.definitionRows += 1;
                 break;
               }

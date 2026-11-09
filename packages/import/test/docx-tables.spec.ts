@@ -194,13 +194,10 @@ describe('convertDocx — tables', () => {
       'replaced 1 one-row table with their content (a table needs a header row and a body, §6.2.8)',
     );
     const pair = await convert(tbl(tr(tc('Nazionalità'), tc('Italiana'), tc('')), GRID));
-    const dl = pair.blocks[0];
-    expect(dl?.tag).toBe('dl');
-    expect(dl?.children.map((c) => [(c as MEl).tag, textOf(c as MEl)])).toEqual([
-      ['dt', 'Nazionalità'],
-      ['dd', 'Italiana'],
-    ]);
-    expect(pair.report).toContain('replaced 1 label/value row with a definition list (dl)');
+    expect(pair.blocks.map((b) => [b.tag, textOf(b)])).toEqual([['p', 'Nazionalità Italiana']]);
+    expect(pair.report).toContain(
+      'replaced 1 label/value row with one paragraph each (label and value on one citable line)',
+    );
   });
 
   it('drops the blank rows of a form, keeps the filled ones', async () => {
