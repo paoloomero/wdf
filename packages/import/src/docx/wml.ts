@@ -1618,7 +1618,42 @@ function sectionLabelOf(tbl: XmlElement, ctx: WmlContext): XmlElement | undefine
 function labelValueOf(tbl: XmlElement, ctx: WmlContext): [XmlElement, XmlElement] | undefined {
   const rows = xmlChildren(tbl, W_NS, 'tr');
   const tr = rows[0];
-  if (rows.length !== 1 || tr === undefined) return undefined;
+  return rows.length === 1 && tr !== undefined ? rowPairOf(tr, ctx) : undefined;
+}
+
+/** Ratio above which a value is set off from its label, not a plain value (= T7.7). */
+const EMPHASIS_RATIO = 1.15;
+
+/** Effective font size (half-points) of a paragraph's first run of text. */
+function paragraphFontSize(p: XmlElement, ctx: WmlContext): number | undefined {
+  const direct = parsePPr(xmlChild(p, W_NS, 'pPr'));
+  let size: number | undefined;
+  const walk = (node: XmlElement): boolean => {
+    for (const child of node.children) {
+      if (child.kind !== 'element') continue;
+      if (child.ns === W_NS && child.local === 'r') {
+        const text = xmlChildren(child, W_NS, 't')
+          .map((t) => xmlText(t))
+          .join('');
+        if (text.trim() === '') continue;
+        size = ctx.styles.effectiveRun(parseRPr(xmlChild(child, W_NS, 'rPr')), direct.styleId).sz;
+        return true;
+      }
+      if (walk(child)) return true;
+    }
+    return false;
+  };
+  walk(p);
+  return size;
+}
+
+/**
+ * The label and value of a row holding exactly two non-empty cells, each
+ * one short paragraph of text, or undefined (plan §10.88, §10.90). Not a
+ * pair when the value is set in a clearly larger type than its label — a
+ * CV's "INFORMAZIONI PERSONALI | PAOLO OMERO": the name is the title.
+ */
+function rowPairOf(tr: XmlElement, ctx: WmlContext): [XmlElement, XmlElement] | undefined {
   const filled = xmlChildren(tr, W_NS, 'tc')
     .map((tc) => contentParagraphs(tc))
     .filter((ps) => ps.length > 0);
@@ -1626,15 +1661,45 @@ function labelValueOf(tbl: XmlElement, ctx: WmlContext): [XmlElement, XmlElement
   const pair = filled.map((ps) => ps[0] as XmlElement);
   for (const p of pair) {
     if (paragraphText(p) === '') return undefined;
-    if (findDescendant(p, W_NS, 'drawing') !== undefined) return undefined; // no img in dt/dd
+    if (findDescendant(p, W_NS, 'drawing') !== undefined) return undefined; // pictures stay apart
     if (findDescendant(p, W_NS, 'pict') !== undefined) return undefined;
     const direct = parsePPr(xmlChild(p, W_NS, 'pPr'));
     if (ctx.styles.headingLevel(direct) !== undefined) return undefined;
     const numId = ctx.styles.effectivePara(direct).numId;
     if (numId !== undefined && numId !== '0') return undefined;
   }
-  if (paragraphText(pair[0] as XmlElement).length > MAX_SECTION_LABEL) return undefined;
-  return [pair[0] as XmlElement, pair[1] as XmlElement];
+  const [label, value] = pair as [XmlElement, XmlElement];
+  if (paragraphText(label).length > MAX_SECTION_LABEL) return undefined;
+  const labelSize = paragraphFontSize(label, ctx);
+  const valueSize = paragraphFontSize(value, ctx);
+  if (
+    labelSize !== undefined &&
+    valueSize !== undefined &&
+    valueSize > labelSize * EMPHASIS_RATIO
+  ) {
+    return undefined;
+  }
+  return [label, value];
+}
+
+/**
+ * Label and value as ONE paragraph, each keeping its own style: a citable
+ * line (§6.4.1 — a dl has no anchor in core 0.1; Paolo, 10 Nov).
+ */
+function pairParagraph(labelP: XmlElement, valueP: XmlElement, ctx: WmlContext): MEl | undefined {
+  const label = paragraphToBlock(labelP, parsePPr(xmlChild(labelP, W_NS, 'pPr')), 'p', ctx);
+  const value = paragraphToBlock(valueP, parsePPr(xmlChild(valueP, W_NS, 'pPr')), 'p', ctx);
+  if (label === undefined || value === undefined) return undefined;
+  const part = (block: MEl): MNode[] => {
+    const sig = block.attrs[STYLE_TMP_ATTR];
+    return sig === undefined
+      ? block.children
+      : [el('span', { [STYLE_TMP_ATTR]: sig }, block.children)];
+  };
+  const attrs: Record<string, string> = {};
+  const id = label.attrs['id'] ?? value.attrs['id'];
+  if (id !== undefined) attrs['id'] = id;
+  return el('p', attrs, [...part(label), ' ', ...part(value)]);
 }
 
 /**
@@ -2386,39 +2451,23 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
             else ctx.stats.oneRowTables += 1;
             pendingCaption = undefined;
             const pair = oneRow ? labelValueOf(child, ctx) : undefined;
-            if (pair !== undefined) {
-              const [labelP, valueP] = pair;
-              const label = paragraphToBlock(
-                labelP,
-                parsePPr(xmlChild(labelP, W_NS, 'pPr')),
-                'p',
-                ctx,
-              );
-              const value = paragraphToBlock(
-                valueP,
-                parsePPr(xmlChild(valueP, W_NS, 'pPr')),
-                'p',
-                ctx,
-              );
-              if (label !== undefined && value !== undefined) {
-                // One citable line (§6.4.1 — a dl has no anchor in core 0.1):
-                // label and value side by side, each keeping its own style.
-                const part = (block: MEl): MNode[] => {
-                  const sig = block.attrs[STYLE_TMP_ATTR];
-                  return sig === undefined
-                    ? block.children
-                    : [el('span', { [STYLE_TMP_ATTR]: sig }, block.children)];
-                };
-                const attrs: Record<string, string> = {};
-                const id = label.attrs['id'] ?? value.attrs['id'];
-                if (id !== undefined) attrs['id'] = id;
-                blocks.push(el('p', attrs, [...part(label), ' ', ...part(value)]));
-                ctx.stats.definitionRows += 1;
-                break;
-              }
+            const merged = pair === undefined ? undefined : pairParagraph(pair[0], pair[1], ctx);
+            if (merged !== undefined) {
+              blocks.push(merged);
+              ctx.stats.definitionRows += 1;
+              break;
             }
             ctx.stats.layoutDepth += 1;
             for (const tr of xmlChildren(child, W_NS, 'tr')) {
+              // Plan §10.90: a label/value row stays one line.
+              const rowPair = rowPairOf(tr, ctx);
+              const line =
+                rowPair === undefined ? undefined : pairParagraph(rowPair[0], rowPair[1], ctx);
+              if (line !== undefined) {
+                blocks.push(line);
+                ctx.stats.definitionRows += 1;
+                continue;
+              }
               const label = sectionLabelOf(child, ctx);
               for (const [n, tc] of xmlChildren(tr, W_NS, 'tc').entries()) {
                 if (n === 0 && label !== undefined) {

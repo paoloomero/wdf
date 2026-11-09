@@ -269,8 +269,7 @@ describe('convertDocx — layout tables, Europass-like CV (plan §10.87)', () =>
     );
     const body = blocks.filter((b) => b.tag !== 'footer');
     expect(body.map((b) => [b.tag, textOf(b)])).toEqual([
-      ['p', '1985-1989'],
-      ['p', 'Liceo'],
+      ['p', '1985-1989 Liceo'], // a label/value row stays one line (§10.90)
       ['p', 'Maturità'],
     ]);
   });
@@ -439,5 +438,58 @@ describe('convertDocx — borderless data tables stay tables (plan §10.89)', ()
       ),
     );
     expect(blocks[0]?.tag).toBe('table');
+  });
+});
+
+// Plan §10.90: label/value rows of multi-row layout tables stay one line.
+describe('convertDocx — label/value rows in layout tables (plan §10.90)', () => {
+  it('an offer sheet: the price row is one citable line', async () => {
+    const { blocks, report } = await convertCv(
+      tbl(
+        tr(tc(p('Analisi preliminare')), tc(p('Redazione di un report') + p('Incontro finale'))) +
+          tr(tc(p('Prezzo a Voi riservato')), tc(p('€ 2.100,00 + IVA'))),
+      ),
+    );
+    const body = blocks.filter((b) => b.tag !== 'footer');
+    expect(body.map((b) => textOf(b))).toEqual([
+      'Analisi preliminare',
+      'Redazione di un report',
+      'Incontro finale',
+      'Prezzo a Voi riservato € 2.100,00 + IVA',
+    ]);
+    expect(report).toContain(
+      'replaced 1 label/value row with one paragraph each (label and value on one citable line)',
+    );
+  });
+
+  it('a cover block: label and value in a row of four cells, two empty', async () => {
+    const { blocks } = await convertCv(
+      tbl(
+        tr(
+          tc(p('Il documento delinea la soluzione') + p('per il servizio')),
+          tc(''),
+          tc(p('referente')),
+          tc(p('Maria Esempio')),
+        ) + tr(tc(''), tc(''), tc(p('obiettivo')), tc(p('Accessibilità'))),
+      ),
+    );
+    const texts = blocks.filter((b) => b.tag !== 'footer').map((b) => textOf(b));
+    expect(texts).toContain('obiettivo Accessibilità');
+  });
+
+  it('a name set larger than its label stays its own paragraph (the CV title)', async () => {
+    const { blocks } = await convertCv(
+      tbl(
+        tr(tc(p('INFORMAZIONI PERSONALI', 'Sezione')), tc(p('Maria Esempio', 'Nome'))) +
+          tr(tc(''), tc('')) + // spacing row: a layout table
+          tr(tc(p('Telefono')), tc(p('000'))),
+      ),
+    );
+    const texts = blocks.filter((b) => b.tag !== 'footer').map((b) => [b.tag, textOf(b)]);
+    expect(texts).toEqual([
+      ['p', 'INFORMAZIONI PERSONALI'],
+      ['h1', 'Maria Esempio'],
+      ['p', 'Telefono 000'],
+    ]);
   });
 });
