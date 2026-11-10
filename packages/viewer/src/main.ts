@@ -1314,6 +1314,10 @@ function init(): void {
   // Standalone distribution profile (spec §9): embedded package.
   const embedded = document.getElementById('wdf-package');
   if (embedded !== null) {
+    // The readable copy and its note (§9.5, §9.7) serve readers that run no
+    // script; here the document renders from the package (§9.6) — drop them.
+    document.getElementById('wdf-readable')?.remove();
+    document.getElementById('wdf-agent-note')?.remove();
     const b64 = (embedded.textContent ?? '').replace(/\s+/g, '');
     const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);

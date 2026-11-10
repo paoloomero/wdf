@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 import {
+  checkReadableCopy,
   extractStandalone,
   readPackage,
   sha256Hex,
@@ -42,7 +43,7 @@ const dec = new TextDecoder('utf-8', { fatal: true });
  * a standalone `.wdf.html`, whose embedded package is the canonical artifact
  * (spec §9.2). Recognised by content, not by file name.
  */
-function packageBytes(file: Uint8Array): { bytes: Uint8Array; form: string } {
+function packageBytes(file: Uint8Array): { bytes: Uint8Array; form: string; html?: string } {
   const zip = file[0] === 0x50 && file[1] === 0x4b && file[2] === 0x03 && file[3] === 0x04;
   if (zip) return { bytes: file, form: '.wdf package' };
   let html: string;
@@ -54,6 +55,7 @@ function packageBytes(file: Uint8Array): { bytes: Uint8Array; form: string } {
   return {
     bytes: extractStandalone(html),
     form: 'standalone .wdf.html (embedded package, spec §9.2)',
+    html,
   };
 }
 
@@ -165,9 +167,11 @@ function subtreeIds(outline: WdfOutline, id: string): Set<string> {
 async function toolOpen(state: McpState, path: string): Promise<ToolResult> {
   let pkg: WdfPackage;
   let form: string;
+  let html: string | undefined;
   try {
     const opened = packageBytes(readFileSync(path));
     form = opened.form;
+    html = opened.html;
     pkg = readPackage(opened.bytes);
   } catch (e) {
     return fail(
@@ -181,7 +185,10 @@ async function toolOpen(state: McpState, path: string): Promise<ToolResult> {
   const outline = JSON.parse(
     dec.decode(pkg.files.get('ai/outline.json') ?? new Uint8Array()),
   ) as WdfOutline;
-  const validation = await validatePackage(pkg);
+  // A standalone file also answers for its readable copy (spec §9.6).
+  const packageVerdict = await validatePackage(pkg);
+  const validation =
+    html === undefined ? packageVerdict : checkReadableCopy(packageVerdict, html, markdown);
   state.doc = {
     path,
     pkg,

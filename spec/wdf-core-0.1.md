@@ -779,6 +779,34 @@ The _standalone distribution profile_ addresses this for dissemination:
   the consumer requirements of §8.2 and §11.
 - **9.4** The standalone form is a _distribution profile_, not the
   canonical format: tooling interoperates on `.wdf` packages.
+- **9.5** A standalone file SHOULD carry a _readable copy_ of the
+  document's AI representation, so that a reader that does not run scripts
+  — a text extractor, an agent fetching the page — finds the document and
+  not only the viewer. The readable copy is the package's `ai/content.md`
+  (§7) as the text content of exactly one element of the page,
+  `<pre id="wdf-readable">`, present in the page source before any script
+  runs. Its text, once the character references `&amp;`, `&lt;` and `&gt;`
+  are decoded (the only ones it may contain), MUST be byte-identical to
+  `ai/content.md`. It MUST NOT be inside `script`, `template` or `noscript`,
+  nor hidden by markup (the `hidden` attribute, or an inline `style` that
+  hides it): text extractors drop those. A viewer MAY hide it with a stylesheet rule
+  that applies only once scripts run.
+- **9.6** The readable copy is informative. The embedded package (§9.1)
+  remains the canonical artifact: viewers MUST render, verify and cite
+  from the package, never from the readable copy. A validator MUST report
+  an error when a readable copy is present and differs from the package's
+  `ai/content.md`.
+- **9.7** A standalone file SHOULD declare `<meta name="description">`
+  with the document title and SHOULD place, before the readable copy, one
+  short sentence addressed to automated readers saying that the text that
+  follows is the document and that the verifiable original is the embedded
+  package (non-normative wording, e.g. "WDF document. The text below is its
+  canonical Markdown; the verifiable original is the embedded package.").
+
+> _Errata 2026-11-10 (additive):_ 9.5–9.7 were added after a test in
+> which an agent reading a standalone file as a web page found only the
+> viewer's interface: the document existed only as base64 inside a
+> script. Files without a readable copy remain conforming.
 
 ## 10. Extensions
 

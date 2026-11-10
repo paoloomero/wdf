@@ -5,6 +5,7 @@ import {
   readPackage,
   STATUS_TEXT,
   validatePackage,
+  validateStandalone,
   validateProfile,
   WdfError,
   type ValidationResult,
@@ -74,9 +75,18 @@ export async function cmdValidate(
 
   // One pipeline for every consumer (spec §8.2 errata 2026-09-15, plan §10.70):
   // CLI, Reader and MCP all report validatePackage()'s verdict.
+  // A .wdf is a ZIP; a file carrying the §9.1 embedding script is a
+  // standalone .wdf.html — its embedded package (§9.2) plus its readable
+  // copy (§9.6). Anything else goes to the package validator, which reports
+  // what it is not (§3.1).
+  const zip = bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+  const standalone =
+    !zip && new TextDecoder('utf-8').decode(bytes).includes('<script type="application/wdf+zip"');
   let result: ValidationResult;
   try {
-    result = await validatePackage(bytes);
+    result = standalone
+      ? await validateStandalone(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+      : await validatePackage(bytes);
   } catch (e) {
     ctx.err(`error: ${String(e)}`);
     return 2;

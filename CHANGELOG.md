@@ -54,6 +54,14 @@ Everything since 0.1.0 (12 August 2026).
   the search box, documents open at a `#anchor`.
 - Installable app (PWA): install button and `.wdf` file association.
 
+### Share
+
+- **A `.wdf.html` an agent can read** (spec §9.5–§9.7, errata 2026-11-10):
+  the document's canonical Markdown is also plain text in the page, so an
+  agent or text extractor that runs no script finds the document, not only
+  the viewer. The embedded package stays the verifiable original; `wdf
+validate` now accepts `.wdf.html` and checks that the copy matches it.
+
 ### Verify
 
 - One verification pipeline, `validatePackage()`, shared by the CLI, the

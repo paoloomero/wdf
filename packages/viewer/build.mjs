@@ -36,8 +36,26 @@ const page = shell
 mkdirSync(join(here, 'dist'), { recursive: true });
 writeFileSync(join(here, 'dist/viewer.html'), page.replace('<!--WDF:PACKAGE-->', ''));
 
+// Spec §9.5–§9.7 (plan §10.91): a reader that runs no script — a text
+// extractor, an agent fetching the page — must find the DOCUMENT, not only
+// the viewer. The canonical Markdown goes at the top of the body as page
+// text; a tiny head script hides it at once wherever scripts run, so people
+// never see it flash, and the viewer then removes it.
+const READABLE_HEAD = `
+    <meta name="description" content="__WDF_TITLE__" />
+    <script>document.documentElement.classList.add('wdf-js')</script>
+    <style>
+      #wdf-agent-note, #wdf-readable { margin: 1rem; max-width: 80ch; font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+      #wdf-readable { white-space: pre-wrap; }
+      .wdf-js #wdf-agent-note, .wdf-js #wdf-readable { display: none; }
+    </style>`;
+const READABLE_BODY = `
+    <p id="wdf-agent-note">WDF document. The text below is its canonical Markdown (ai/content.md); the verifiable original is the embedded package (script#wdf-package, spec §9).</p>
+    <pre id="wdf-readable">__WDF_READABLE_MARKDOWN__</pre>`;
+
 const standalone = page
-  .replace('<title>WDF Viewer</title>', '<title>__WDF_TITLE__</title>')
+  .replace('<title>WDF Viewer</title>', () => `<title>__WDF_TITLE__</title>${READABLE_HEAD}`)
+  .replace(/<body>/, () => `<body>${READABLE_BODY}`)
   // A standalone file is a document artifact opened from file://, not the
   // installable app: no manifest link.
   .replace(/\s*<link rel="manifest"[^>]*\/>/, '')

@@ -3,7 +3,7 @@
 // package, downloaded as a standalone HTML (the T15.1 sendable default;
 // the .wdf option arrives with the popup UX, T18.5). Fully client-side:
 // the pipeline uses parse5, no DOM needed (§10.31 "Architettura").
-import { fillStandalone, type WdfCapture } from '@wdf-dev/core';
+import { standaloneFor, type WdfCapture } from '@wdf-dev/core';
 import {
   aggregateReport,
   geometryExclusions,
@@ -151,11 +151,7 @@ function buildReply(
       report: aggregateReport(report),
     };
   }
-  const standalone = fillStandalone(
-    standaloneTemplate,
-    result.title,
-    bytesToBase64(result.wdfBytes),
-  );
+  const standalone = standaloneFor(standaloneTemplate, result.title, result.wdfBytes);
   return {
     type: 'wdf-download',
     filename: downloadFilename(result.title, 'wdf.html'),

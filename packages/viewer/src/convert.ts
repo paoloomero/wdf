@@ -1,4 +1,4 @@
-import { bytesToBase64, fillStandalone } from '@wdf-dev/core';
+import { standaloneFor } from '@wdf-dev/core';
 import {
   decodeHtml,
   DEFAULT_CAPS,
@@ -223,5 +223,5 @@ export function toStandalone(
   template: string,
   converted: Pick<Converted, 'title' | 'wdfBytes'>,
 ): string {
-  return fillStandalone(template, converted.title, bytesToBase64(converted.wdfBytes));
+  return standaloneFor(template, converted.title, converted.wdfBytes);
 }

@@ -88,3 +88,26 @@ describe('wdf validate — one verdict (plan §10.70)', () => {
     expect(c.logs.join('\n')).not.toMatch(/tamper/i);
   });
 });
+
+// Plan §10.91: a standalone .wdf.html is validated too — its embedded
+// package (§9.2) and its readable copy (§9.6).
+describe('wdf validate — standalone .wdf.html (spec §9.5–§9.6)', () => {
+  it('verifies a standalone file and rejects an altered readable copy', async () => {
+    const { makeStandalone } = await import('../src/lib/build.js');
+    const files = readDirFiles(join(examplesDir, 'municipal-decree'));
+    const bytes = await buildPackage(files);
+    const html = makeStandalone(bytes, 'Decree no. 87/2026');
+    expect(html).toContain('<pre id="wdf-readable">');
+    const good = join(work, 'decree.wdf.html');
+    writeFileSync(good, html);
+    const ok = capture();
+    expect(await cmdValidate(good, {}, ok)).toBe(0);
+    expect(ok.logs.at(-1)).toContain('status verified');
+
+    const bad = join(work, 'altered.wdf.html');
+    writeFileSync(bad, html.replace('fifteen consecutive days', 'thirty consecutive days'));
+    const ko = capture();
+    expect(await cmdValidate(bad, {}, ko)).toBe(1);
+    expect(ko.logs.some((l) => l.includes('§9.6'))).toBe(true);
+  });
+});

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
-import { fillStandalone } from '@wdf-dev/core';
+import { aiMarkdownOf, standaloneFor } from '@wdf-dev/core';
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -30,7 +30,7 @@ function loadViewerTemplate(): string | undefined {
 export function makeStandalone(wdfBytes: Uint8Array, title: string): string {
   const b64 = Buffer.from(wdfBytes).toString('base64');
   const template = loadViewerTemplate();
-  if (template !== undefined) return fillStandalone(template, title, b64);
+  if (template !== undefined) return standaloneFor(template, title, wdfBytes);
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -39,6 +39,7 @@ export function makeStandalone(wdfBytes: Uint8Array, title: string): string {
     <title>${escapeHtml(title)} — WDF</title>
     <style>
       body { font: 16px/1.6 system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
+      #wdf-readable { white-space: pre-wrap; }
     </style>
   </head>
   <body>
@@ -49,6 +50,8 @@ export function makeStandalone(wdfBytes: Uint8Array, title: string): string {
       future build; meanwhile you can retrieve the canonical package:
     </p>
     <p><a id="wdf-download" download="document.wdf" href="#">Download document.wdf</a></p>
+    <p id="wdf-agent-note">WDF document. The text below is its canonical Markdown (ai/content.md); the verifiable original is the embedded package (script#wdf-package, spec §9).</p>
+    <pre id="wdf-readable">${escapeHtml(aiMarkdownOf(wdfBytes))}</pre>
     <script type="application/wdf+zip" id="wdf-package">${b64}</script>
     <script>
       (function () {

@@ -54,11 +54,17 @@ export {
 } from './table.js';
 export { readPackage, writePackage, checkPackageStructure, type WdfPackage } from './package.js';
 export {
+  aiMarkdownOf,
   bytesToBase64,
+  checkReadableCopy,
   extractStandalone,
   fillStandalone,
+  readableCopyOf,
+  standaloneFor,
   STANDALONE_PACKAGE,
+  STANDALONE_READABLE,
   STANDALONE_TITLE,
+  validateStandalone,
 } from './standalone.js';
 export {
   validatePackage,
