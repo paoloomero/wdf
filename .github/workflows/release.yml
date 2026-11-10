@@ -6,6 +6,8 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Manual re-run from main when a tagged run failed before publishing.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -44,5 +46,5 @@ jobs:
               echo "@wdf-dev/$name@$version already published - skipping"
               continue
             fi
-            npm publish "tarballs/wdf-dev-$name-$version.tgz" --access public
+            npm publish "./tarballs/wdf-dev-$name-$version.tgz" --access public
           done
