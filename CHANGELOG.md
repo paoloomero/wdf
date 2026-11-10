@@ -5,7 +5,7 @@ The five public packages (`@wdf-dev/core`, `@wdf-dev/import`, `@wdf-dev/viewer`,
 not the format version: every release below reads and writes **WDF Core 0.1**
 (`spec/wdf-core-0.1.md`).
 
-## 0.2.0 — unreleased
+## 0.2.0 — 10 November 2026
 
 Everything since 0.1.0 (12 August 2026).
 

@@ -1,6 +1,6 @@
 # WP19 (plan §10.46): publish the five public packages to npm on a version tag.
-# Requires npm "trusted publishing" (OIDC) configured on npmjs.com for this
-# repository+workflow — or, as a fallback, an NPM_TOKEN granular secret.
+# Requires npm "trusted publishing" (OIDC) configured on npmjs.com, per package,
+# for this repository + workflow file. A re-run skips what is already published.
 name: Release
 
 on:
@@ -9,7 +9,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # npm provenance (OIDC)
+  id-token: write # npm trusted publishing (OIDC)
 
 jobs:
   publish:
@@ -26,10 +26,23 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
-      - name: Publish to npm (with provenance)
+      # Trusted publishing needs npm >= 11.5.1; Node 22 ships npm 10.
+      - run: npm install -g npm@11
+      # pnpm packs (it rewrites workspace:* dependencies); npm publishes the
+      # tarballs over OIDC. No token: provenance is attached automatically.
+      - name: Pack
         run: >-
           pnpm --filter @wdf-dev/core --filter @wdf-dev/import --filter @wdf-dev/viewer
-          --filter @wdf-dev/cli --filter @wdf-dev/mcp publish
-          --access public --provenance --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          --filter @wdf-dev/cli --filter @wdf-dev/mcp
+          exec pnpm pack --pack-destination "$GITHUB_WORKSPACE/tarballs"
+      - name: Publish to npm (trusted publishing, dependency order)
+        run: |
+          set -euo pipefail
+          for name in core import viewer cli mcp; do
+            version=$(node -p "require('./packages/$name/package.json').version")
+            if npm view "@wdf-dev/$name@$version" version >/dev/null 2>&1; then
+              echo "@wdf-dev/$name@$version already published - skipping"
+              continue
+            fi
+            npm publish "tarballs/wdf-dev-$name-$version.tgz" --access public
+          done
