@@ -55,6 +55,7 @@ export {
 export { readPackage, writePackage, checkPackageStructure, type WdfPackage } from './package.js';
 export {
   bytesToBase64,
+  extractStandalone,
   fillStandalone,
   STANDALONE_PACKAGE,
   STANDALONE_TITLE,

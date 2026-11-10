@@ -4,21 +4,38 @@ import { join, resolve } from 'node:path';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { bytesToBase64, readPackage } from '@wdf-dev/core';
 import { buildPackage } from '@wdf-dev/import';
 import { readDirFiles } from '../../cli/src/lib/fsutil.js';
-import { handleMessage } from '../src/rpc.js';
+import { PassThrough } from 'node:stream';
+
+import { handleMessage, serveStdio } from '../src/rpc.js';
 import { callTool, type McpState } from '../src/tools.js';
 
 const examplesDir = resolve(import.meta.dirname, '../../../examples');
 
 let wdfPath: string;
 let tamperedPath: string;
+let standalonePath: string;
+let expectedContentHash: string;
 
 beforeAll(async () => {
   const work = mkdtempSync(join(tmpdir(), 'wdf-mcp-'));
   const bytes = await buildPackage(readDirFiles(join(examplesDir, 'municipal-decree')));
   wdfPath = join(work, 'decree.wdf');
   writeFileSync(wdfPath, bytes);
+  const hashes = JSON.parse(
+    new TextDecoder().decode(readPackage(bytes).files.get('integrity/hashes.json')),
+  ) as { files: Record<string, string> };
+  expectedContentHash = hashes.files['ai/content.md'] ?? '';
+
+  // Spec §9.1 form, base64 wrapped with line feeds as producers MAY do.
+  const b64 = bytesToBase64(bytes).replace(/.{76}/g, '$&\n');
+  standalonePath = join(work, 'decree.wdf.html');
+  writeFileSync(
+    standalonePath,
+    `<!doctype html><title>Decree</title><script type="application/wdf+zip" id="wdf-package">${b64}</script>`,
+  );
 
   // Flip one byte mid-archive: depending on where it lands the package is
   // either structurally unreadable or fails verification — never VERIFIED.
@@ -43,6 +60,22 @@ describe('WDF tools (T6.1)', () => {
     expect(out).toContain('Verification: VERIFIED');
     expect(out).toContain('sec-recitals');
     expect(state.doc?.outline.length).toBeGreaterThan(10);
+  });
+
+  it('wdf_open opens a standalone .wdf.html through its embedded package (spec §9.2)', async () => {
+    const state: McpState = {};
+    const out = text(await callTool(state, 'wdf_open', { path: standalonePath }));
+    expect(out).toContain('Form: standalone .wdf.html');
+    expect(out).toContain('Verification: VERIFIED');
+    expect(state.doc?.pkg.manifest.title).toContain('Decree no. 87/2026');
+  });
+
+  it('wdf_open rejects a file that is neither a package nor a standalone, citing §9.1', async () => {
+    const notWdf = join(mkdtempSync(join(tmpdir(), 'wdf-mcp-html-')), 'page.html');
+    writeFileSync(notWdf, '<!doctype html><p>just a page</p>');
+    const result = await callTool({}, 'wdf_open', { path: notWdf });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('§9.1');
   });
 
   it('wdf_outline returns the ordered structure map', async () => {
@@ -81,6 +114,9 @@ describe('WDF tools (T6.1)', () => {
     );
     expect(out).toContain('Verified: yes');
     expect(out).toContain('Spending commitments by chapter and year {#tbl-commitments}');
+    // The revision pin is the digest integrity/hashes.json lists (§8.1).
+    expect(expectedContentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(out).toContain(`Content hash: sha256:${expectedContentHash} of ai/content.md`);
   });
 
   it('tools fail cleanly without an open document or with unknown ids', async () => {
@@ -193,5 +229,30 @@ describe('JSON-RPC layer', () => {
   it('rejects unknown methods with -32601', async () => {
     const reply = await handleMessage({}, { jsonrpc: '2.0', id: 4, method: 'resources/list' });
     expect(reply?.error?.code).toBe(-32601);
+  });
+
+  it('handles pipelined messages in arrival order (plan §10.85)', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    serveStdio(input, output);
+    const replies: { id: number; result: { content: { text: string }[] } }[] = [];
+    const done = new Promise<void>((resolve) => {
+      let buffered = '';
+      output.on('data', (chunk: Buffer) => {
+        buffered += chunk.toString('utf8');
+        const lines = buffered.split('\n');
+        buffered = lines.pop() ?? '';
+        for (const line of lines) replies.push(JSON.parse(line) as (typeof replies)[number]);
+        if (replies.length === 2) resolve();
+      });
+    });
+    // Both requests in one chunk: wdf_cite must wait for the async wdf_open.
+    input.write(
+      `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'wdf_open', arguments: { path: wdfPath } } })}\n` +
+        `${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'wdf_cite', arguments: { id: 'tbl-commitments' } } })}\n`,
+    );
+    await done;
+    expect(replies.map((r) => r.id)).toEqual([1, 2]);
+    expect(replies[1]?.result.content[0]?.text).toContain('Citation: wdf:');
   });
 });

@@ -5,6 +5,8 @@
  * the same package and title always yield the same file, on any platform.
  */
 
+import { WdfError } from './errors.js';
+
 // The placeholders are assembled at run time, never written as literals:
 // the Reader bundles this module INTO the template it fills, and a literal
 // would be a second occurrence — the title (HTML-escaped only) would land in
@@ -36,4 +38,37 @@ export function fillStandalone(template: string, title: string, wdfBase64: strin
   return template
     .replaceAll(STANDALONE_TITLE, () => escapeHtml(title))
     .replace(STANDALONE_PACKAGE, () => wdfBase64);
+}
+
+const EMBED_OPEN = '<script type="application/wdf+zip" id="wdf-package">';
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/**
+ * Re-extracts the embedded package from a standalone file (spec §9.2). Only
+ * the form of §9.1 is accepted: exactly one embedding script, standard
+ * base64 whose only allowed extra character is the line feed. Anything else
+ * is rejected — the bytes returned still go through readPackage() and
+ * validatePackage() like any other package.
+ */
+export function extractStandalone(html: string): Uint8Array {
+  const parts = html.split(EMBED_OPEN);
+  if (parts.length !== 2) {
+    throw new WdfError(
+      parts.length === 1
+        ? 'not a standalone file: no embedded package script'
+        : 'ambiguous standalone file: more than one embedded package script',
+      '§9.1',
+    );
+  }
+  const rest = parts[1] ?? '';
+  const end = rest.indexOf('</script>');
+  if (end === -1) throw new WdfError('unterminated embedded package script', '§9.1');
+  const encoded = rest.slice(0, end).replaceAll('\n', '');
+  if (encoded.length === 0 || encoded.length % 4 !== 0 || !BASE64.test(encoded)) {
+    throw new WdfError('embedded package is not standard base64 (RFC 4648)', '§9.1');
+  }
+  const bin = atob(encoded);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
 }

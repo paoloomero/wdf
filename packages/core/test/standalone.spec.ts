@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   bytesToBase64,
+  extractStandalone,
   fillStandalone,
   STANDALONE_PACKAGE,
   STANDALONE_TITLE,
@@ -45,5 +46,36 @@ describe('standalone filler (spec §9)', () => {
     const template = readFileSync(built, 'utf8');
     expect(template.split(STANDALONE_TITLE).length - 1).toBe(1);
     expect(template.split(STANDALONE_PACKAGE).length - 1).toBe(1);
+  });
+});
+
+describe('standalone extraction (spec §9.2)', () => {
+  const embed = (b64: string): string =>
+    `<!doctype html><title>t</title><script type="application/wdf+zip" id="wdf-package">${b64}</script><script>/* viewer */</script>`;
+
+  it('re-extracts the byte-identical package from a filled template', () => {
+    const bytes = new Uint8Array(0x8000 + 7);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 13) & 0xff;
+    const template = embed(STANDALONE_PACKAGE).replace('<title>t', `<title>${STANDALONE_TITLE}`);
+    const html = fillStandalone(template, 'Title', bytesToBase64(bytes));
+    expect(extractStandalone(html)).toEqual(bytes);
+  });
+
+  it('accepts line feeds inside the encoded text (§9.1)', () => {
+    expect(extractStandalone(embed('QU\nJD\n'))).toEqual(new TextEncoder().encode('ABC'));
+  });
+
+  it('rejects anything but exactly one well-formed embedding, citing §9.1', () => {
+    for (const html of [
+      '<html>no package</html>',
+      embed('QUJD') + embed('QUJD'),
+      embed('QU JD'),
+      embed('QUJD\r\n'),
+      embed('QUJ'),
+      embed(''),
+      '<script type="application/wdf+zip" id="wdf-package">QUJD',
+    ]) {
+      expect(() => extractStandalone(html)).toThrow(/§9\.1/);
+    }
   });
 });

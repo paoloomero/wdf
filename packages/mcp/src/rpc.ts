@@ -82,10 +82,15 @@ export async function handleMessage(
   }
 }
 
-/** Runs the newline-delimited stdio loop. */
+/**
+ * Runs the newline-delimited stdio loop. Messages are handled strictly in
+ * arrival order, one at a time: the tools share one open document, so a
+ * wdf_cite pipelined behind a wdf_open must see that document (plan §10.85).
+ */
 export function serveStdio(input: NodeJS.ReadableStream, output: NodeJS.WritableStream): void {
   const state: McpState = {};
   let buffer = '';
+  let queue: Promise<void> = Promise.resolve();
   input.setEncoding('utf8');
   input.on('data', (chunk: string) => {
     buffer += chunk;
@@ -95,7 +100,7 @@ export function serveStdio(input: NodeJS.ReadableStream, output: NodeJS.Writable
       buffer = buffer.slice(newline + 1);
       newline = buffer.indexOf('\n');
       if (line === '') continue;
-      void (async () => {
+      queue = queue.then(async () => {
         let reply: JsonRpcResponse | null;
         try {
           reply = await handleMessage(state, JSON.parse(line) as JsonRpcRequest);
@@ -103,7 +108,7 @@ export function serveStdio(input: NodeJS.ReadableStream, output: NodeJS.Writable
           reply = errorResponse(null, -32700, 'Parse error');
         }
         if (reply !== null) output.write(`${JSON.stringify(reply)}\n`);
-      })();
+      });
     }
   });
 }

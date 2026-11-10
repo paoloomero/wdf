@@ -60,7 +60,7 @@ claude mcp add wdf -- node <repo>/packages/mcp/dist/index.js
   "params": {
     "name": "wdf_open",
     "arguments": {
-      "path": "/var/folders/qr/b8_044zd73l_f8nwrwlvhn200000gn/T/wdf-mcp-demo-me1Vn5/municipal-decree.wdf"
+      "path": "/var/folders/qr/b8_044zd73l_f8nwrwlvhn200000gn/T/wdf-mcp-demo-sG9Pqy/municipal-decree.wdf"
     }
   }
 }
@@ -68,6 +68,7 @@ claude mcp add wdf -- node <repo>/packages/mcp/dist/index.js
 
 ```
 Opened: Decree no. 87/2026 — Award of document digitisation services
+Form: .wdf package
 Document id: urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7
 Language: en · 22 citable elements · 16 blocks
 Verification: VERIFIED (conforming package, hashes ok, AI layer is the canonical derivation of the content)
@@ -227,6 +228,7 @@ No citable element "sec-dispositivo" in this document. Use wdf_outline to list e
 
 ```
 Citation: wdf:urn:uuid:7d444840-9dc0-5d1c-b745-1a56c4e5f6a7#tbl-commitments
+Content hash: sha256:a208728766792e7c98e45b5c395f21560072b8c591ca23cac0cb506ab70522ff of ai/content.md (spec §8.1) — pins the revision the quote comes from
 Verified: yes — the cited content is the canonical derivation of the document content (conforming package, hashes ok)
 Resolves to:
 Spending commitments by chapter and year {#tbl-commitments}

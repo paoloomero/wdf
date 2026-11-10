@@ -6,10 +6,12 @@ Zero runtime dependencies beyond `@wdf-dev/core`; speaks MCP over stdio.
 
 ## Tools
 
-- `wdf_open` — open a `.wdf` package and verify its integrity
+- `wdf_open` — open a `.wdf` package or a standalone `.wdf.html` and verify it (conformance, hashes, derivation of the AI layer)
 - `wdf_outline` — document outline with stable section anchors
 - `wdf_read` — read a section's canonical content
-- `wdf_cite` — produce a verifiable citation (anchor + content hash)
+- `wdf_cite` — produce a verifiable citation: `wdf:<document-id>#<element-id>`, the quoted content, and the SHA-256 of `ai/content.md` that pins the revision (the digest `integrity/hashes.json` lists)
+
+A package that does not verify stays readable, but every answer is marked NOT VERIFIED.
 
 ## Setup
 

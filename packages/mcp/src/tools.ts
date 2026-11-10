@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 
 import {
+  extractStandalone,
   readPackage,
+  sha256Hex,
   STATUS_TEXT,
   validatePackage,
   WdfError,
@@ -25,6 +27,8 @@ export interface OpenDocument {
   outline: WdfOutline;
   blocks: { text: string; ids: string[] }[];
   validation: ValidationResult;
+  /** Lowercase hex SHA-256 of the ai/content.md bytes served (spec §8.1). */
+  contentHash: string;
 }
 
 export interface McpState {
@@ -32,6 +36,26 @@ export interface McpState {
 }
 
 const dec = new TextDecoder('utf-8', { fatal: true });
+
+/**
+ * A `.wdf` is a ZIP (local file header signature); anything else is tried as
+ * a standalone `.wdf.html`, whose embedded package is the canonical artifact
+ * (spec §9.2). Recognised by content, not by file name.
+ */
+function packageBytes(file: Uint8Array): { bytes: Uint8Array; form: string } {
+  const zip = file[0] === 0x50 && file[1] === 0x4b && file[2] === 0x03 && file[3] === 0x04;
+  if (zip) return { bytes: file, form: '.wdf package' };
+  let html: string;
+  try {
+    html = dec.decode(file);
+  } catch {
+    throw new WdfError('neither a ZIP archive nor a UTF-8 standalone file', '§9.1');
+  }
+  return {
+    bytes: extractStandalone(html),
+    form: 'standalone .wdf.html (embedded package, spec §9.2)',
+  };
+}
 
 function splitBlocks(markdown: string): { text: string; ids: string[] }[] {
   const body = markdown.endsWith('\n') ? markdown.slice(0, -1) : markdown;
@@ -62,10 +86,12 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: 'wdf_open',
     description:
-      'Open a .wdf package from a filesystem path, verify it (conformance, hashes, and derivation of the AI layer — spec §8.2), and return its summary. Must be called before the other tools.',
+      'Open a .wdf package, or a standalone .wdf.html (spec §9), from a filesystem path, verify it (conformance, hashes, and derivation of the AI layer — spec §8.2), and return its summary. Must be called before the other tools.',
     inputSchema: {
       type: 'object',
-      properties: { path: { type: 'string', description: 'Path to a .wdf file' } },
+      properties: {
+        path: { type: 'string', description: 'Path to a .wdf or .wdf.html file' },
+      },
       required: ['path'],
     },
   },
@@ -89,7 +115,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: 'wdf_cite',
     description:
-      'Build a verifiable citation (wdf:<document-id>#<element-id>) for a citable element of the open document, with the exact quoted content it resolves to.',
+      'Build a verifiable citation (wdf:<document-id>#<element-id>) for a citable element of the open document, with the exact quoted content it resolves to and the SHA-256 of ai/content.md, which pins the revision the quote comes from (spec §8.1).',
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string', description: 'Citable element id' } },
@@ -138,8 +164,11 @@ function subtreeIds(outline: WdfOutline, id: string): Set<string> {
 
 async function toolOpen(state: McpState, path: string): Promise<ToolResult> {
   let pkg: WdfPackage;
+  let form: string;
   try {
-    pkg = readPackage(readFileSync(path));
+    const opened = packageBytes(readFileSync(path));
+    form = opened.form;
+    pkg = readPackage(opened.bytes);
   } catch (e) {
     return fail(
       e instanceof WdfError
@@ -147,12 +176,21 @@ async function toolOpen(state: McpState, path: string): Promise<ToolResult> {
         : `Cannot open ${path}: ${String(e)}`,
     );
   }
-  const markdown = dec.decode(pkg.files.get('ai/content.md') ?? new Uint8Array());
+  const contentBytes = pkg.files.get('ai/content.md') ?? new Uint8Array();
+  const markdown = dec.decode(contentBytes);
   const outline = JSON.parse(
     dec.decode(pkg.files.get('ai/outline.json') ?? new Uint8Array()),
   ) as WdfOutline;
   const validation = await validatePackage(pkg);
-  state.doc = { path, pkg, markdown, outline, blocks: splitBlocks(markdown), validation };
+  state.doc = {
+    path,
+    pkg,
+    markdown,
+    outline,
+    blocks: splitBlocks(markdown),
+    validation,
+    contentHash: await sha256Hex(contentBytes),
+  };
 
   const sections = outline
     .filter((n) => n.type === 'section' && n.parent === null)
@@ -164,6 +202,7 @@ async function toolOpen(state: McpState, path: string): Promise<ToolResult> {
   return ok(
     [
       `Opened: ${pkg.manifest.title}`,
+      `Form: ${form}`,
       `Document id: ${pkg.manifest.id}`,
       `Language: ${pkg.manifest.language} · ${String(outline.length)} citable elements · ${String(state.doc.blocks.length)} blocks`,
       `Verification: ${status}`,
@@ -201,6 +240,7 @@ function toolCite(state: McpState, id: string): ToolResult {
   return ok(
     [
       `Citation: wdf:${doc.pkg.manifest.id}#${id}`,
+      `Content hash: sha256:${doc.contentHash} of ai/content.md (spec §8.1) — pins the revision the quote comes from`,
       `Verified: ${doc.validation.verified ? 'yes — the cited content is the canonical derivation of the document content (conforming package, hashes ok)' : `NO — ${STATUS_TEXT[doc.validation.status].label}: ${STATUS_TEXT[doc.validation.status].detail}`}`,
       'Resolves to:',
       block === undefined ? '(container element; use wdf_read for its content)' : block.text,
