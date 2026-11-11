@@ -99,6 +99,23 @@ export async function cmdValidate(
   const warnings = result.violations.filter((v) => v.severity === 'warning');
   const valid = result.verified;
 
+  // The author's PDF, when the package carries one (extension "source"): it is
+  // included as-is and never compared with the content — say it here too
+  // (plan §10.97). Informative: it does not change the verdict.
+  let authorPdf: string | undefined;
+  try {
+    const pkg = readPackage(
+      standalone ? extractStandalone(new TextDecoder('utf-8').decode(bytes)) : bytes,
+    );
+    const sourceJson = pkg.files.get('ext/source/source.json');
+    if (sourceJson !== undefined) {
+      const visual = (JSON.parse(dec.decode(sourceJson)) as { visual?: { name?: unknown } }).visual;
+      if (visual !== undefined) authorPdf = typeof visual.name === 'string' ? visual.name : '';
+    }
+  } catch {
+    /* an unreadable package is already reported by the verdict */
+  }
+
   if (opts.json === true) {
     ctx.log(
       JSON.stringify(
@@ -109,6 +126,7 @@ export async function cmdValidate(
           integrity: result.integrity,
           determinism: result.determinism,
           violations: result.violations,
+          ...(authorPdf !== undefined && { authorPdf: { name: authorPdf, compared: false } }),
         },
         null,
         2,
@@ -116,6 +134,11 @@ export async function cmdValidate(
     );
   } else {
     for (const v of result.violations) ctx.log(formatViolation(v));
+    if (authorPdf !== undefined) {
+      ctx.log(
+        `note: includes the author's PDF${authorPdf === '' ? '' : ` (${authorPdf})`}: included as-is, not compared with the content (docs/ext-source.md)`,
+      );
+    }
     ctx.log(
       `${valid ? 'VALID' : 'INVALID'}: ${String(errors.length)} error(s), ${String(warnings.length)} warning(s); status ${result.status} (${STATUS_TEXT[result.status].label}); integrity ${result.integrity ? 'ok' : 'FAILED'}, determinism ${result.determinism ? 'ok' : 'FAILED'}`,
     );

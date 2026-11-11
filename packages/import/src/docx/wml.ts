@@ -1196,7 +1196,7 @@ function imageFromVml(pict: XmlElement, ctx: WmlContext): MEl | undefined {
 }
 
 /**
- * A footnote/endnote reference (T20.7): notes move to the final Notes
+ * A footnote/endnote reference (T20.7): notes move to the final notes
  * section; the reference becomes a sup-wrapped fragment link. Numbers are
  * unified across kinds, in first-reference order; the FIRST reference
  * carries the backlink target id.
@@ -2403,7 +2403,7 @@ export async function convertDocx(
     }
   }
 
-  // Notes section (T20.7): referenced footnotes/endnotes become a final
+  // Notes list (T20.7): referenced footnotes/endnotes become a final
   // "Note"/"Notes" section — an ordered list whose numbering matches the
   // sup references; each item ends with a backlink to its first reference.
   if (ctx.notes.byKey.size > 0) {
@@ -2429,12 +2429,13 @@ export async function convertDocx(
       items.push(el('li', { id: `note-${String(ref.number)}` }, parts));
     }
     if (items.length > 0) {
-      const heading = (styles.language ?? '').toLowerCase().startsWith('it') ? 'Note' : 'Notes';
-      const notesBlocks = [el('h2', {}, [heading]), el('ol', {}, items)];
+      // No heading: a title here would be text the author did not write
+      // (plan §10.97). The numbered list, the references and the backlinks
+      // carry the notes.
       const footerAt = blocks.findIndex((b) => b.tag === 'footer');
-      blocks.splice(footerAt === -1 ? blocks.length : footerAt, 0, ...notesBlocks);
+      blocks.splice(footerAt === -1 ? blocks.length : footerAt, 0, el('ol', {}, items));
       report.push(
-        `moved ${String(items.length)} note${items.length === 1 ? '' : 's'} to the final ${heading} section (footnotes/endnotes)`,
+        `moved ${String(items.length)} note${items.length === 1 ? '' : 's'} to the end of the document, as a numbered list with no heading added (footnotes/endnotes)`,
       );
     }
   }

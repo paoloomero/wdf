@@ -66,7 +66,7 @@ function findAll(nodes: MNode[], tag: string): MEl[] {
 }
 
 describe('convertDocx — footnotes and endnotes (T20.7)', () => {
-  it('moves a footnote to the final Notes section with sup reference and backlink', async () => {
+  it('moves a footnote to a final list with sup reference and backlink — no heading added', async () => {
     const { blocks, report } = await convert(
       para(run('Testo con nota') + noteRef('footnote', '1') + run('.')),
       { 'word/footnotes.xml': notesXml('footnotes', [['1', 'La nota vera e propria.']]) },
@@ -75,9 +75,11 @@ describe('convertDocx — footnotes and endnotes (T20.7)', () => {
     expect(sup?.attrs['id']).toBe('noteref-1');
     expect((sup?.children[0] as MEl).attrs['href']).toBe('#note-1');
     expect(textOf(sup as MEl)).toBe('1');
-    // Final section: h2 + ol > li#note-1 with text and backlink.
-    const h2 = blocks.find((b) => b.tag === 'h2');
-    expect(textOf(h2 as MEl)).toBe('Notes');
+    // Final list: ol > li#note-1 with text and backlink. No generated title:
+    // it would be text the author did not write (plan §10.97).
+    expect(blocks.some((b) => /^h[1-6]$/.test(b.tag))).toBe(false);
+    expect(blocks.at(-1)?.tag).toBe('ol');
+    expect(blocks.map((b) => textOf(b)).join(' ')).not.toMatch(/\bNotes?\b/);
     const li = findAll(blocks, 'li')[0];
     expect(li?.attrs['id']).toBe('note-1');
     expect(textOf(li as MEl)).toContain('La nota vera e propria.');
@@ -112,7 +114,7 @@ describe('convertDocx — footnotes and endnotes (T20.7)', () => {
     expect(findAll(blocks, 'li')).toHaveLength(1);
   });
 
-  it('keeps inline formatting inside notes and titles the section by language', async () => {
+  it('keeps inline formatting inside notes; no title in any language', async () => {
     const styles =
       '<?xml version="1.0"?>' +
       `<w:styles xmlns:w="${W_NS}"><w:docDefaults><w:rPrDefault><w:rPr>` +
@@ -126,12 +128,12 @@ describe('convertDocx — footnotes and endnotes (T20.7)', () => {
       'word/footnotes.xml': notes,
       'word/styles.xml': styles,
     });
-    expect(textOf(blocks.find((b) => b.tag === 'h2') as MEl)).toBe('Note');
+    expect(blocks.some((b) => b.tag === 'h2')).toBe(false);
     const li = findAll(blocks, 'li')[0];
     expect(findAll([li as MEl], 'em')).toHaveLength(1);
   });
 
-  it('drops references without a matching note; no empty Notes section', async () => {
+  it('drops references without a matching note; no empty notes list', async () => {
     const { blocks, report } = await convert(para(run('x') + noteRef('footnote', '99')), {
       'word/footnotes.xml': notesXml('footnotes', [['1', 'inutile']]),
     });

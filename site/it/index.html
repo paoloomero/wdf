@@ -496,9 +496,9 @@
               </p>
               <pre class="cmd"><span class="c"># valida qualsiasi documento</span>
 npx @wdf-dev/cli validate documento.wdf
-<span class="c"># Word → WDF, con l’originale e il suo PDF</span>
+<span class="c"># Word → .wdf + un .wdf.html che chiunque apre, con l’originale e il suo PDF</span>
 npx @wdf-dev/cli import relazione.docx \
-    --with-source --with-pdf relazione.pdf
+    --with-source --with-pdf relazione.pdf --standalone
 <span class="c"># dai il documento a un agente</span>
 claude mcp add wdf -- npx -y @wdf-dev/mcp</pre>
               <p class="start__note">

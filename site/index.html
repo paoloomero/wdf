@@ -453,9 +453,9 @@
               </p>
               <pre class="cmd"><span class="c"># validate any document</span>
 npx @wdf-dev/cli validate document.wdf
-<span class="c"># Word → WDF, keeping the original and its PDF</span>
+<span class="c"># Word → .wdf + a .wdf.html anyone can open, with the original and its PDF</span>
 npx @wdf-dev/cli import report.docx \
-    --with-source --with-pdf report.pdf
+    --with-source --with-pdf report.pdf --standalone
 <span class="c"># give an agent the document</span>
 claude mcp add wdf -- npx -y @wdf-dev/mcp</pre>
               <p class="start__note">
