@@ -1,6 +1,6 @@
 {
   "name": "@wdf-dev/viewer",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "description": "Single-file HTML viewer for .wdf packages — zero installation, works offline.",
   "keywords": [

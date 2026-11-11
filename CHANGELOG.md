@@ -5,6 +5,16 @@ The five public packages (`@wdf-dev/core`, `@wdf-dev/import`, `@wdf-dev/viewer`,
 not the format version: every release below reads and writes **WDF Core 0.1**
 (`spec/wdf-core-0.1.md`).
 
+## 0.2.2 — 11 November 2026
+
+- **`.docx` text boxes**: their text is now converted — it used to be dropped,
+  with nothing in the report. It enters the flow right after the paragraph
+  the box is anchored to (once: a box Word writes twice counts once); the
+  report says how many, and that the position on the page is not kept.
+- **`.docx` form fields** (content controls): the prompt of an empty field
+  ("Click or tap here to enter text") is removed everywhere and reported;
+  table rows and cells wrapped in a content control are no longer skipped.
+
 ## 0.2.1 — 11 November 2026
 
 - **`wdf cite <file> <id>`**: the verifiable citation of one element from the
