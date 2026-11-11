@@ -50,10 +50,10 @@ for (const name of readdirSync(dir)
     rec.src = {
       tables: (c.partText(main).match(/<w:tbl>/g) ?? []).length,
       images: parts.filter((p) => /^word\/media\//.test(p)).length,
-      footnotes: Math.max(
-        0,
-        ((c.partText('word/footnotes.xml') ?? '').match(/<w:footnote /g) ?? []).length - 2,
-      ),
+      // Real notes only: separators and continuation notices carry w:type.
+      footnotes: (
+        (c.partText('word/footnotes.xml') ?? '').match(/<w:footnote (?![^>]*w:type=)[^>]*>/g) ?? []
+      ).length,
       headersFooters: parts.filter((p) => /^word\/(header|footer)\d*\.xml$/.test(p)).length,
       textboxes: (c.partText(main).match(/<w:txbxContent>/g) ?? []).length,
     };

@@ -15,7 +15,7 @@ What the `.docx` importer does on real documents it was not written against, and
 
 ## Result
 
-16 of 16 valid, 0 errors. Words found: 81004 of 81623 (99.24%).
+16 of 16 valid, 0 errors. Words found: 81032 of 81623 (99.28%).
 
 | #   | Body                                         | Document                                                  | Words in source | Found  | Missing | Why                                                | Text boxes | Images without description |
 | --- | -------------------------------------------- | --------------------------------------------------------- | --------------- | ------ | ------- | -------------------------------------------------- | ---------- | -------------------------- |
@@ -46,11 +46,23 @@ The first run, on release 0.2.1, found 79782 of 81623 words (97.74%) and three d
 
 After the fixes the missing words are the table of contents of document 02 and the form-field prompts of 10 and 11 — both reported — plus three words not yet explained (03, 05).
 
+## Numbering: found by reading, not by counting
+
+The word count above could not see the fourth defect, because numbers are not words of the source: Word computes them. A reader of document 02 saw it at once.
+
+- **Numbered headings lost their number**: "1.1. LA PIATTAFORMA…" came out as "LA PIATTAFORMA…", while the text keeps referring to "paragraph 13" or "point 2.2".
+- **Letters and roman numerals became 1., 2., 3.**: "a) bando di gara; b) disciplinare di gara" came out as "1. … 2. …", and references to "letter a)" no longer resolved.
+- **A numbering resumed after other text restarted at 1**: of 107 numbered items in document 02, 49 were numbered "1.".
+
+The cause: a WDF `ol` carries no type and no start, so a browser can only show 1., 2., 3. from one. Since the fix, the number of a numbered heading is part of its text, and a list keeps its `ol` only where that is exactly what Word shows; everywhere else Word's label is written at the start of the item and the list is bulleted ("• a) bando di gara;"). On document 02 the result was checked against the text of its PDF: 61 of 61 headings and 97 of 97 checkable labelled items match (5 items could not be found in the PDF text at all). Ten of the 16 documents have numbered headings or such lists.
+
+One assumption is not verified: when two numbering instances share one definition and the second does not say "restart", the importer continues the count, as Word is understood to do. It decides the numbers in 12 of 2031 documents of the private collection.
+
 ## Warnings and other findings
 
 - **One `h1` (spec §6.1.5):** the only validator warning, on 9 documents of 16 — no `h1` in four (01, 03, 07, 14), more than one in five (02: 5, 05: 2, 11: 5, 15: 17, 16: 2). Real Word documents rarely have exactly one top-level heading.
 - **Images without a description:** 7 documents of 16 carry pictures with no alternative text in Word and not marked decorative (93 pictures; 72 in document 03). The importer keeps an empty `alt`, invents nothing, and reports the count.
-- **Open checks:** a footnote of document 02 with no reference in the output; three unexplained words (03, 05).
+- **Open checks:** three unexplained words (03, 05). (A footnote of document 02 once listed here was not one: Word stores a "continuation notice" among the footnotes, and the first version of the script counted it.)
 - **Known limits of the fix:** a text box follows its anchor paragraph, which is not always the visual order on the page; text boxes anchored inside a table cell are not collected yet.
 
 ## Sources
