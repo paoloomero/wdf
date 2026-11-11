@@ -534,12 +534,25 @@ function exportPdf(): void {
     a.click();
     return;
   }
+  printDocument();
+}
+
+// The whole document through the browser's print engine. Also the answer to
+// the browser's own Print shortcut (plan §10.93): printing the Reader window
+// would give one page, the document frame cut at the first screen.
+function printDocument(): void {
+  if (loaded === undefined) return;
   const entry = dec.decode(loaded.pkg.files.get(loaded.pkg.manifest.entry) ?? new Uint8Array());
   const frame = $('print-frame') as HTMLIFrameElement;
   frame.onload = () => {
     frame.contentWindow?.print();
   };
   frame.srcdoc = buildPrintSrcdoc(entry, loaded.pkg.files);
+}
+
+/** Ctrl+P / Cmd+P, with no other modifier. */
+function isPrintShortcut(e: KeyboardEvent): boolean {
+  return (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p';
 }
 
 function setPaged(on: boolean): void {
@@ -642,6 +655,20 @@ function paintPdfTitle(): void {
   $('pdf-export').title = visualAvailable
     ? msg().downloadAuthorPdf(visualFileName)
     : msg().exportPdf;
+}
+
+// What the browser's own Print gives in place of the Reader window (plan
+// §10.93). Created here, never in the page source: a text extractor reading a
+// .wdf.html must find the document, not a line about printing.
+function paintPrintNotice(): void {
+  let notice = document.getElementById('print-notice');
+  if (notice === null) {
+    notice = document.createElement('p');
+    notice.id = 'print-notice';
+    notice.className = 'print-notice';
+    document.body.append(notice);
+  }
+  notice.textContent = msg().printNotice;
 }
 
 // The author's PDF rendition (ext-source 0.5, WP21): the lean card offers
@@ -1026,6 +1053,7 @@ function setView(view: 'human' | 'agent' | 'original'): void {
 // A language change (plan §10.81) repaints what the code wrote; the shell's
 // own texts are handled by i18n.ts.
 function repaintTexts(): void {
+  paintPrintNotice();
   paintZone('read');
   paintZone('convert');
   if (!$('convert-panel').hidden) renderConvertReport(shownReport);
@@ -1214,10 +1242,21 @@ function init(): void {
     if (selectedId !== undefined) void copyCitation(selectedId, $('chip-copy'));
   });
 
+  // Ctrl/Cmd+P with a document open prints the document, not the window
+  // (plan §10.93). The document frame forwards the same shortcut ('wdf-print').
+  paintPrintNotice();
+  window.addEventListener('keydown', (e) => {
+    if (!isPrintShortcut(e) || loaded === undefined) return;
+    e.preventDefault();
+    printDocument();
+  });
+
   window.addEventListener('message', (e: MessageEvent) => {
     const data = e.data as { type?: string; id?: string; href?: string } | null;
     if (data === null || typeof data !== 'object') return;
-    if (data.type === 'wdf-click' && typeof data.id === 'string') {
+    if (data.type === 'wdf-print') {
+      printDocument();
+    } else if (data.type === 'wdf-click' && typeof data.id === 'string') {
       select(data.id, 'human');
     } else if (data.type === 'wdf-link' && typeof data.href === 'string') {
       if (/^(https?:\/\/|mailto:)/.test(data.href)) window.open(data.href, '_blank', 'noopener');

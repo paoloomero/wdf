@@ -1787,3 +1787,28 @@ code {
 #original-report li.report__change {
   color: #6b5a00;
 }
+
+/* The browser's own Print on the Reader window (plan §10.93): the document
+   lives in a frame, which prints cut at the first screen. With a document
+   open, print a notice instead of a truncated page; Ctrl/Cmd+P and the PDF
+   button print the whole document through the dedicated print frame. */
+.print-notice {
+  display: none;
+}
+@media print {
+  html,
+  body {
+    height: auto !important;
+  }
+  #app:not([hidden]) {
+    display: none !important;
+  }
+  #app:not([hidden]) ~ .print-notice {
+    display: block;
+    margin: 20mm;
+    font:
+      14pt/1.5 system-ui,
+      sans-serif;
+    color: #000;
+  }
+}

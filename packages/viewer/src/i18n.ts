@@ -64,7 +64,7 @@ export const SHELL_IT: Readonly<Record<string, string>> = {
   'result.htmlDesc':
     'Si apre in qualsiasi browser, con il lettore incorporato. Un solo file, funziona offline.',
   'result.htmlLimit':
-    'Nel .wdf.html il PDF si scarica come file; il Reader installato lo mostra come pagine.',
+    'Nel .wdf.html il PDF si apre con il visualizzatore PDF del browser, se ne ha uno; altrimenti si scarica. Il Reader installato lo mostra sempre come pagine.',
   'result.wdfLead': 'Per il WDF Reader e gli agenti AI.',
   'result.wdfDesc':
     'Il formato pacchetto: più leggero, si apre nel Reader installato, leggibile dagli agenti via MCP.',
@@ -115,11 +115,11 @@ export const SHELL_IT: Readonly<Record<string, string>> = {
     'L’originale incorporato è un file binario — non c’è niente da mostrare. Scaricalo per aprirlo nella sua applicazione (i byte vengono dal pacchetto, senza passare dalla rete).',
   'app.downloadOriginal': 'Scarica l’originale',
   'app.visual':
-    'L’autore ha salvato anche una versione PDF di questo documento — l’immagine della pagina fissata dall’applicazione originale (ext-source 0.5). È inclusa così com’è: il pacchetto prova che i suoi byte non sono cambiati, non che corrisponda al contenuto canonico.',
+    'L’autore ha salvato anche una versione PDF di questo documento — l’immagine della pagina fissata dall’applicazione originale. È inclusa così com’è: il pacchetto prova che i suoi byte non sono cambiati, non che corrisponda al contenuto canonico.',
   'app.downloadPdf': 'Scarica il PDF',
   'app.pdfLabel': 'PDF salvato dall’autore',
   'app.visualHint':
-    'Per vedere le pagine identiche al PDF, apri questo documento nel WDF Reader installabile (https://wdf.dev).',
+    'Questo browser non può mostrare qui il PDF: scaricalo, oppure apri questo documento nel WDF Reader installabile (https://wdf.dev), che ne mostra le pagine.',
   'app.copyCitation': 'Copia citazione',
 };
 
@@ -170,6 +170,8 @@ const EN = {
   reportKind: { loss: 'loss', change: 'change', info: 'info' },
   pages: (n: number) => count(n, 'page', 'pages'),
   exportPdf: 'Export the document as PDF (browser print)',
+  printNotice:
+    'This is the WDF Reader window, not the document. To print the whole document, press Ctrl+P (⌘P on a Mac) inside the Reader, or use the PDF button in its toolbar.',
   downloadAuthorPdf: (name: string) => `Download the PDF saved by the author (${name})`,
   copyCitationFor: (id: string) => `Copy citation for ${id}`,
   copyCitationPrompt: 'Copy citation:',
@@ -239,6 +241,8 @@ const IT: Messages = {
   reportKind: { loss: 'tolto', change: 'cambiato', info: 'info' },
   pages: (n) => count(n, 'pagina', 'pagine'),
   exportPdf: 'Esporta il documento in PDF (stampa del browser)',
+  printNotice:
+    'Questa è la finestra del WDF Reader, non il documento. Per stampare il documento intero premi Ctrl+P (⌘P su Mac) dentro il Reader, oppure usa il bottone PDF nella barra.',
   downloadAuthorPdf: (name) => `Scarica il PDF salvato dall’autore (${name})`,
   copyCitationFor: (id) => `Copia la citazione di ${id}`,
   copyCitationPrompt: 'Copia la citazione:',

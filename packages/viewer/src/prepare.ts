@@ -438,6 +438,12 @@ export const CONTROLLER_JS = `
       parent.postMessage({ type: 'wdf-click', id: el.id }, '*');
     }
   });
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === 'p') {
+      e.preventDefault();
+      parent.postMessage({ type: 'wdf-print' }, '*');
+    }
+  });
   addEventListener('message', function (e) {
     var d = e.data || {};
     if (d.type === 'wdf-paged') {

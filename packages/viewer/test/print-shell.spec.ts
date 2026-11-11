@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { buildPrintSrcdoc, wrapPrintShell } from '../src/prepare.js';
+import { buildPrintSrcdoc, CONTROLLER_JS, wrapPrintShell } from '../src/prepare.js';
 
 // T14.2 (plan §10.25): the print document repeats the imported page header
 // and footer on every sheet via a thead/tfoot shell. Documents without them
@@ -86,5 +89,41 @@ describe('buildPrintSrcdoc with the shell', () => {
     const out = buildPrintSrcdoc(doc(HEADER + BODY + FOOTER), files);
     expect(out).toContain('<table class="wdf-print-shell">');
     expect(out).toContain('@page');
+  });
+});
+
+// Plan §10.93: the browser's own Print on the Reader window gives one page,
+// the document frame cut at the first screen. Ctrl/Cmd+P prints the document
+// through the print frame; anything else prints a notice, never a cut page.
+describe('browser print on the Reader window', () => {
+  const src = (name: string): string =>
+    readFileSync(join(import.meta.dirname, '../src', name), 'utf8');
+
+  it('the document frame forwards Ctrl/Cmd+P to the Reader', () => {
+    const handler = CONTROLLER_JS.slice(CONTROLLER_JS.indexOf("addEventListener('keydown'"));
+    expect(handler).toContain('e.ctrlKey || e.metaKey');
+    expect(handler).toContain('e.preventDefault()');
+    expect(handler).toContain("parent.postMessage({ type: 'wdf-print' }, '*')");
+  });
+
+  it('the Reader answers the shortcut and the message with the print frame', () => {
+    const main = src('main.ts');
+    expect(main).toContain("if (data.type === 'wdf-print') {\n      printDocument();");
+    expect(main).toMatch(
+      /if \(!isPrintShortcut\(e\) \|\| loaded === undefined\) return;\s+e\.preventDefault\(\);\s+printDocument\(\);/,
+    );
+  });
+
+  it('print media hides the open Reader and shows the notice instead', () => {
+    const css = src('viewer.css');
+    const print = css.slice(css.lastIndexOf('@media print'));
+    expect(print).toContain('#app:not([hidden]) {\n    display: none !important;');
+    expect(print).toContain('#app:not([hidden]) ~ .print-notice {\n    display: block;');
+    expect(css).toMatch(/\.print-notice \{\s+display: none;/);
+  });
+
+  it('the notice is not in the page source: a text extractor must find the document', () => {
+    expect(src('shell.html')).not.toContain('print-notice');
+    expect(src('main.ts')).toContain("notice.id = 'print-notice'");
   });
 });
