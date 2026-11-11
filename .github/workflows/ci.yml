@@ -27,6 +27,10 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright Chromium
-        run: pnpm --filter @wdf-dev/extension exec playwright install --with-deps chromium
+        # No --with-deps: it installs system packages with apt, and the run
+        # then depends on Ubuntu's mirrors resolving (they did not, three
+        # times, on 11 Nov 2026). The hosted runner already has the libraries
+        # a browser needs; if one is ever missing, the e2e step says so.
+        run: pnpm --filter @wdf-dev/extension exec playwright install chromium
       - name: Extension e2e (real browser)
         run: pnpm --filter @wdf-dev/extension test:e2e
