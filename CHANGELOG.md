@@ -5,6 +5,20 @@ The five public packages (`@wdf-dev/core`, `@wdf-dev/import`, `@wdf-dev/viewer`,
 not the format version: every release below reads and writes **WDF Core 0.1**
 (`spec/wdf-core-0.1.md`).
 
+## 0.2.4 — 11 November 2026
+
+- **Footnotes and endnotes** of a `.docx` go to the end of the document as a
+  numbered list **with no heading**: the "Notes" title the importer used to
+  add was text the author did not write.
+- `wdf validate` on a package that carries the author's PDF says so: included
+  as-is, not compared with the content (`authorPdf` in `--json`). The verdict
+  does not change.
+- The import command on the home page adds `--standalone`: it now gives the
+  `.wdf.html` anyone can open, next to the `.wdf`.
+- Known limit, kept on purpose: the browser's own File → Print on the Reader
+  window prints a notice, not the document (the document stays inside its
+  isolated frame). Ctrl/Cmd+P and the PDF button print the whole document.
+
 ## 0.2.3 — 11 November 2026
 
 - **Reader, file picker**: choosing a `.docx` together with its `.pdf` now
