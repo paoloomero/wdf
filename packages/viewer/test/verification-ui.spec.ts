@@ -64,3 +64,25 @@ describe('Plain view, typed-data mark and conversion report (plan §10.70)', () 
     expect(shell).toContain('not that it matches the canonical content');
   });
 });
+
+// Plan §10.97: two findings on the published Reader.
+describe('Reader: file picker and status bar hash', () => {
+  const main = readFileSync(join(import.meta.dirname, '../src/main.ts'), 'utf8');
+
+  it('copies the picked files before clearing the input (a live list empties)', () => {
+    const handler = main.slice(main.indexOf("input.addEventListener('change'"));
+    const copy = handler.indexOf('const files = pickedFiles(input);');
+    const clear = handler.indexOf("input.value = '';");
+    const read = handler.indexOf('fileListToMap(files)');
+    expect(copy).toBeGreaterThan(-1);
+    expect(clear).toBeGreaterThan(copy);
+    expect(read).toBeGreaterThan(clear);
+    expect(main).toContain('Array.from(input.files)');
+  });
+
+  it('the status bar shows the hash `wdf cite` prints, and names it', () => {
+    expect(main).toContain("hashes.files?.['ai/content.md']");
+    expect(main).toContain('content.md sha-256');
+    expect(main).not.toContain('hashes.files?.[doc.pkg.manifest.entry]');
+  });
+});

@@ -233,6 +233,11 @@ async function fileListToMap(files: Iterable<File>): Promise<Map<string, Uint8Ar
   return out;
 }
 
+/** The files chosen in a file input, as a list that outlives the input's own. */
+function pickedFiles(input: HTMLInputElement): File[] {
+  return input.files === null ? [] : Array.from(input.files);
+}
+
 /** Routes a file set by type: a .wdf opens, anything else converts. */
 async function handleDropped(files: Map<string, Uint8Array>, zone: Zone): Promise<void> {
   setZone(zone === 'read' ? 'convert' : 'read', 'idle');
@@ -933,9 +938,13 @@ function paintVerdict(): void {
     const hashes = JSON.parse(
       dec.decode(doc.pkg.files.get('integrity/hashes.json') ?? new Uint8Array()),
     ) as { files?: Record<string, string> };
-    const entryHash = hashes.files?.[doc.pkg.manifest.entry];
+    // The hash of ai/content.md: the one `wdf cite` and the MCP server print,
+    // so the three can be compared (plan §10.97) — and labelled as such.
+    const contentHash = hashes.files?.['ai/content.md'];
     const short =
-      entryHash === undefined ? '' : ` · sha-256 ${entryHash.slice(0, 4)}…${entryHash.slice(-4)}`;
+      contentHash === undefined
+        ? ''
+        : ` · content.md sha-256 ${contentHash.slice(0, 4)}…${contentHash.slice(-4)}`;
     const verdict = result.verified ? m.verifiedLocally : text.label.toUpperCase();
     setStatus(`${m.anchors(doc.outline.length)}${short} · ${verdict}`);
   } catch {
@@ -1110,11 +1119,14 @@ function init(): void {
       input.click();
     });
     input.addEventListener('change', () => {
-      const files = input.files;
-      if (files !== null && files.length > 0) {
+      // Copy first: input.files is a live list, and clearing the input empties
+      // it while the files are still being read — a .docx chosen with its
+      // .pdf used to arrive alone (plan §10.97).
+      const files = pickedFiles(input);
+      input.value = ''; // choosing the same file again still fires change
+      if (files.length > 0) {
         void fileListToMap(files).then((map) => handleDropped(map, zone));
       }
-      input.value = ''; // choosing the same file again still fires change
     });
     // Child elements fire their own enter/leave: count the depth, and give
     // the card back the state it had (a notice, an error) when the drag leaves.
