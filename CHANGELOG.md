@@ -5,6 +5,21 @@ The five public packages (`@wdf-dev/core`, `@wdf-dev/import`, `@wdf-dev/viewer`,
 not the format version: every release below reads and writes **WDF Core 0.1**
 (`spec/wdf-core-0.1.md`).
 
+## 0.2.5 — 11 November 2026
+
+- **`.docx` numbering, as Word shows it.** A WDF `ol` has no type and no
+  start: a browser numbers it 1., 2., 3. from one. So far the importer left
+  every numbering to it, and:
+  - numbered headings lost their number — "1.1. Scope" is now the heading's
+    text;
+  - letters and roman numerals turned into 1., 2., 3. — "a)", "ii." are now
+    written at the start of the item;
+  - a numbering resumed after other text restarted at 1 — it now goes on
+    ("3.").
+    A list stays an `ol` only where 1., 2., 3. from one is exactly what Word
+    shows; elsewhere the label is text and the list is bulleted. The report
+    counts both. Counters follow Word's model over the whole document.
+
 ## 0.2.4 — 11 November 2026
 
 - **Footnotes and endnotes** of a `.docx` go to the end of the document as a

@@ -1,6 +1,6 @@
 {
   "name": "@wdf-dev/mcp",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "type": "module",
   "description": "MCP server exposing WDF packages to AI agents: open, outline, read, cite — with verifiable citations and no parsing heuristics.",
   "keywords": [
