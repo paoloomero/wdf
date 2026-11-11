@@ -5,6 +5,20 @@ The five public packages (`@wdf-dev/core`, `@wdf-dev/import`, `@wdf-dev/viewer`,
 not the format version: every release below reads and writes **WDF Core 0.1**
 (`spec/wdf-core-0.1.md`).
 
+## 0.2.3 — 11 November 2026
+
+- **Reader, file picker**: choosing a `.docx` together with its `.pdf` now
+  converts both, as dropping them does (the PDF used to be lost, and in the
+  other order nothing converted).
+- **`.docx` images without a description**: a picture with no alternative
+  text in Word, not marked decorative, keeps an empty `alt` — nothing is made
+  up — and the conversion report now says how many there are.
+- `wdf extract` reads a standalone `.wdf.html` too, like `validate` and `cite`.
+- Reader status bar: shows the SHA-256 of `ai/content.md`, the one `wdf cite`
+  and the MCP server print, and names it.
+- `docs/field-test-pa-docx.md`: the importer on 16 public `.docx` files of
+  Italian public bodies — what is found, what is lost, how it was measured.
+
 ## 0.2.2 — 11 November 2026
 
 - **`.docx` text boxes**: their text is now converted — it used to be dropped,
@@ -48,7 +62,7 @@ Everything since 0.1.0 (12 August 2026).
   footers, authored page breaks, notes, fields, equations. Extension
   `pagination` 0.1.
 - **The author's PDF**, kept next to the converted document:
-  `--with-pdf report.pdf` (extension `source` 0.5, visual rendition).
+  `--with-pdf report.pdf` (extension `source`, visual rendition).
 - **Revisions keep their identity**: `--id <urn:uuid:…>` and
   `--previous <file.wdf>` keep the document id and the ids of unchanged
   elements (spec §4.1, §6.4.4).
@@ -66,8 +80,10 @@ Everything since 0.1.0 (12 August 2026).
   conversion report.
 - Pictures inside headings or list items move to their own paragraph
   (§6.2.9): such documents used to fail validation. An empty document
-  title no longer breaks the manifest. Tested on 2031 real `.docx` files:
-  0 validation errors.
+  title no longer breaks the manifest. Run on 2031 real `.docx` files of a
+  private collection (not published, so not checkable from outside): 0
+  validation errors. For a test anyone can repeat, on 16 public documents,
+  see `docs/field-test-pa-docx.md`.
 - `--standalone` writes a single self-contained `.wdf.html` next to the
   package.
 - Markdown: inline runs across line breaks, list item continuation lines,
