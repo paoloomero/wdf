@@ -21,7 +21,7 @@ interface JsonRpcResponse {
   error?: { code: number; message: string };
 }
 
-export const SERVER_INFO = { name: 'wdf-mcp', version: '0.2.0' };
+export const SERVER_INFO = { name: 'wdf-mcp', version: '0.2.1' };
 const FALLBACK_PROTOCOL = '2024-11-05';
 
 function response(id: number | string | null, result: unknown): JsonRpcResponse {

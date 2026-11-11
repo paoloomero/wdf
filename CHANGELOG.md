@@ -5,6 +5,28 @@ The five public packages (`@wdf-dev/core`, `@wdf-dev/import`, `@wdf-dev/viewer`,
 not the format version: every release below reads and writes **WDF Core 0.1**
 (`spec/wdf-core-0.1.md`).
 
+## 0.2.1 — 11 November 2026
+
+- **`wdf cite <file> <id>`**: the verifiable citation of one element from the
+  command line — `wdf:` URI, SHA-256 of `ai/content.md` (pins the revision
+  the quote comes from), verdict, quoted content. Same answer as the MCP tool
+  `wdf_cite`; reads `.wdf` and `.wdf.html`; `--json`.
+- `wdf import --help` names `.docx` among the inputs and quotes no extension
+  version number.
+- `--with-pdf`: the CLI warns that the PDF is included as-is and is **not
+  compared** with the document content; the conversion report records it.
+- **Printing from the browser's own menu or shortcut**: Ctrl/Cmd+P in the
+  Reader now prints the whole document (it used to print the Reader window:
+  one page, the document cut at the first screen). File → Print on the window
+  prints a notice saying how to print the document, never a cut page.
+- `.docx` with one paragraph in the **Title** style and **Heading 1**
+  chapters: the Title stays the only `h1`, the other headings move one level
+  down (it used to give several `h1`). The report says how many moved.
+  Documents with no Title are left as they are — no title is invented.
+- `.docx` written by scripts, citing `Title` / `Heading1…6` (or `Titolo`,
+  `Titolo1…6`) without defining the styles: read as headings, with a note in
+  the report. A defined style is still read by its name only.
+
 ## 0.2.0 — 10 November 2026
 
 Everything since 0.1.0 (12 August 2026).
