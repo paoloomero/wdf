@@ -6,7 +6,7 @@ import { readPackage, sha256Hex } from '@wdf-dev/core';
 import { describe, expect, it } from 'vitest';
 
 import { callTool, type McpState } from '../../mcp/src/tools.js';
-import { cmdCite, cmdPack, type Ctx } from '../src/commands.js';
+import { cmdCite, cmdExtract, cmdPack, type Ctx } from '../src/commands.js';
 
 // Plan §10.93: `wdf cite` — the citation with the content hash that pins
 // the revision, from the CLI on npm and not only from the MCP server. Both
@@ -113,5 +113,35 @@ describe('wdf cite', () => {
     const run = capture();
     expect(await cmdCite(bad, 'p-signature', {}, run)).toBe(1);
     expect(run.outText).not.toContain('Verified: yes');
+  });
+});
+
+// Plan §10.97: extract reads a standalone .wdf.html too, like validate and cite.
+describe('wdf extract on a standalone .wdf.html', () => {
+  it('prints the same AI layer as from the .wdf', async () => {
+    await build();
+    const a = capture();
+    const b = capture();
+    expect(cmdExtract(wdf, {}, a)).toBe(0);
+    expect(cmdExtract(standalone, {}, b)).toBe(0);
+    expect(a.outText).toContain('{#p-signature}');
+    expect(b.outText).toBe(a.outText);
+  });
+
+  it('--outline too', async () => {
+    await build();
+    const a = capture();
+    const b = capture();
+    expect(cmdExtract(wdf, { outline: true }, a)).toBe(0);
+    expect(cmdExtract(standalone, { outline: true }, b)).toBe(0);
+    expect(b.outText).toBe(a.outText);
+  });
+
+  it('a file that is neither still fails as "not a package" (§3.1)', () => {
+    const junk = join(work, 'junk.txt');
+    writeFileSync(junk, 'not a package');
+    const run = capture();
+    expect(cmdExtract(junk, {}, run)).toBe(1);
+    expect(run.errors.join('\n')).toContain('§3.1');
   });
 });

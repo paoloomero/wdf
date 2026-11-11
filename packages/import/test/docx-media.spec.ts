@@ -87,6 +87,43 @@ function findAll(nodes: MNode[], tag: string): MEl[] {
   });
 }
 
+// Plan §10.97: a picture with no description in Word, not marked decorative,
+// keeps an empty alt — a description is never made up — and the report says
+// so. A described picture and a picture marked decorative are not reported.
+describe('convertDocx — images without a description', () => {
+  const NOTE = /no description in the Word file/;
+  const media = { 'word/media/image1.png': PNG };
+  const rels = rel('rId10', 'image', 'media/image1.png');
+
+  it('reports it, keeps alt empty, invents nothing', async () => {
+    const { blocks, report } = await convert({ body: para(drawing('rId10')), rels, media });
+    expect(findAll(blocks, 'img')[0]?.attrs['alt']).toBe('');
+    expect(report).toContain(
+      '1 image has no description in the Word file and is not marked decorative: empty alt kept, nothing invented — add the alternative text in Word (§6.3.3)',
+    );
+  });
+
+  it('says nothing for a described picture', async () => {
+    const { report } = await convert({
+      body: para(drawing('rId10', { alt: 'Planimetria del lotto' })),
+      rels,
+      media,
+    });
+    expect(report.some((r) => NOTE.test(r))).toBe(false);
+  });
+
+  it('says nothing for a picture marked decorative in Word', async () => {
+    const decorative = drawing('rId10').replace(
+      '<wp:docPr id="1" name="Picture 1"/>',
+      '<wp:docPr id="1" name="Picture 1"><a:extLst><a:ext><adec:decorative xmlns:adec="http://schemas.microsoft.com/office/drawing/2017/decorative" val="1"/></a:ext></a:extLst></wp:docPr>',
+    );
+    expect(decorative).toContain('adec:decorative');
+    const { blocks, report } = await convert({ body: para(decorative), rels, media });
+    expect(findAll(blocks, 'img')[0]?.attrs['alt']).toBe('');
+    expect(report.some((r) => NOTE.test(r))).toBe(false);
+  });
+});
+
 describe('convertDocx — images (T20.5)', () => {
   it('packages an inline PNG with content-hashed name, alt and size', async () => {
     const { blocks, assets, report } = await convert({

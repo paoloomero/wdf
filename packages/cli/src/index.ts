@@ -52,7 +52,7 @@ program
 program
   .command('extract')
   .description('print the AI layer of a package (give this to an LLM)')
-  .argument('<file>', 'package file (.wdf)')
+  .argument('<file>', 'package file (.wdf) or standalone file (.wdf.html)')
   .option('--outline', 'print ai/outline.json instead of ai/content.md')
   .action((file: string, opts: { outline?: boolean }) => {
     process.exitCode = cmdExtract(file, opts);

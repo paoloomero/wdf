@@ -185,7 +185,13 @@ export function cmdExtract(
   ctx: Ctx = defaultCtx,
 ): number {
   try {
-    const pkg = readPackage(readFileSync(file));
+    // A .wdf, or a standalone .wdf.html (its embedded package, spec §9.2) —
+    // like validate and cite.
+    const bytes = readFileSync(file);
+    const zip = bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+    const html = zip ? '' : new TextDecoder('utf-8').decode(bytes);
+    const standalone = html.includes('<script type="application/wdf+zip"');
+    const pkg = readPackage(standalone ? extractStandalone(html) : bytes);
     const path = opts.outline === true ? 'ai/outline.json' : 'ai/content.md';
     ctx.out(dec.decode(pkg.files.get(path) ?? new Uint8Array()));
     return 0;
