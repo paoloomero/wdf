@@ -174,11 +174,11 @@ describe('convertDocx — layout tables, Europass-like CV (plan §10.87)', () =>
     );
     const order = texts.map(([, t]) => t);
     expect(order.indexOf('Maria Esempio')).toBeLessThan(order.indexOf('Via dei Test 1, Udine'));
-    // The lettered list is a real list again.
-    const list = blocks.find((b) => b.tag === 'ol');
+    // The lettered list is a real list again, with Word's letters (§10.102).
+    const list = blocks.find((b) => b.tag === 'ul' && textOf(b).startsWith('a) '));
     expect(
       list?.children.filter((c) => typeof c !== 'string').map((c) => textOf(c as MEl)),
-    ).toEqual(['sviluppo software', 'analisi dei processi']);
+    ).toEqual(['a) sviluppo software', 'b) analisi dei processi']);
     // The section row (label alone in the first cell) is a heading by
     // structure; the name, larger than every heading, becomes the title
     // (T7.8). The label sharing its row with the name stays a paragraph.

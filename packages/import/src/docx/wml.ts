@@ -439,10 +439,11 @@ function numberingLevelOf(lvl: XmlElement): NumberingLevel | undefined {
 
 /**
  * The numbering model: w:num instances point at w:abstractNum definitions;
- * each abstract level carries a numFmt. In body lists only the format
- * matters — the numbers are rendered by the list element, never as text.
- * Inside a data-table cell, where no list element can exist (§6.2.3), the
- * label is written out as text (plan §10.87): hence lvlText and start.
+ * each abstract level carries a numFmt, a label text and a start. The list
+ * element renders the numbers only where it shows what Word shows (1., 2.,
+ * 3. from one); everywhere else the label is written out as text — in a
+ * data-table cell (plan §10.87), on a numbered heading, on a list with any
+ * other numbering (plan §10.102).
  */
 export class DocxNumbering {
   /** numId → abstractNumId. */
@@ -451,6 +452,8 @@ export class DocxNumbering {
   private readonly overrides = new Map<string, Map<number, NumberingLevel>>();
   /** abstractNumId → ilvl → level. */
   private readonly abstract = new Map<string, Map<number, NumberingLevel>>();
+  /** numId → ilvl → restart value (w:lvlOverride/w:startOverride). */
+  private readonly restarts = new Map<string, Map<number, number>>();
 
   constructor(numberingXml: string | undefined) {
     if (numberingXml === undefined) return;
@@ -472,13 +475,17 @@ export class DocxNumbering {
       if (id === undefined || absId === undefined) continue;
       this.nums.set(id, absId);
       const overrides = new Map<number, NumberingLevel>();
+      const restarts = new Map<number, number>();
       for (const over of xmlChildren(num, W_NS, 'lvlOverride')) {
         const ilvl = twips(xmlAttr(over, W_NS, 'ilvl'));
         const lvl = xmlChild(over, W_NS, 'lvl');
         const level = lvl === undefined ? undefined : numberingLevelOf(lvl);
         if (ilvl !== undefined && level !== undefined) overrides.set(ilvl, level);
+        const start = twips(wVal(over, 'startOverride'));
+        if (ilvl !== undefined && start !== undefined) restarts.set(ilvl, start);
       }
       if (overrides.size > 0) this.overrides.set(id, overrides);
+      if (restarts.size > 0) this.restarts.set(id, restarts);
     }
   }
 
@@ -489,6 +496,20 @@ export class DocxNumbering {
     const absId = this.nums.get(numId);
     if (absId === undefined) return undefined;
     return this.abstract.get(absId)?.get(ilvl);
+  }
+
+  /**
+   * The counter an instance counts on: instances of one abstract definition
+   * continue each other's numbering, as in Word.
+   */
+  counterOf(numId: string): string {
+    const absId = this.nums.get(numId);
+    return absId === undefined ? `num:${numId}` : `abs:${absId}`;
+  }
+
+  /** The value an instance restarts a level at, when it says so. */
+  restartOf(numId: string, ilvl: number): number | undefined {
+    return this.restarts.get(numId)?.get(ilvl);
   }
 
   /** numFmt of an instance level, or undefined when the definition is missing. */
@@ -548,24 +569,38 @@ function formatNumber(n: number, fmt: string): string {
 }
 
 /**
- * Writes list labels out as text, for list paragraphs that end up inside a
- * data-table cell (plan §10.87): "a) ", "1.2. ", "• ". Counters follow
- * Word's model — per numbering instance, deeper levels restart when a
- * shallower item appears.
+ * The label Word shows for a numbered paragraph — "a) ", "1.2. ", "• " —
+ * for the places where the label has to be written out as text: a list
+ * paragraph inside a data-table cell (plan §10.87), a numbered heading, a
+ * list whose numbers a plain <ol> would not show (plan §10.102). One
+ * instance per document, fed every numbered paragraph in order: counters
+ * follow Word's model — one per abstract definition (instances continue each
+ * other unless one restarts), deeper levels restart when a shallower item
+ * appears.
  */
 class ListLabels {
   private readonly counters = new Map<string, number[]>();
+  private readonly restarted = new Set<string>();
 
   constructor(private readonly numbering: DocxNumbering) {}
 
   next(info: ListInfo): string {
     const level = this.numbering.level(info.numId, info.level);
     if (level === undefined || level.fmt === 'bullet') return '\u2022 ';
-    const counts = this.counters.get(info.numId) ?? [];
+    const key = this.numbering.counterOf(info.numId);
+    const counts = this.counters.get(key) ?? [];
     counts.length = info.level + 1;
-    counts[info.level] =
-      counts[info.level] === undefined ? level.start : (counts[info.level] as number) + 1;
-    this.counters.set(info.numId, counts);
+    // An instance that restarts a level does so once, at its first paragraph.
+    const restart = this.numbering.restartOf(info.numId, info.level);
+    const restartKey = `${info.numId}:${String(info.level)}`;
+    if (restart !== undefined && !this.restarted.has(restartKey)) {
+      this.restarted.add(restartKey);
+      counts[info.level] = restart;
+    } else {
+      counts[info.level] =
+        counts[info.level] === undefined ? level.start : (counts[info.level] as number) + 1;
+    }
+    this.counters.set(key, counts);
     const template = level.text ?? `%${String(info.level + 1)}.`;
     const label = template.replace(/%([1-9])/g, (_, k: string) => {
       const at = Number(k) - 1;
@@ -804,6 +839,10 @@ interface WmlContext {
   readonly stats: ConversionStats;
   /** Body headings that come from the "Title" style (plan §10.93). */
   readonly titleBlocks: Set<MEl>;
+  /** Word's numbering labels, counted over the whole document (§10.102). */
+  readonly labels: ListLabels;
+  /** The label Word shows for each numbered list item (§10.102). */
+  readonly itemLabels: Map<MEl, string>;
 }
 
 interface ConversionStats {
@@ -824,6 +863,10 @@ interface ConversionStats {
   undescribedImages: number;
   /** Text boxes whose text entered the flow (plan §10.95). */
   textBoxes: number;
+  /** Numbered headings whose number is now part of their text (§10.102). */
+  numberedHeadings: number;
+  /** List items whose Word label is written as text (§10.102). */
+  labelledItems: number;
   /** Empty form fields showing Word's own prompt, removed (plan §10.95). */
   placeholders: number;
 }
@@ -919,6 +962,43 @@ function demoteUnderTitle(blocks: MEl[], ctx: WmlContext): void {
   ctx.report.push(
     `the paragraph in the "Title" style is the only <h1>: ${String(moved)} other heading${moved === 1 ? '' : 's'} moved one level down`,
   );
+}
+
+/**
+ * Numbered lists, settled once the tree is built (plan §10.102). WDF-HTML's
+ * <ol> has no type and no start: a browser numbers it 1., 2., 3. from one.
+ * Where that is exactly what Word shows, the list stays an <ol>. Where it is
+ * not — letters, roman numerals, composite labels ("1.2."), a numbering that
+ * resumes after other text, a start other than 1 — Word's label is written at
+ * the start of each item and the list becomes a <ul>: the label is what the
+ * text cites ("letter a)"), and it must not change.
+ */
+function settleListLabels(blocks: readonly MNode[], ctx: WmlContext): void {
+  const walk = (nodes: readonly MNode[]): void => {
+    for (const node of nodes) {
+      if (typeof node === 'string') continue;
+      if (node.tag === 'ol') {
+        const items = node.children.filter(
+          (c): c is MEl => typeof c !== 'string' && c.tag === 'li',
+        );
+        const labels = items.map((li) => ctx.itemLabels.get(li));
+        const asShown = labels.every(
+          (label, i) => label === undefined || label === `${String(i + 1)}.`,
+        );
+        if (labels.some((label) => label !== undefined) && !asShown) {
+          node.tag = 'ul';
+          items.forEach((li, i) => {
+            const label = labels[i];
+            if (label === undefined) return;
+            li.children.unshift(`${label} `);
+            ctx.stats.labelledItems += 1;
+          });
+        }
+      }
+      walk(node.children);
+    }
+  };
+  walk(blocks);
 }
 
 /** Reports once per distinct message — real documents repeat everything. */
@@ -2061,7 +2141,7 @@ function tableToBlock(tbl: XmlElement, caption: string, ctx: WmlContext): MEl | 
   const inside = [borders.insideH, borders.insideV].find((b) => b?.visible === true);
   // A cell holds one line of phrasing (§6.2.3, §6.2.8): list items keep
   // their label as text so their boundaries survive (plan §10.87).
-  const labels = new ListLabels(ctx.numbering);
+  const labels = ctx.labels;
   const cellOf = (cell: RawCell, tag: 'th' | 'td'): MEl => {
     const parts: MNode[] = [];
     let align: string | undefined;
@@ -2341,6 +2421,8 @@ export async function convertDocx(
     },
     furniture: false,
     titleBlocks: new Set(),
+    labels: new ListLabels(numbering),
+    itemLabels: new Map(),
     stats: {
       layoutDepth: 0,
       layoutTables: 0,
@@ -2353,6 +2435,8 @@ export async function convertDocx(
       autoAlt: 0,
       undescribedImages: 0,
       textBoxes: 0,
+      numberedHeadings: 0,
+      labelledItems: 0,
       placeholders: 0,
     },
   };
@@ -2478,6 +2562,17 @@ export async function convertDocx(
     );
   }
   ctx.stats.placeholders = formFields.n;
+  settleListLabels(blocks, ctx);
+  if (ctx.stats.numberedHeadings > 0) {
+    report.push(
+      `wrote the number of ${plural(ctx.stats.numberedHeadings, 'numbered heading', 'numbered headings')} as text, as Word shows it ("1.2. Title")`,
+    );
+  }
+  if (ctx.stats.labelledItems > 0) {
+    report.push(
+      `wrote Word's label at the start of ${plural(ctx.stats.labelledItems, 'list item', 'list items')} (letters, roman numerals, composite numbers, or a numbering resumed after other text — a plain numbered list would show other numbers); those lists are bulleted`,
+    );
+  }
   if (ctx.stats.textBoxes > 0) {
     report.push(
       `placed the text of ${plural(ctx.stats.textBoxes, 'text box', 'text boxes')} in the flow, after the paragraph each is anchored to (the position on the page is not kept)`,
@@ -2636,13 +2731,12 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
         case 'p': {
           const direct = parsePPr(xmlChild(child, W_NS, 'pPr'));
           const level = ctx.styles.headingLevel(direct);
-          const listInfo = level === undefined ? listInfoOf(direct, ctx) : undefined;
-          if (level !== undefined && listInfoOf(direct, ctx) !== undefined) {
-            reportOnce(
-              ctx,
-              'numbered heading: the list number is dropped (headings are not list items)',
-            );
-          }
+          // The label Word shows for this paragraph (plan §10.102). Every
+          // numbered paragraph advances the document's counters, in order.
+          const numbered = listInfoOf(direct, ctx);
+          const listInfo = level === undefined ? numbered : undefined;
+          const label =
+            numbered !== undefined && numbered.ordered ? ctx.labels.next(numbered) : undefined;
           const breakPos = isBody ? pageBreakPosition(child) : undefined;
           if (
             isBody &&
@@ -2681,7 +2775,14 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
             pageBreaks.push(block);
             pendingBreak = false;
           }
+          if (label !== undefined && level !== undefined) {
+            // A numbered heading: the number is part of what the author wrote
+            // and cites ("paragraph 2.2") — it goes into the heading text.
+            block.children.unshift(label);
+            ctx.stats.numberedHeadings += 1;
+          }
           if (listInfo !== undefined) {
+            if (label !== undefined) ctx.itemLabels.set(block, label.trim());
             pendingCaption = undefined;
             lists.add(listInfo, block, blocks, ctx);
           } else {
