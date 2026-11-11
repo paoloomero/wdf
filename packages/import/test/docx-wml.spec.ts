@@ -61,7 +61,51 @@ describe('convertDocx — headings and style chain', () => {
         p(run('Paragrafo per nome'), '<w:pStyle w:val="Sottotitolo2"/>') +
         p(run('Testo')),
     );
-    expect(blocks.map((b) => b.tag)).toEqual(['h1', 'h1', 'h2', 'p']);
+    // One Title next to a Heading 1: the Title stays the only h1 (§10.93).
+    expect(blocks.map((b) => b.tag)).toEqual(['h1', 'h2', 'h3', 'p']);
+  });
+
+  // Plan §10.93: Title + Heading 1 would give two <h1>. With exactly one
+  // Title, every other heading moves one level down; without a Title nothing
+  // moves and no title is invented.
+  it('one Title: the other headings move one level down, and the report says so', async () => {
+    const { blocks, report } = await convert(
+      p(run('Relazione'), '<w:pStyle w:val="Titolo"/>') +
+        p(run('Capitolo 1'), '<w:pStyle w:val="Heading1"/>') +
+        p(run('Paragrafo'), '<w:pStyle w:val="Sottotitolo2"/>') +
+        p(run('Capitolo 2'), '<w:pStyle w:val="Heading1"/>') +
+        p(run('Profondo'), '<w:outlineLvl w:val="5"/>'),
+    );
+    expect(blocks.map((b) => b.tag)).toEqual(['h1', 'h2', 'h3', 'h2', 'h6']);
+    expect(report).toContain(
+      'the paragraph in the "Title" style is the only <h1>: 3 other headings moved one level down',
+    );
+  });
+
+  it('several Heading 1 and no Title: nothing moves', async () => {
+    const { blocks, report } = await convert(
+      p(run('Capitolo 1'), '<w:pStyle w:val="Heading1"/>') +
+        p(run('Capitolo 2'), '<w:pStyle w:val="Heading1"/>'),
+    );
+    expect(blocks.map((b) => b.tag)).toEqual(['h1', 'h1']);
+    expect(report.join('\n')).not.toContain('moved one level down');
+  });
+
+  it('a Title with no other h1: nothing moves', async () => {
+    const { blocks } = await convert(
+      p(run('Relazione'), '<w:pStyle w:val="Titolo"/>') +
+        p(run('Paragrafo'), '<w:pStyle w:val="Sottotitolo2"/>'),
+    );
+    expect(blocks.map((b) => b.tag)).toEqual(['h1', 'h2']);
+  });
+
+  it('two paragraphs in the Title style: ambiguous, nothing moves', async () => {
+    const { blocks } = await convert(
+      p(run('Relazione'), '<w:pStyle w:val="Titolo"/>') +
+        p(run('Seconda riga'), '<w:pStyle w:val="Titolo"/>') +
+        p(run('Capitolo'), '<w:pStyle w:val="Heading1"/>'),
+    );
+    expect(blocks.map((b) => b.tag)).toEqual(['h1', 'h1', 'h1']);
   });
 
   it('resolves the chain: docDefaults → basedOn → style → direct', async () => {
@@ -214,5 +258,79 @@ describe('convertDocx — profile-valid end to end', () => {
     const html = serializeDocument('it-IT', 'Il titolo', blocks, stylesheet !== undefined);
     const violations = validateProfile(html).filter((v) => v.severity === 'error');
     expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
+  });
+});
+
+// Plan §10.93: a document written by a script can cite "Title"/"Heading1"
+// without defining them (no styles.xml) — Word always writes the definitions.
+// The name is then unknowable: the default English and Italian ids decide,
+// and the report says so. A defined style is never second-guessed by its id.
+describe('convertDocx — heading styles cited but not defined', () => {
+  async function convertBare(body: string): Promise<{ tags: string[]; report: string[] }> {
+    const report: string[] = [];
+    const document =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      `<w:document xmlns:w="${W_NS}"><w:body>${body}<w:sectPr/></w:body></w:document>`;
+    const result = await convertDocx(makeDocx({ document }), report);
+    return { tags: result.blocks.map((b) => b.tag), report };
+  }
+
+  it('reads the English default ids: Title, Heading1..3', async () => {
+    const { tags, report } = await convertBare(
+      p(run('Relazione'), '<w:pStyle w:val="Title"/>') +
+        p(run('Premessa'), '<w:pStyle w:val="Heading1"/>') +
+        p(run('Dettaglio'), '<w:pStyle w:val="Heading2"/>') +
+        p(run('Sotto'), '<w:pStyle w:val="Heading3"/>') +
+        p(run('Testo')),
+    );
+    expect(tags).toEqual(['h1', 'h2', 'h3', 'h4', 'p']);
+    expect(report).toContain(
+      'style "Title" is not defined in the document — read as a heading from its id alone',
+    );
+  });
+
+  it('reads the Italian default ids: Titolo, Titolo1..3', async () => {
+    const { tags } = await convertBare(
+      p(run('Relazione'), '<w:pStyle w:val="Titolo"/>') +
+        p(run('Premessa'), '<w:pStyle w:val="Titolo1"/>') +
+        p(run('Dettaglio'), '<w:pStyle w:val="Titolo2"/>') +
+        p(run('Sotto'), '<w:pStyle w:val="Titolo3"/>'),
+    );
+    expect(tags).toEqual(['h1', 'h2', 'h3', 'h4']);
+  });
+
+  it('leaves any other undefined style a paragraph, silently', async () => {
+    const { tags, report } = await convertBare(
+      p(run('Una riga'), '<w:pStyle w:val="Subtitle"/>') +
+        p(run('Altra riga'), '<w:pStyle w:val="Heading7"/>'),
+    );
+    expect(tags).toEqual(['p', 'p']);
+    expect(report).toEqual([]);
+  });
+
+  it('a document with no styles at all converts to plain paragraphs', async () => {
+    const { tags, report } = await convertBare(p(run('Prima riga')) + p(run('Seconda riga')));
+    expect(tags).toEqual(['p', 'p']);
+    expect(report).toEqual([]);
+  });
+
+  it('never overrides a defined style: the name decides, not the id', async () => {
+    // "Heading1" defined as an ordinary style (name "body text") stays a paragraph.
+    const styles =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      `<w:styles xmlns:w="${W_NS}">` +
+      '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="body text"/></w:style>' +
+      '</w:styles>';
+    const document =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      `<w:document xmlns:w="${W_NS}"><w:body>` +
+      p(run('Non un titolo'), '<w:pStyle w:val="Heading1"/>') +
+      '<w:sectPr/></w:body></w:document>';
+    const report: string[] = [];
+    const result = await convertDocx(
+      makeDocx({ document, extra: { 'word/styles.xml': styles } }),
+      report,
+    );
+    expect(result.blocks.map((b) => b.tag)).toEqual(['p']);
   });
 });

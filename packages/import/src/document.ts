@@ -308,7 +308,7 @@ export async function importDocument(
         name: input.visualName ?? '',
       };
       report.push(
-        `embedded the author's PDF rendition as ${visualPath} (extension "source" 0.5, docs/ext-source.md)`,
+        `embedded the author's PDF rendition as ${visualPath} — included as-is, not compared with the document content (extension "source", docs/ext-source.md)`,
       );
     }
     if (Object.keys(stylesheets).length > 0) sourceJson['stylesheets'] = stylesheets;
@@ -338,7 +338,7 @@ export async function importDocument(
   // included); hashed like every other file.
   if (reportPath !== undefined) {
     report.push(
-      `recorded the conversion report as ${reportPath} (extension "source" 0.6, docs/ext-source.md)`,
+      `recorded the conversion report as ${reportPath} (extension "source", docs/ext-source.md)`,
     );
     extFiles.set(
       reportPath,

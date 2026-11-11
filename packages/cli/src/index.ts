@@ -3,7 +3,15 @@ import { Command } from 'commander';
 
 import { WDF_VERSION } from '@wdf-dev/core';
 
-import { cmdExtract, cmdImport, cmdNew, cmdPack, cmdUnpack, cmdValidate } from './commands.js';
+import {
+  cmdCite,
+  cmdExtract,
+  cmdImport,
+  cmdNew,
+  cmdPack,
+  cmdUnpack,
+  cmdValidate,
+} from './commands.js';
 import { CLI_VERSION } from './version.js';
 
 const program = new Command();
@@ -51,9 +59,23 @@ program
   });
 
 program
+  .command('cite')
+  .description(
+    'print the verifiable citation of one element: wdf: URI, content hash, verdict, quoted content',
+  )
+  .argument('<file>', 'package file (.wdf) or standalone file (.wdf.html)')
+  .argument('<id>', 'element id, as listed by: wdf extract --outline')
+  .option('--json', 'machine-readable output')
+  .action(async (file: string, id: string, opts: { json?: boolean }) => {
+    process.exitCode = await cmdCite(file, id, opts);
+  });
+
+program
   .command('import')
-  .description('best-effort conversion of an HTML/Markdown file or a URL to a valid .wdf package')
-  .argument('<file>', 'input file (.html or .md) or an http(s) URL')
+  .description(
+    'best-effort conversion of a Word .docx, HTML or Markdown file, or a URL, to a valid .wdf package',
+  )
+  .argument('<file>', 'input file (.docx, .html or .md) or an http(s) URL')
   .option('-o, --output <file>', 'output file')
   .option('--title <title>', 'document title (default: from the source)')
   .option('--lang <tag>', 'document language (default: from the source, or "en")')
@@ -69,7 +91,7 @@ program
   .option('--with-source', 'embed the original input byte-for-byte (extension "source", §10)')
   .option(
     '--with-pdf <file>',
-    'embed an author-saved PDF rendition of the input (ext-source 0.5; requires --with-source)',
+    'embed the PDF the author saved from the same document, as-is: it is not compared with the content (extension "source"; requires --with-source)',
   )
   .option(
     '--embed-fonts',

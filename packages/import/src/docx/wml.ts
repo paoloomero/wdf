@@ -349,8 +349,53 @@ export class DocxStyles {
       if (m !== null) return Number(m[1]);
       if (name === 'title') return 1;
     }
+    // A style the document cites but never defines (no styles.xml, as files
+    // written by scripts — Word always writes the definitions): the name is
+    // unknowable, so the well-known default ids decide, and the report says so
+    // (plan §10.93).
+    if (direct.styleId !== undefined && chain.length === 0) {
+      const level = undefinedHeadingLevel(direct.styleId);
+      if (level !== undefined) this.onUndefinedHeading?.(direct.styleId);
+      return level;
+    }
     return undefined;
   }
+
+  /**
+   * True when the paragraph is a heading because of the built-in "Title"
+   * style (not a "heading N" style, not an outline level): the document's
+   * own title, as opposed to a chapter heading (plan §10.93).
+   */
+  isTitle(direct: ParaProps): boolean {
+    const effective = this.effectivePara(direct);
+    if (effective.outlineLvl !== undefined && effective.outlineLvl <= 5) return false;
+    const chain = this.chain(direct.styleId);
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const name = chain[i]?.name ?? '';
+      if (/^heading [1-6]$/.test(name)) return false;
+      if (name === 'title') return true;
+    }
+    if (direct.styleId !== undefined && chain.length === 0) {
+      const id = direct.styleId.toLowerCase();
+      return id === 'title' || id === 'titolo';
+    }
+    return false;
+  }
+
+  /** Called when a heading is recognized by an undefined style's id alone. */
+  onUndefinedHeading: ((styleId: string) => void) | undefined;
+}
+
+/**
+ * Heading level for the default ids Word gives its built-in title and heading
+ * styles in English and Italian ("Title", "Heading1", "Titolo", "Titolo1") —
+ * used only when the style has no definition to read the real name from.
+ */
+function undefinedHeadingLevel(styleId: string): number | undefined {
+  const id = styleId.toLowerCase();
+  if (id === 'title' || id === 'titolo') return 1;
+  const m = /^(?:heading|titolo)([1-6])$/.exec(id);
+  return m === null ? undefined : Number(m[1]);
 }
 
 // ---------------------------------------------------------------------------
@@ -747,6 +792,8 @@ interface WmlContext {
   readonly furniture: boolean;
   /** Counters shared across part contexts, reported once at the end (§10.87). */
   readonly stats: ConversionStats;
+  /** Body headings that come from the "Title" style (plan §10.93). */
+  readonly titleBlocks: Set<MEl>;
 }
 
 interface ConversionStats {
@@ -819,6 +866,43 @@ function partContext(ctx: WmlContext, partName: string, furniture = false): WmlC
     rels: new Map(ctx.container.relationshipsOf(partName).map((r) => [r.id, r])),
     furniture,
   };
+}
+
+/**
+ * One paragraph in the "Title" style next to "Heading 1" chapters — a common
+ * Word outline — would give several <h1> (§6.1.5 asks for one). The
+ * Title is the document's title: it stays the only <h1> and every other
+ * heading moves one level down (h6 stays h6). Applied only when exactly one
+ * Title exists and some other <h1> does: with no Title there is no title to
+ * keep, and none is invented (plan §10.93).
+ */
+function demoteUnderTitle(blocks: MEl[], ctx: WmlContext): void {
+  const titles = [...ctx.titleBlocks].filter((b) => b.tag === 'h1');
+  if (titles.length !== 1) return;
+  const title = titles[0];
+  const headings: MEl[] = [];
+  const walk = (nodes: readonly MNode[]): void => {
+    for (const node of nodes) {
+      if (typeof node === 'string') continue;
+      if (/^h[1-6]$/.test(node.tag)) {
+        if (node !== title) headings.push(node);
+      } else {
+        walk(node.children);
+      }
+    }
+  };
+  walk(blocks);
+  if (!headings.some((h) => h.tag === 'h1')) return;
+  let moved = 0;
+  for (const h of headings) {
+    const level = Number(h.tag.slice(1));
+    if (level >= 6) continue;
+    h.tag = `h${String(level + 1)}`;
+    moved += 1;
+  }
+  ctx.report.push(
+    `the paragraph in the "Title" style is the only <h1>: ${String(moved)} other heading${moved === 1 ? '' : 's'} moved one level down`,
+  );
 }
 
 /** Reports once per distinct message — real documents repeat everything. */
@@ -2129,6 +2213,7 @@ export async function convertDocx(
       endnotesPart: loadedEndnotes.part,
     },
     furniture: false,
+    titleBlocks: new Set(),
     stats: {
       layoutDepth: 0,
       layoutTables: 0,
@@ -2141,11 +2226,18 @@ export async function convertDocx(
       autoAlt: 0,
     },
   };
+  styles.onUndefinedHeading = (styleId) => {
+    reportOnce(
+      ctx,
+      `style "${styleId}" is not defined in the document — read as a heading from its id alone`,
+    );
+  };
 
   const body = xmlChild(root, W_NS, 'body');
   const bodyResult =
     body === undefined ? { blocks: [], empty: 0, pageBreaks: [] } : convertBlocks(body, ctx, true);
   const blocks = bodyResult.blocks;
+  demoteUnderTitle(blocks, ctx);
   const pageBreakBlocks = bodyResult.pageBreaks;
   let emptyParagraphs = bodyResult.empty;
 
@@ -2432,6 +2524,7 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
           } else {
             lists.flush();
             blocks.push(block);
+            if (isBody && level === 1 && ctx.styles.isTitle(direct)) ctx.titleBlocks.add(block);
             pendingCaption = tag === 'p' && ctx.styles.isCaption(direct) ? block : undefined;
           }
           if (breakPos === 'after') pendingBreak = true;

@@ -2,7 +2,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, dirname, join } from 'node:path';
 
 import {
+  extractStandalone,
   readPackage,
+  sha256Hex,
   STATUS_TEXT,
   validatePackage,
   validateStandalone,
@@ -11,6 +13,7 @@ import {
   type ValidationResult,
   type Violation,
   type WdfManifest,
+  type WdfOutline,
 } from '@wdf-dev/core';
 
 import {
@@ -196,6 +199,95 @@ export function cmdExtract(
   }
 }
 
+/** The Markdown block an element id resolves to (anchor `{#id}`, spec §7). */
+function citedBlock(markdown: string, id: string): string | undefined {
+  const body = markdown.endsWith('\n') ? markdown.slice(0, -1) : markdown;
+  if (body === '') return undefined;
+  const blocks = body.split('\n\n');
+  const at = blocks.findIndex((text) => text.includes(`{#${id}}`));
+  if (at === -1) return undefined;
+  // Anchor-less blocks that follow (table rows after their caption) belong
+  // to the same element.
+  let end = at + 1;
+  while (end < blocks.length && !/\{#[a-z]+-[a-z0-9-]*\}/.test(blocks[end] ?? '')) end++;
+  return blocks.slice(at, end).join('\n\n');
+}
+
+/**
+ * `wdf cite` (plan §10.93): the verifiable citation of one element — the
+ * `wdf:` URI, the SHA-256 of ai/content.md that pins the revision the quote
+ * comes from (spec §8.1), the verdict, and the exact content it resolves to.
+ * The same answer the MCP tool `wdf_cite` gives an agent. Accepts a .wdf or a
+ * standalone .wdf.html. Exit code: 0 verified, 1 not verified or unknown id.
+ */
+export async function cmdCite(
+  file: string,
+  id: string,
+  opts: { json?: boolean } = {},
+  ctx: Ctx = defaultCtx,
+): Promise<number> {
+  let bytes: Uint8Array;
+  try {
+    bytes = readFileSync(file);
+  } catch (e) {
+    ctx.err(`error: cannot read ${file} (${String(e)})`);
+    return 2;
+  }
+  const zip = bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+  try {
+    let result: ValidationResult;
+    let packageBytes = bytes;
+    if (zip) {
+      result = await validatePackage(bytes);
+    } else {
+      const html = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      packageBytes = extractStandalone(html);
+      result = await validateStandalone(html);
+    }
+    const pkg = readPackage(packageBytes);
+    const contentBytes = pkg.files.get('ai/content.md') ?? new Uint8Array();
+    const outline = JSON.parse(
+      dec.decode(pkg.files.get('ai/outline.json') ?? new Uint8Array()),
+    ) as WdfOutline;
+    if (!outline.some((n) => n.id === id)) {
+      ctx.err(
+        `error: no citable element "${id}" in this document (list them with: wdf extract --outline ${file})`,
+      );
+      return 1;
+    }
+    const citation = `wdf:${pkg.manifest.id}#${id}`;
+    const contentHash = `sha256:${await sha256Hex(contentBytes)}`;
+    const text = citedBlock(dec.decode(contentBytes), id);
+    if (opts.json === true) {
+      ctx.out(
+        `${JSON.stringify({ citation, contentHash, verified: result.verified, status: result.status, text: text ?? null }, null, 2)}\n`,
+      );
+    } else {
+      const verdict = result.verified
+        ? 'yes — the cited content is the canonical derivation of the document content (conforming package, hashes ok)'
+        : `NO — ${STATUS_TEXT[result.status].label}: ${STATUS_TEXT[result.status].detail}`;
+      ctx.out(
+        [
+          `Citation: ${citation}`,
+          `Content hash: ${contentHash} of ai/content.md (spec §8.1) — pins the revision the quote comes from`,
+          `Verified: ${verdict}`,
+          'Resolves to:',
+          text ?? '(container element; its content is in: wdf extract)',
+          '',
+        ].join('\n'),
+      );
+    }
+    return result.verified ? 0 : 1;
+  } catch (e) {
+    if (e instanceof WdfError) {
+      ctx.err(`invalid package: ${e.message}`);
+      return 1;
+    }
+    ctx.err(`error: ${String(e)}`);
+    return 2;
+  }
+}
+
 function urlBaseName(url: string): string {
   try {
     const last = new URL(url).pathname
@@ -252,7 +344,7 @@ export async function cmdImport(
   let visualName = '';
   if (opts.withPdf !== undefined) {
     if (opts.withSource !== true) {
-      ctx.err('error: --with-pdf requires --with-source (ext-source 0.5)');
+      ctx.err('error: --with-pdf requires --with-source (extension "source", docs/ext-source.md)');
       return 2;
     }
     try {
@@ -415,6 +507,13 @@ export async function cmdImport(
     const output = opts.output ?? `${baseName}.wdf`;
     writeFileSync(output, result.wdfBytes);
     for (const line of aggregateReport(report)) ctx.log(`note: ${line}`);
+    // The PDF is the author's own rendition, taken on trust: WDF never parses
+    // a PDF, so nothing ties it to the content. Say so, loudly (plan §10.93).
+    if (visualBytes !== undefined) {
+      ctx.err(
+        `warning: ${visualName} is included as-is — it is NOT compared with the document content (docs/ext-source.md)`,
+      );
+    }
     ctx.log(`wrote ${output} (${String(result.wdfBytes.length)} bytes)`);
 
     // T15.1 (plan §10.28): the sendable artifact in one step — the standalone
