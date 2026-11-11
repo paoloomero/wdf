@@ -83,7 +83,7 @@ Requirements: Node ≥ 20, pnpm ≥ 9.
 
 ```sh
 pnpm install
-pnpm test          # 219 tests
+pnpm test
 pnpm lint
 pnpm build
 pnpm demo          # build the demo site into _site/
