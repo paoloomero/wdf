@@ -5,7 +5,15 @@ import { DEFAULT_CAPS, identifyImage, type AssetCaps, type LoadedAsset } from '.
 import { promoteHeadings } from '../headings.js';
 import { hoistStyles, sanitizeDeclarations, STYLE_TMP_ATTR, type Decls } from '../styles.js';
 import { openDocx, resolveTarget, type DocxContainer, type Relationship } from './container.js';
-import { parseXml, xmlAttr, xmlChild, xmlChildren, xmlText, type XmlElement } from './xml.js';
+import {
+  parseXml,
+  xmlAttr,
+  xmlChild,
+  xmlChildren,
+  xmlText,
+  type XmlElement,
+  type XmlNode,
+} from './xml.js';
 
 // WordprocessingML → importer blocks (WP20 T20.2, plan §10.47): paragraphs
 // and runs with the style CHAIN resolved (docDefaults → basedOn chain →
@@ -20,6 +28,8 @@ const STYLES_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relati
 /** DrawingML namespaces (T20.5): images travel as a:blip r:embed → rels. */
 const A_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const WP_NS = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+/** Markup compatibility: mc:AlternateContent = one content, written twice. */
+const MC_NS = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
 /** Namespace of r:id / r:embed attributes. */
 const R_OFFICE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
@@ -810,6 +820,10 @@ interface ConversionStats {
   joinedCells: number;
   pageFields: number;
   autoAlt: number;
+  /** Text boxes whose text entered the flow (plan §10.95). */
+  textBoxes: number;
+  /** Empty form fields showing Word's own prompt, removed (plan §10.95). */
+  placeholders: number;
 }
 
 /** OOXML math namespace (T20.7): formulas flatten to their text. */
@@ -1009,6 +1023,103 @@ function meaningfulAlt(docPr: XmlElement, ctx: WmlContext): string {
   return alt;
 }
 
+/**
+ * mc:AlternateContent holds the same content twice — mc:Choice for current
+ * Word, mc:Fallback (legacy VML) for older readers. Exactly one is read: the
+ * first Choice, the Fallback only when there is no Choice.
+ */
+function alternateContentBranch(alt: XmlElement): XmlElement | undefined {
+  const of = (local: string): XmlElement | undefined =>
+    alt.children.find(
+      (c): c is XmlElement => c.kind === 'element' && c.ns === MC_NS && c.local === local,
+    );
+  return of('Choice') ?? of('Fallback');
+}
+
+/** Child elements with every mc:AlternateContent replaced by its one branch. */
+function resolvedChildren(parent: XmlElement): XmlElement[] {
+  const out: XmlElement[] = [];
+  for (const child of parent.children) {
+    if (child.kind !== 'element') continue;
+    if (child.ns === MC_NS && child.local === 'AlternateContent') {
+      const branch = alternateContentBranch(child);
+      if (branch !== undefined) out.push(...resolvedChildren(branch));
+    } else {
+      out.push(child);
+    }
+  }
+  return out;
+}
+
+/**
+ * The text boxes anchored in a paragraph (w:txbxContent of a DrawingML shape
+ * or of a legacy VML one), outermost only — a box inside a box is reached
+ * when the outer one is converted. A box written twice counts once.
+ */
+function textBoxesOf(p: XmlElement): XmlElement[] {
+  const out: XmlElement[] = [];
+  const walk = (node: XmlElement): void => {
+    for (const child of resolvedChildren(node)) {
+      if (child.ns === W_NS && child.local === 'txbxContent') out.push(child);
+      else walk(child);
+    }
+  };
+  walk(p);
+  return out;
+}
+
+/** True for an empty form field that only shows Word's prompt ("Click or tap here…"). */
+function isPlaceholderSdt(sdt: XmlElement): boolean {
+  const sdtPr = xmlChild(sdt, W_NS, 'sdtPr');
+  return sdtPr !== undefined && xmlChild(sdtPr, W_NS, 'showingPlcHdr') !== undefined;
+}
+
+/**
+ * Content controls (w:sdt), settled once on the parsed tree (plan §10.95):
+ *
+ * - an EMPTY form field shows Word's own prompt ("Click or tap here to enter
+ *   text") — interface text, not the author's. Inside a paragraph or the body
+ *   the control goes; around table rows or cells the rows and cells stay, with
+ *   the prompt text removed (the grid is the author's);
+ * - a control that wraps table rows or cells (w:tbl > w:sdt > w:tr,
+ *   w:tr > w:sdt > w:tc) is unwrapped, so the rows and cells it holds are
+ *   seen as rows and cells — they used to be skipped, text and all.
+ */
+function normalizeContentControls(root: XmlElement, removed: { n: number }): XmlElement {
+  const withoutText = (node: XmlElement): XmlElement => ({
+    ...node,
+    children: node.children
+      .filter((c) => !(c.kind === 'element' && c.ns === W_NS && c.local === 't'))
+      .map((c) => (c.kind === 'element' ? withoutText(c) : c)),
+  });
+  const walk = (node: XmlElement): XmlElement => {
+    const inGrid = node.ns === W_NS && (node.local === 'tbl' || node.local === 'tr');
+    const children: XmlNode[] = [];
+    for (const child of node.children) {
+      if (child.kind !== 'element') {
+        children.push(child);
+        continue;
+      }
+      if (child.ns === W_NS && child.local === 'sdt') {
+        const placeholder = isPlaceholderSdt(child);
+        if (placeholder) removed.n += 1;
+        if (inGrid) {
+          const content = xmlChild(child, W_NS, 'sdtContent');
+          const inner = content === undefined ? [] : walk(content).children;
+          for (const c of inner) {
+            children.push(placeholder && c.kind === 'element' ? withoutText(c) : c);
+          }
+          continue;
+        }
+        if (placeholder) continue;
+      }
+      children.push(walk(child));
+    }
+    return { ...node, children };
+  };
+  return walk(root);
+}
+
 /** <img> from a w:drawing (DrawingML): blip r:embed, extent, docPr alt. */
 function imageFromDrawing(drawing: XmlElement, ctx: WmlContext): MEl | undefined {
   if (findDescendant(drawing, WP_NS, 'anchor') !== undefined) {
@@ -1019,6 +1130,8 @@ function imageFromDrawing(drawing: XmlElement, ctx: WmlContext): MEl | undefined
   }
   const blip = findDescendant(drawing, A_NS, 'blip');
   if (blip === undefined) {
+    // A text box: its text enters the flow after the paragraph (convertBlocks).
+    if (findDescendant(drawing, W_NS, 'txbxContent') !== undefined) return undefined;
     const data = findDescendant(drawing, A_NS, 'graphicData');
     const uri = data === undefined ? '' : (xmlAttr(data, '', 'uri') ?? '');
     const what = /chart/i.test(uri)
@@ -1061,6 +1174,8 @@ function imageFromVml(pict: XmlElement, ctx: WmlContext): MEl | undefined {
   };
   walk(pict);
   if (imagedata === undefined) {
+    // A text box: its text enters the flow after the paragraph (convertBlocks).
+    if (findDescendant(pict, W_NS, 'txbxContent') !== undefined) return undefined;
     reportOnce(ctx, 'legacy shape (VML) without an image skipped');
     return undefined;
   }
@@ -1103,8 +1218,8 @@ function noteReference(
 function runToNodes(run: XmlElement, paraStyleId: string | undefined, ctx: WmlContext): MNode[] {
   const props = ctx.styles.effectiveRun(parseRPr(xmlChild(run, W_NS, 'rPr')), paraStyleId);
   const content: MNode[] = [];
-  for (const child of run.children) {
-    if (child.kind !== 'element' || child.ns !== W_NS) continue;
+  for (const child of resolvedChildren(run)) {
+    if (child.ns !== W_NS) continue;
     switch (child.local) {
       case 't':
         content.push(xmlText(child));
@@ -2151,7 +2266,8 @@ export async function convertDocx(
   if (mainXml === undefined) throw new Error(`main part ${mainPart} is unreadable`);
   const styles = new DocxStyles(stylesXmlOf(container, mainPart));
   const numbering = new DocxNumbering(numberingXmlOf(container, mainPart));
-  const root = parseXml(mainXml);
+  const formFields = { n: 0 };
+  const root = normalizeContentControls(parseXml(mainXml), formFields);
 
   // Bookmark prepass (T20.5): only names some hyperlink actually references
   // become element ids — no id litter from Word's internal bookmarks.
@@ -2224,6 +2340,8 @@ export async function convertDocx(
       joinedCells: 0,
       pageFields: 0,
       autoAlt: 0,
+      textBoxes: 0,
+      placeholders: 0,
     },
   };
   styles.onUndefinedHeading = (styleId) => {
@@ -2260,7 +2378,8 @@ export async function convertDocx(
       const part = resolveTarget(mainPart, rel.target);
       const partXml = container.partText(part);
       if (partXml === undefined) continue;
-      const partResult = convertBlocks(parseXml(partXml), partContext(ctx, part, true), false);
+      const partRoot = normalizeContentControls(parseXml(partXml), formFields);
+      const partResult = convertBlocks(partRoot, partContext(ctx, part, true), false);
       emptyParagraphs += partResult.empty;
       if (partResult.blocks.length === 0) continue; // empty containers are pruned (T14.1)
       if (kind === 'header') {
@@ -2343,6 +2462,17 @@ export async function convertDocx(
   if (ctx.stats.pageFields > 0) {
     report.push(
       `removed ${plural(ctx.stats.pageFields, 'page-number field', 'page-number fields')} (a reflowed document has no pages)`,
+    );
+  }
+  ctx.stats.placeholders = formFields.n;
+  if (ctx.stats.textBoxes > 0) {
+    report.push(
+      `placed the text of ${plural(ctx.stats.textBoxes, 'text box', 'text boxes')} in the flow, after the paragraph each is anchored to (the position on the page is not kept)`,
+    );
+  }
+  if (ctx.stats.placeholders > 0) {
+    report.push(
+      `removed ${plural(ctx.stats.placeholders, 'empty form field', 'empty form fields')} showing only Word's prompt ("Click or tap here to enter text" — not the author's text)`,
     );
   }
   if (ctx.stats.autoAlt > 0) {
@@ -2509,9 +2639,24 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
           const tag =
             level !== undefined ? `h${String(level)}` : listInfo !== undefined ? 'li' : 'p';
           const block = paragraphToBlock(child, direct, tag, ctx);
+          // Text boxes anchored here (plan §10.95): their text is content. It
+          // enters the flow right after this paragraph — the place on the page
+          // is layout, and is not kept.
+          const emitTextBoxes = (): void => {
+            for (const box of textBoxesOf(child)) {
+              const inner = convertBlocks(box, ctx, false);
+              empty += inner.empty;
+              if (inner.blocks.length === 0) continue;
+              lists.flush();
+              pendingCaption = undefined;
+              blocks.push(...inner.blocks);
+              ctx.stats.textBoxes += 1;
+            }
+          };
           if (block === undefined) {
             empty += 1;
             if (breakPos !== undefined) pendingBreak = true;
+            emitTextBoxes();
             break;
           }
           if (pendingBreak || breakPos === 'before') {
@@ -2528,6 +2673,7 @@ function convertBlocks(parent: XmlElement, ctx: WmlContext, isBody: boolean): Bl
             pendingCaption = tag === 'p' && ctx.styles.isCaption(direct) ? block : undefined;
           }
           if (breakPos === 'after') pendingBreak = true;
+          emitTextBoxes();
           break;
         }
         case 'tbl': {
